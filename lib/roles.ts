@@ -8,7 +8,7 @@ export function isAppRole(role: unknown): role is AppRole {
 
 export function homePathForRole(role: AppRole): string {
   if (role === "batch_editor") return "/production/batches";
-  if (role === "dispatch_editor") return "/orders";
+  if (role === "dispatch_editor") return "/dispatch/trips";
   return "/new-order";
 }
 

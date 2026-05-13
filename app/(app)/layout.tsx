@@ -29,6 +29,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Orders
               </Link>
             ) : null}
+            {role === "dispatch_editor" ? (
+              <Link href="/dispatch/trips" className="text-sm text-zinc-600 hover:text-zinc-900">
+                Dispatch trips
+              </Link>
+            ) : null}
             {role === "po_creator" ? (
               <Link href="/new-order" className="text-sm text-zinc-600 hover:text-zinc-900">
                 New order

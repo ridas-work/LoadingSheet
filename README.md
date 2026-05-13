@@ -39,7 +39,7 @@ Sign in at `/login`. Accounts are created only via seed (no signup).
 
 1. **PO team** creates orders at `/new-order`.
 2. **Nimra** registers **prepared batches** at `/production/batches` (batch number, product, total liters — no PO).
-3. **Rashid** opens `/orders`, **Edit dispatch** on a PO: assigns batches to rows, fills vehicle/driver/footer, saves.
+3. **Rashid** lands on **`/dispatch/trips`**: create a **vehicle trip** with one or more POs, enter vehicle/driver/footer once (synced to every linked sheet). Per PO, use **Assign batches** on the trip page or **Edit dispatch** on the loading sheet for batch rows only when the order is on a trip.
 4. **Anyone** can **View loading sheet** and print.
 
 ### Batch volume (liters)

@@ -40,6 +40,8 @@ type Props = {
   canEditDispatch: boolean;
   initialDispatchEditMode: boolean;
   backHref: string;
+  dispatchTripId?: string | null;
+  dispatchTripHref?: string | null;
 };
 
 function HeaderField({
@@ -126,6 +128,8 @@ export function LoadingSheetBatchEditor({
   canEditDispatch,
   initialDispatchEditMode,
   backHref,
+  dispatchTripId,
+  dispatchTripHref,
 }: Props) {
   const router = useRouter();
   const [dispatchEditMode, setDispatchEditMode] = useState(initialDispatchEditMode);
@@ -226,6 +230,16 @@ export function LoadingSheetBatchEditor({
       return;
     }
 
+    if (dispatchTripId != null && dispatchTripId.length > 0) {
+      setSaving(false);
+      setSaved(true);
+      setSavedMessage("Batch assignments saved.");
+      setDispatchEditMode(false);
+      router.replace(sheetUrl);
+      router.refresh();
+      return;
+    }
+
     const dispatchRes = await fetch(`/api/orders/${orderId}/dispatch`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -241,11 +255,13 @@ export function LoadingSheetBatchEditor({
     }
 
     setSaved(true);
-    setSavedMessage("Dispatch and batch assignments saved.");
+    setSavedMessage(
+      dispatchTripId ? "Batch assignments saved." : "Dispatch and batch assignments saved.",
+    );
     setDispatchEditMode(false);
     router.replace(sheetUrl);
     router.refresh();
-  }, [batches, dispatch, orderId, router, sheetLines, sheetUrl, validation]);
+  }, [batches, dispatch, dispatchTripId, orderId, router, sheetLines, sheetUrl, validation]);
 
   const cartonLabel = useMemo(
     () => `${sheetLines.length} carton${sheetLines.length !== 1 ? "s" : ""}`,
@@ -253,6 +269,9 @@ export function LoadingSheetBatchEditor({
   );
 
   const showDispatchInputs = dispatchEditMode && canEditDispatch;
+  const onTrip = Boolean(dispatchTripId);
+  const showVehicleInputs = showDispatchInputs && !onTrip;
+  const showBatchInputs = showDispatchInputs;
 
   return (
     <div className="space-y-4">
@@ -291,7 +310,7 @@ export function LoadingSheetBatchEditor({
         </div>
       </div>
 
-      {!validation.ok && showDispatchInputs ? (
+      {!validation.ok && showBatchInputs ? (
         <p className="text-sm text-red-700 print:hidden">{validation.error}</p>
       ) : null}
       {error ? <p className="text-sm text-red-700 print:hidden">{error}</p> : null}
@@ -299,12 +318,22 @@ export function LoadingSheetBatchEditor({
         <p className="text-sm text-emerald-700 print:hidden">{savedMessage}</p>
       ) : null}
 
+      {onTrip && showBatchInputs && dispatchTripHref ? (
+        <p className="text-sm text-amber-800 print:hidden">
+          Vehicle and driver are managed on the{" "}
+          <Link href={dispatchTripHref} className="font-medium underline">
+            dispatch trip
+          </Link>
+          . Here you can assign batches only.
+        </p>
+      ) : null}
+
       <div className="rounded-xl border border-zinc-900 bg-white p-4 text-black shadow-sm print:border-0 print:p-2 print:shadow-none">
         <div className="mb-4 grid grid-cols-1 gap-2 text-sm md:grid-cols-2 print:text-xs">
           <HeaderField
             label="VEHICLE NO:"
             value={dispatch.vehicleNo}
-            editing={showDispatchInputs}
+            editing={showVehicleInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, vehicleNo: v }));
@@ -313,7 +342,7 @@ export function LoadingSheetBatchEditor({
           <HeaderField
             label="DRIVER NAME:"
             value={dispatch.driverName}
-            editing={showDispatchInputs}
+            editing={showVehicleInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, driverName: v }));
@@ -322,7 +351,7 @@ export function LoadingSheetBatchEditor({
           <HeaderField
             label="DC NO:"
             value={dispatch.dcNo}
-            editing={showDispatchInputs}
+            editing={showVehicleInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, dcNo: v }));
@@ -335,7 +364,7 @@ export function LoadingSheetBatchEditor({
           <HeaderField
             label="HELPER NAME:"
             value={dispatch.helperName}
-            editing={showDispatchInputs}
+            editing={showVehicleInputs}
             colSpan
             onChange={(v) => {
               setSaved(false);
@@ -362,9 +391,9 @@ export function LoadingSheetBatchEditor({
                 const batchValue = batches[row.boxNo] ?? "";
                 const rowIssue = rowIssueByBox.get(row.boxNo);
                 const displayWeight =
-                  showDispatchInputs && rowIssue
+                  showBatchInputs && rowIssue
                     ? null
-                    : showDispatchInputs
+                    : showBatchInputs
                       ? (previewWeights.get(row.boxNo) ?? row.weight)
                       : row.weight;
                 const options = batchesForRow(row.productName);
@@ -372,13 +401,13 @@ export function LoadingSheetBatchEditor({
                 return (
                   <tr
                     key={row.boxNo}
-                    className={rowIssue && showDispatchInputs ? "bg-red-50 print:bg-transparent" : undefined}
+                    className={rowIssue && showBatchInputs ? "bg-red-50 print:bg-transparent" : undefined}
                   >
                     <td className="border border-black px-1 py-1 text-center">{row.boxNo}</td>
                     <td className="border border-black px-1 py-1">{row.productName}</td>
                     <td className="border border-black px-1 py-1 text-center">{row.bottlesPerBox}</td>
                     <td className="border border-black px-1 py-1 text-center">
-                      {showDispatchInputs ? (
+                      {showBatchInputs ? (
                         <div className="space-y-0.5">
                           <select
                             value={batchValue}
@@ -417,12 +446,12 @@ export function LoadingSheetBatchEditor({
                     </td>
                     <td
                       className={`border border-black px-1 py-1 text-center ${
-                        rowIssue && showDispatchInputs
+                        rowIssue && showBatchInputs
                           ? "text-red-700 line-through print:text-black print:no-underline"
                           : ""
                       }`}
                     >
-                      {rowIssue && showDispatchInputs ? "—" : weightCell(displayWeight)}
+                      {rowIssue && showBatchInputs ? "—" : weightCell(displayWeight)}
                     </td>
                     <td className="border border-black px-1 py-1 text-center">{poNumber}</td>
                     <td className="border border-black px-1 py-1">{customerName}</td>
@@ -437,7 +466,7 @@ export function LoadingSheetBatchEditor({
           <FooterField
             label="PRODUCTION INCHARGE:"
             value={dispatch.productionIncharge}
-            editing={showDispatchInputs}
+            editing={showVehicleInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, productionIncharge: v }));
@@ -446,7 +475,7 @@ export function LoadingSheetBatchEditor({
           <FooterField
             label="SECURITY:"
             value={dispatch.securityName}
-            editing={showDispatchInputs}
+            editing={showVehicleInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, securityName: v }));
@@ -455,7 +484,7 @@ export function LoadingSheetBatchEditor({
           <FooterField
             label="DRIVER:"
             value={dispatch.driverSignature || dispatch.driverName}
-            editing={showDispatchInputs}
+            editing={showVehicleInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, driverSignature: v }));

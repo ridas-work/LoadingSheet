@@ -108,6 +108,10 @@ export default async function LoadingSheetPage(props: PageProps) {
     driverSignature: rawDispatch?.driverSignature ?? "",
   };
 
+  const dispatchTripIdRaw = (order as { dispatchTripId?: { toString(): string } | null }).dispatchTripId;
+  const dispatchTripId = dispatchTripIdRaw ? dispatchTripIdRaw.toString() : null;
+  const dispatchTripHref = dispatchTripId ? `/dispatch/trips/${dispatchTripId}` : null;
+
   return (
     <LoadingSheetBatchEditor
       orderId={id}
@@ -122,6 +126,8 @@ export default async function LoadingSheetPage(props: PageProps) {
       canEditDispatch={canEditDispatch}
       initialDispatchEditMode={initialDispatchEditMode}
       backHref={backHref}
+      dispatchTripId={dispatchTripId}
+      dispatchTripHref={dispatchTripHref}
     />
   );
 }
