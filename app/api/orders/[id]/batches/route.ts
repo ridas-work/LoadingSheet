@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 
 import { auth } from "@/lib/auth";
 import {
+  inferLitersPerBottleFromName,
   normalizeBatchNo,
   validateAndComputeWeights,
   type BatchDef,
@@ -80,7 +81,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const catalogDocs = await ProductPacking.find({ active: true }).lean();
   const catalog: CatalogProduct[] = catalogDocs.map((p) => ({
     name: p.name,
-    litersPerBottle: p.litersPerBottle,
+    litersPerBottle: inferLitersPerBottleFromName(p.name, p.litersPerBottle),
     aliases: p.aliases ?? [],
   }));
 

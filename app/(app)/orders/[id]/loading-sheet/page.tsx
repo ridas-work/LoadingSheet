@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { LoadingSheetBatchEditor, type LoadingSheetLine } from "@/components/LoadingSheetBatchEditor";
 import { auth } from "@/lib/auth";
 import type { BatchDef, CatalogProduct } from "@/lib/batchVolume";
+import { inferLitersPerBottleFromName } from "@/lib/batchVolume";
 import { buildSheetLines, type OrderItemInput, type SheetLine } from "@/lib/buildSheetLines";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
@@ -73,7 +74,7 @@ export default async function LoadingSheetPage(props: PageProps) {
 
   const catalog: CatalogProduct[] = catalogDocs.map((p) => ({
     name: p.name,
-    litersPerBottle: p.litersPerBottle ?? 1,
+    litersPerBottle: inferLitersPerBottleFromName(p.name, p.litersPerBottle),
     aliases: p.aliases ?? [],
   }));
 

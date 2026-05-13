@@ -20,15 +20,34 @@ export function normalizeBatchNo(batchNo: string): string {
   return batchNo.trim();
 }
 
+export function inferLitersPerBottleFromName(name: string, explicit?: number | null): number {
+  if (typeof explicit === "number" && explicit > 0) return explicit;
+  const ml = name.match(/(\d+(?:\.\d+)?)\s*ml/i);
+  if (ml) return Number(ml[1]) / 1000;
+  const litre = name.match(/(\d+(?:\.\d+)?)\s*l(?:itre|iter)?s?\b/i);
+  if (litre) return Number(litre[1]);
+  return 1;
+}
+
 export function resolveLitersPerBottle(productName: string, catalog: CatalogProduct[]): number | null {
   const key = productName.trim().toLowerCase();
   if (!key) return null;
 
   for (const p of catalog) {
-    if (p.name.trim().toLowerCase() === key) return p.litersPerBottle;
-    for (const alias of p.aliases ?? []) {
-      if (alias.trim().toLowerCase() === key) return p.litersPerBottle;
+    if (p.name.trim().toLowerCase() === key) {
+      return inferLitersPerBottleFromName(p.name, p.litersPerBottle);
     }
+    for (const alias of p.aliases ?? []) {
+      if (alias.trim().toLowerCase() === key) {
+        return inferLitersPerBottleFromName(p.name, p.litersPerBottle);
+      }
+    }
+  }
+
+  // Custom / unmatched PO line — infer from product name (e.g. "Rhino 250ml" → 0.25 L).
+  const inferred = inferLitersPerBottleFromName(productName);
+  if (inferred !== 1 || /\d+\s*ml/i.test(productName) || /\d+\s*l(?:itre|iter)?/i.test(productName)) {
+    return inferred;
   }
   return null;
 }
