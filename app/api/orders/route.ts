@@ -31,7 +31,8 @@ export async function GET() {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (roleFromSession(session.user as { role?: string }) !== "batch_editor") {
+  const role = roleFromSession(session.user as { role?: string });
+  if (!role) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

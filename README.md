@@ -32,6 +32,12 @@ Sign in at `/login`. Accounts are created only via seed (no signup).
 | Ibtisam | `ibtisam` | `Ibtisam-Order-04`  |
 | Nimra   | `nimra`   | `Nimra-Batch-01`    | Production — batch numbers only |
 
+### Workflow
+
+1. **PO team** creates orders at `/new-order`.
+2. **Nimra** opens `/production/batches` or `/orders`, then **Edit batches** on the loading sheet.
+3. **Anyone** opens **Orders** (`/orders`) → **View loading sheet** to print the sheet (with batches once saved).
+
 ```bash
 npm run seed:users
 ```
