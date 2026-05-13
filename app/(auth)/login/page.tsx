@@ -17,10 +17,10 @@ export default function LoginPage() {
     setError(null);
 
     const res = await signIn("credentials", {
-      username,
+      username: username.trim(),
       password,
       redirect: false,
-      callbackUrl: "/new-order",
+      callbackUrl: "/",
     });
 
     setSubmitting(false);
@@ -35,14 +35,14 @@ export default function LoginPage() {
       return;
     }
 
-    window.location.href = res.url ?? "/new-order";
+    window.location.href = res.url ?? "/";
   }
 
   return (
-    <div className="min-h-dvh flex items-center justify-center bg-zinc-50 px-4">
+    <div className="flex min-h-dvh items-center justify-center bg-zinc-50 px-4">
       <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
         <h1 className="text-xl font-semibold text-zinc-900">Sign in</h1>
-        <p className="mt-1 text-sm text-zinc-600">Use your assigned username and password.</p>
+        <p className="mt-1 text-sm text-zinc-600">Authorized users only. No self-registration.</p>
 
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <div>
@@ -56,7 +56,7 @@ export default function LoginPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
-              placeholder="e.g. po1"
+              placeholder="e.g. nouman"
             />
           </div>
 
@@ -91,4 +91,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

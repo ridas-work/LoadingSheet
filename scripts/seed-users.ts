@@ -1,8 +1,10 @@
 import bcrypt from "bcryptjs";
-import "dotenv/config";
+import dotenv from "dotenv";
+import path from "node:path";
 
-import { connectToDatabase } from "@/lib/db";
-import { User } from "@/lib/models/User";
+// Ensure env is loaded before importing DB/model modules.
+dotenv.config({ path: path.join(process.cwd(), ".env.local"), override: false });
+dotenv.config({ path: path.join(process.cwd(), ".env"), override: false });
 
 type SeedUser = {
   name: string;
@@ -13,23 +15,27 @@ type SeedUser = {
 
 function getSeedUsers(): SeedUser[] {
   const raw = process.env.SEED_USERS_JSON;
-  if (raw) {
+    if (raw) {
     const parsed = JSON.parse(raw) as SeedUser[];
-    if (!Array.isArray(parsed) || parsed.length !== 4) {
-      throw new Error("SEED_USERS_JSON must be a JSON array with exactly 4 users");
+    if (!Array.isArray(parsed) || parsed.length < 1) {
+      throw new Error("SEED_USERS_JSON must be a non-empty JSON array");
     }
     return parsed;
   }
 
   return [
-    { name: "PO User 1", username: "po1", password: "change-me-1", role: "po_creator" },
-    { name: "PO User 2", username: "po2", password: "change-me-2", role: "po_creator" },
-    { name: "PO User 3", username: "po3", password: "change-me-3", role: "po_creator" },
-    { name: "PO User 4", username: "po4", password: "change-me-4", role: "po_creator" },
+    { name: "Nouman", username: "nouman", password: "Nouman-Order-01", role: "po_creator" },
+    { name: "Javeria", username: "javeria", password: "Javeria-Order-02", role: "po_creator" },
+    { name: "Aslam", username: "aslam", password: "Aslam-Order-03", role: "po_creator" },
+    { name: "Ibtisam", username: "ibtisam", password: "Ibtisam-Order-04", role: "po_creator" },
+    { name: "Nimra", username: "nimra", password: "Nimra-Batch-01", role: "batch_editor" },
   ];
 }
 
 async function main() {
+  const { connectToDatabase } = await import("@/lib/db");
+  const { User } = await import("@/lib/models/User");
+
   await connectToDatabase();
 
   const seedUsers = getSeedUsers().map((u) => ({
@@ -63,7 +69,7 @@ async function main() {
   }
 
   // eslint-disable-next-line no-console
-  console.log(`Seeded/updated ${upserted} user(s).`);
+  console.log(`Seeded/updated ${upserted} user(s). See README for credentials.`);
 }
 
 main().catch((err) => {

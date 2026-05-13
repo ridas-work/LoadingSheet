@@ -20,7 +20,29 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-### Seed users (Phase 1)
+### Authorized users (login)
 
-This phase expects exactly 4 authorized users in MongoDB. (The seed script will be added in this phase plan.)
+Sign in at `/login`. Accounts are created only via seed (no signup).
+
+| Person  | Username  | Initial password    |
+|---------|-----------|---------------------|
+| Nouman  | `nouman`  | `Nouman-Order-01`   |
+| Javeria | `javeria` | `Javeria-Order-02`  |
+| Aslam   | `aslam`   | `Aslam-Order-03`    |
+| Ibtisam | `ibtisam` | `Ibtisam-Order-04`  |
+| Nimra   | `nimra`   | `Nimra-Batch-01`    | Production — batch numbers only |
+
+```bash
+npm run seed:users
+```
+
+Set `NEXTAUTH_SECRET` and `NEXTAUTH_URL` (e.g. `http://localhost:3000`) in `.env.local`, then restart the dev server.
+
+### Seed product packings (bottles per carton)
+
+Catalog lives in `data/product-packings.json` (array of `{ "code", "name", "bottlesPerCarton" }`). Override with env `SEED_PRODUCTS_JSON` if needed.
+
+```bash
+npm run seed:products
+```
 

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
+import { homePathForRole, roleFromSession } from "@/lib/roles";
 
 import { LogoutButton } from "./logout-button";
 
@@ -12,15 +13,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/login");
   }
 
+  const role = roleFromSession(session.user as { role?: string });
+  const homeHref = role ? homePathForRole(role) : "/new-order";
+
   return (
     <div className="min-h-dvh bg-zinc-50">
       <header className="border-b border-zinc-200 bg-white">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-          <Link href="/new-order" className="text-sm font-semibold text-zinc-900">
+          <Link href={homeHref} className="text-sm font-semibold text-zinc-900">
             Loading Sheet
           </Link>
           <div className="flex items-center gap-3">
-            <div className="text-sm text-zinc-700">Signed in as {session.user.name}</div>
+            <span className="text-sm text-zinc-700">{session.user.name}</span>
             <LogoutButton />
           </div>
         </div>
@@ -29,4 +33,3 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     </div>
   );
 }
-

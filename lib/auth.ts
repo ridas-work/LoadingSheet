@@ -1,11 +1,13 @@
-import NextAuth from "next-auth";
+import NextAuth, { type NextAuthOptions } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+import { getServerSession } from "next-auth/next";
 
 import { connectToDatabase } from "@/lib/db";
+import { isAppRole } from "@/lib/roles";
 import { User } from "@/lib/models/User";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
   providers: [
@@ -26,7 +28,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const user = await User.findOne({ username, active: true }).lean();
         if (!user) return null;
 
-        if (user.role !== "po_creator") return null;
+        if (!isAppRole(user.role)) return null;
 
         const ok = await bcrypt.compare(password, user.passwordHash);
         if (!ok) return null;
@@ -36,7 +38,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           username: user.username,
           role: user.role,
-        } as any;
+        };
       },
     }),
   ],
@@ -56,5 +58,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return session;
     },
   },
-});
+};
+
+export async function auth() {
+  return getServerSession(authOptions);
+}
+
+export const authHandler = NextAuth(authOptions);
 
