@@ -227,3 +227,37 @@ Users open the site and are still logged in from a previous visit (NextAuth defa
 
 Executable plan: `.planning/phases/07-session-security/01-PLAN.md`.
 
+---
+
+## Phase 08 (Production batch registry & dispatch assignment) — **planned**
+
+### Workflow change (supersedes Nimra per-PO batch entry)
+
+| Who | Before | After |
+|-----|--------|-------|
+| **Nimra** | Open each PO → enter batch per box + liters on that order | Register **prepared batch** once: batch no, product (Dishwash, Rhino, …), total liters |
+| **Rashid** | Vehicle/driver/footer only | Assigns **which batch** fills each PO row on loading sheet; PO choice is his |
+| **PO team** | Create orders | Unchanged |
+
+### Nimra — production batch registry
+
+- **`/production/batches`** — list + add prepared batches.
+- Fields: **batch number**, **product** (catalog), **total liters**, date prepared.
+- **No PO** selected at batch creation.
+
+### Rashid — batch assignment on dispatch
+
+- **`/orders`** → **Edit dispatch** (`?dispatch=1`) on loading sheet.
+- Per box row: pick batch from pool (product must match row).
+- Auto **Weight (L)**; reject if batch liters exceeded **across all POs**.
+- Header/footer dispatch fields unchanged.
+
+### Data
+
+- New collection: **`ProductionBatch`**.
+- `Order.sheetLines[].batchNo` + `weight` set by Rashid save (not Nimra).
+
+Executable plans:
+- `.planning/phases/08-production-batch-registry/01-PLAN.md`
+- `.planning/phases/08-production-batch-registry/02-PLAN.md`
+

@@ -28,3 +28,10 @@ Executable plan: `.planning/phases/06-dispatch-assignment/01-PLAN.md`.
 **Login required for every browser session.** Global middleware; session cookie expires when the browser closes (no 30-day persistent login). JWT capped to one work shift (default 8h) while the browser stays open.
 
 Executable plan: `.planning/phases/07-session-security/01-PLAN.md`.
+
+## Phase 08: Production batch registry & dispatch assignment — **planned**
+**Workflow change:** Nimra registers **prepared batches** (batch no + product + liters) **without picking a PO**. Rashid assigns batches from that pool to each PO on the loading sheet when dispatching.
+
+Executable plans:
+- `.planning/phases/08-production-batch-registry/01-PLAN.md` — Nimra batch registry
+- `.planning/phases/08-production-batch-registry/02-PLAN.md` — Rashid batch-to-PO assignment
