@@ -10,7 +10,6 @@ export default async function OrdersPage() {
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
-  const isBatchEditor = role === "batch_editor";
   const isDispatchEditor = role === "dispatch_editor";
 
   const orders = await Order.find({})
@@ -54,14 +53,6 @@ export default async function OrdersPage() {
                     >
                       View loading sheet
                     </Link>
-                    {isBatchEditor ? (
-                      <Link
-                        href={`/orders/${id}/loading-sheet?edit=1`}
-                        className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
-                      >
-                        Edit batches
-                      </Link>
-                    ) : null}
                     {isDispatchEditor ? (
                       <Link
                         href={`/orders/${id}/loading-sheet?dispatch=1`}

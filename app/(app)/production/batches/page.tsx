@@ -1,73 +1,74 @@
 import Link from "next/link";
 
+import { auth } from "@/lib/auth";
+import { formatLiters } from "@/lib/batchVolume";
 import { connectToDatabase } from "@/lib/db";
-import { Order } from "@/lib/models/Order";
+import { ProductionBatch } from "@/lib/models/ProductionBatch";
+import { roleFromSession } from "@/lib/roles";
 
 export default async function ProductionBatchesPage() {
   await connectToDatabase();
 
-  const orders = await Order.find({})
-    .sort({ createdAt: -1 })
-    .select("_id poNumber customerName createdAt sheetLines.batchNo")
-    .lean();
+  const session = await auth();
+  const role = roleFromSession(session?.user as { role?: string });
+  const isBatchEditor = role === "batch_editor";
+
+  const batches = await ProductionBatch.find({}).sort({ preparedAt: -1, createdAt: -1 }).lean();
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Batch entry</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Enter batch numbers on the loading sheet, or browse all orders.
-        </p>
-        <Link href="/orders" className="mt-2 inline-block text-sm font-medium text-zinc-700 underline">
-          View all orders
-        </Link>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold text-zinc-900">Production batches</h1>
+          <p className="mt-1 text-sm text-zinc-600">
+            Register each prepared batch (number, product, liters). Rashid assigns batches to POs at dispatch.
+          </p>
+          <Link href="/orders" className="mt-2 inline-block text-sm font-medium text-zinc-700 underline">
+            View orders
+          </Link>
+        </div>
+        {isBatchEditor ? (
+          <Link
+            href="/production/batches/new"
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
+          >
+            Add batch
+          </Link>
+        ) : null}
       </div>
 
-      {orders.length === 0 ? (
+      {batches.length === 0 ? (
         <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
-          No orders yet. PO creators will add orders first.
+          No production batches yet.
+          {isBatchEditor ? " Use Add batch when a run is prepared." : null}
         </p>
       ) : (
-        <ul className="divide-y divide-zinc-200 overflow-hidden rounded-xl border border-zinc-200 bg-white">
-          {orders.map((o) => {
-            const id = o._id.toString();
-            const lines = o.sheetLines ?? [];
-            const total = lines.length;
-            const filled = lines.filter((l) => typeof l.batchNo === "string" && l.batchNo.trim().length > 0).length;
-            const complete = total > 0 && filled === total;
-
-            return (
-              <li key={id} className="px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-zinc-900">{o.poNumber}</p>
-                    <p className="text-sm text-zinc-600">{o.customerName}</p>
-                    <p className="text-xs text-zinc-500">
-                      {new Date(o.createdAt).toLocaleDateString()} ·{" "}
-                      <span className={complete ? "text-emerald-700" : ""}>
-                        {filled}/{total} batches
-                      </span>
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Link
-                      href={`/orders/${id}/loading-sheet`}
-                      className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
-                    >
-                      View loading sheet
-                    </Link>
-                    <Link
-                      href={`/orders/${id}/loading-sheet?edit=1`}
-                      className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white"
-                    >
-                      Edit batches
-                    </Link>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-zinc-200 bg-zinc-50 text-left">
+                <th className="px-4 py-2 font-medium">Batch no</th>
+                <th className="px-4 py-2 font-medium">Product</th>
+                <th className="px-4 py-2 font-medium">Liters</th>
+                <th className="px-4 py-2 font-medium">Prepared</th>
+                <th className="px-4 py-2 font-medium">By</th>
+              </tr>
+            </thead>
+            <tbody>
+              {batches.map((b) => (
+                <tr key={b._id.toString()} className="border-b border-zinc-100 last:border-0">
+                  <td className="px-4 py-2 font-medium text-zinc-900">{b.batchNo}</td>
+                  <td className="px-4 py-2 text-zinc-700">{b.productName}</td>
+                  <td className="px-4 py-2 text-zinc-700">{formatLiters(b.totalLiters)} L</td>
+                  <td className="px-4 py-2 text-zinc-600">
+                    {new Date(b.preparedAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-4 py-2 text-zinc-600">{b.createdByName || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
