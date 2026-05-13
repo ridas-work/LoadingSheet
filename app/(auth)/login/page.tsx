@@ -44,7 +44,7 @@ export default function LoginPage() {
         <h1 className="text-xl font-semibold text-zinc-900">Sign in</h1>
         <p className="mt-1 text-sm text-zinc-600">Authorized users only. No self-registration.</p>
 
-        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+        <form className="mt-6 space-y-4" onSubmit={onSubmit} autoComplete="off">
           <div>
             <label className="block text-sm font-medium text-zinc-800" htmlFor="username">
               Username

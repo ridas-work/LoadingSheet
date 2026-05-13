@@ -24,6 +24,8 @@ Open `http://localhost:3000`.
 
 Sign in at `/login`. Accounts are created only via seed (no signup).
 
+**Session security:** You must sign in on each new browser session. Closing the browser clears your login even if you did not click **Log out**. While the browser stays open, sessions last up to **8 hours** (override with `SESSION_MAX_AGE_SECONDS` in `.env.local`).
+
 | Person  | Username  | Initial password    |
 |---------|-----------|---------------------|
 | Nouman  | `nouman`  | `Nouman-Order-01`   |

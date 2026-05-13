@@ -7,8 +7,27 @@ import { connectToDatabase } from "@/lib/db";
 import { isAppRole } from "@/lib/roles";
 import { User } from "@/lib/models/User";
 
+const sessionMaxAge = Number(process.env.SESSION_MAX_AGE_SECONDS ?? 28800);
+
 export const authOptions: NextAuthOptions = {
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: sessionMaxAge,
+  },
+  cookies: {
+    sessionToken: {
+      name:
+        process.env.NODE_ENV === "production"
+          ? "__Secure-next-auth.session-token"
+          : "next-auth.session-token",
+      options: {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        secure: process.env.NODE_ENV === "production",
+      },
+    },
+  },
   pages: { signIn: "/login" },
   providers: [
     Credentials({
