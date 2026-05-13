@@ -1,15 +1,14 @@
 # Project State
 
-Phase: **05 complete** — **06 planned** (Dispatch)
-Status: Ready to plan/execute Phase 06
+Phase: **06 planned** — Dispatch (Rashid)
+Status: Ready to execute Phase 06 (`/gsd-execute-phase 6`)
 
 ## Context
-- Loading Sheet app: Next.js + MongoDB Atlas + NextAuth (credentials)
-- Batch entry with liter validation (Phase 05).
+- PO → Nimra batches (liters) → loading sheet ready for dispatch fields.
 
 ## Decisions Made
-- Stickers in **kg**; app tracks **liters** for batches and row weights.
-- `litersPerBottle` from product catalog; Nimra enters batch **total liters**.
+- **Rashid** = `dispatch_editor`, same `/login`, home `/orders`.
+- Fills header + footer on existing loading sheet URL; everyone prints final sheet.
 
 ## Next
-- **Phase 06:** Dispatch (vehicle, driver, helper, DC no)
+- **Execute Phase 06:** `/gsd-execute-phase 6`

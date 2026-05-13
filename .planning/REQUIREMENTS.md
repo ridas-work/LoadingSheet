@@ -181,7 +181,26 @@ Executable plan: `.planning/phases/05-batch-volume-validation/01-PLAN.md`.
 
 ---
 
-## Phase 06 (Dispatch) — **planned**
+## Phase 06 (Dispatch — Rashid) — **planned**
 
-Vehicle, driver, helper, DC no — see ROADMAP Phase 06.
+### Who
+
+| Display name | Username | Role | Initial password |
+|--------------|----------|------|------------------|
+| Rashid | `rashid` | `dispatch_editor` | `Rashid-Dispatch-01` |
+
+### What he fills (on loading sheet)
+
+**Header:** Vehicle No, Driver Name, DC No, Helper Name (Date = order date).
+
+**Footer:** Production Incharge, Security, Driver (signature line).
+
+### Rules
+
+- Login at `/login` (no signup); seed with `npm run seed:users`.
+- Opens **Orders** → **Edit dispatch** on loading sheet (`?dispatch=1`).
+- Cannot create POs or edit batches.
+- PO team + Nimra can **view/print** completed sheet; cannot edit dispatch fields.
+
+Executable plan: `.planning/phases/06-dispatch-assignment/01-PLAN.md`.
 
