@@ -1,12 +1,13 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import mongoose from "mongoose";
 
 import { LoadingSheetBatchEditor, type LoadingSheetLine } from "@/components/LoadingSheetBatchEditor";
 import { auth } from "@/lib/auth";
+import type { BatchDef, CatalogProduct } from "@/lib/batchVolume";
 import { buildSheetLines, type OrderItemInput, type SheetLine } from "@/lib/buildSheetLines";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
+import { ProductPacking } from "@/lib/models/ProductPacking";
 import { roleFromSession } from "@/lib/roles";
 
 type PageProps = {
@@ -63,8 +64,23 @@ export default async function LoadingSheetPage(props: PageProps) {
   const initialEditMode = canEditBatches && edit === "1";
 
   await connectToDatabase();
-  const order = await Order.findById(id).lean();
+  const [order, catalogDocs] = await Promise.all([
+    Order.findById(id).lean(),
+    ProductPacking.find({ active: true }).select({ name: 1, litersPerBottle: 1, aliases: 1 }).lean(),
+  ]);
+
   if (!order) notFound();
+
+  const catalog: CatalogProduct[] = catalogDocs.map((p) => ({
+    name: p.name,
+    litersPerBottle: p.litersPerBottle ?? 1,
+    aliases: p.aliases ?? [],
+  }));
+
+  const rawBatchDefs = (order as { batchDefs?: Array<{ batchNo?: string; totalLiters?: number }> }).batchDefs ?? [];
+  const initialBatchDefs: BatchDef[] = rawBatchDefs
+    .filter((d) => d.batchNo && typeof d.totalLiters === "number")
+    .map((d) => ({ batchNo: String(d.batchNo).trim(), totalLiters: d.totalLiters as number }));
 
   const sheetLines = normalizeSheetLines(order as Parameters<typeof normalizeSheetLines>[0]);
   const created = order.createdAt ? new Date(order.createdAt).toISOString().slice(0, 10) : "";
@@ -77,6 +93,8 @@ export default async function LoadingSheetPage(props: PageProps) {
       customerName={order.customerName}
       createdDate={created}
       sheetLines={sheetLines}
+      catalog={catalog}
+      initialBatchDefs={initialBatchDefs}
       canEditBatches={canEditBatches}
       initialEditMode={initialEditMode}
       backHref={backHref}

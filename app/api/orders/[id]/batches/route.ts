@@ -2,11 +2,20 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 
 import { auth } from "@/lib/auth";
+import {
+  normalizeBatchNo,
+  validateAndComputeWeights,
+  type BatchDef,
+  type CatalogProduct,
+  type VolumeSheetLine,
+} from "@/lib/batchVolume";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
+import { ProductPacking } from "@/lib/models/ProductPacking";
 import { roleFromSession } from "@/lib/roles";
 
 type BatchUpdate = { boxNo?: unknown; batchNo?: unknown };
+type BatchDefInput = { batchNo?: unknown; totalLiters?: unknown };
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -27,7 +36,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Invalid order id" }, { status: 400 });
   }
 
-  const body = (await req.json().catch(() => null)) as { batches?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as {
+    batches?: unknown;
+    batchDefs?: unknown;
+  } | null;
   if (!body || !Array.isArray(body.batches)) {
     return NextResponse.json({ error: "batches array is required" }, { status: 400 });
   }
@@ -38,8 +50,24 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (!Number.isInteger(boxNo) || boxNo < 1) {
       return NextResponse.json({ error: "Each batch entry needs a valid boxNo" }, { status: 400 });
     }
-    const batchNo = typeof raw.batchNo === "string" ? raw.batchNo.trim() : "";
+    const batchNo = typeof raw.batchNo === "string" ? normalizeBatchNo(raw.batchNo) : "";
     updates.set(boxNo, batchNo);
+  }
+
+  const batchDefs: BatchDef[] = [];
+  if (Array.isArray(body.batchDefs)) {
+    for (const raw of body.batchDefs as BatchDefInput[]) {
+      const batchNo = typeof raw.batchNo === "string" ? normalizeBatchNo(raw.batchNo) : "";
+      const totalLiters = typeof raw.totalLiters === "number" ? raw.totalLiters : Number(raw.totalLiters);
+      if (!batchNo) continue;
+      if (!Number.isFinite(totalLiters) || totalLiters <= 0) {
+        return NextResponse.json(
+          { error: `Batch "${batchNo}" needs total liters greater than 0.` },
+          { status: 400 },
+        );
+      }
+      batchDefs.push({ batchNo, totalLiters });
+    }
   }
 
   await connectToDatabase();
@@ -48,6 +76,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!order) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  const catalogDocs = await ProductPacking.find({ active: true }).lean();
+  const catalog: CatalogProduct[] = catalogDocs.map((p) => ({
+    name: p.name,
+    litersPerBottle: p.litersPerBottle,
+    aliases: p.aliases ?? [],
+  }));
 
   const lines = order.sheetLines ?? [];
   const knownBoxNos = new Set(lines.map((l) => l.boxNo));
@@ -58,10 +93,43 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
   }
 
-  for (const line of lines) {
-    if (updates.has(line.boxNo)) {
-      line.batchNo = updates.get(line.boxNo) ?? "";
+  const volumeLines: VolumeSheetLine[] = lines.map((line) => ({
+    boxNo: line.boxNo,
+    productName: line.productName,
+    bottlesPerBox: line.bottlesPerBox,
+    batchNo: updates.has(line.boxNo) ? (updates.get(line.boxNo) ?? "") : (line.batchNo ?? ""),
+  }));
+
+  const hasBatchAssignment = volumeLines.some((l) => normalizeBatchNo(l.batchNo).length > 0);
+  if (hasBatchAssignment) {
+    const validation = validateAndComputeWeights(volumeLines, batchDefs, catalog);
+    if (!validation.ok) {
+      return NextResponse.json(
+        {
+          error: validation.error,
+          details: validation.details,
+          missingProducts: validation.missingProducts,
+        },
+        { status: 400 },
+      );
     }
+
+    for (const line of lines) {
+      if (updates.has(line.boxNo)) {
+        line.batchNo = updates.get(line.boxNo) ?? "";
+      }
+      line.weight = validation.weights.get(line.boxNo) ?? null;
+    }
+
+    order.set("batchDefs", batchDefs);
+  } else {
+    for (const line of lines) {
+      if (updates.has(line.boxNo)) {
+        line.batchNo = "";
+        line.weight = null;
+      }
+    }
+    order.set("batchDefs", batchDefs);
   }
 
   order.sheetLines = lines;

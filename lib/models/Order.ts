@@ -9,6 +9,14 @@ const OrderItemSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const BatchDefSchema = new mongoose.Schema(
+  {
+    batchNo: { type: String, required: true, trim: true },
+    totalLiters: { type: Number, required: true, min: 0.001 },
+  },
+  { _id: false },
+);
+
 const SheetLineSchema = new mongoose.Schema(
   {
     boxNo: { type: Number, required: true, min: 1 },
@@ -44,6 +52,11 @@ const OrderSchema = new mongoose.Schema(
     batchUpdatedByUserId: { type: String, required: false, default: null },
     batchUpdatedByName: { type: String, required: false, default: "" },
     batchUpdatedAt: { type: Date, required: false, default: null },
+    batchDefs: {
+      type: [BatchDefSchema],
+      required: false,
+      default: [],
+    },
   },
   { timestamps: { createdAt: true, updatedAt: true } },
 );

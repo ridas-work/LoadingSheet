@@ -1,0 +1,194 @@
+export type CatalogProduct = {
+  name: string;
+  litersPerBottle: number;
+  aliases?: string[];
+};
+
+export type BatchDef = {
+  batchNo: string;
+  totalLiters: number;
+};
+
+export type VolumeSheetLine = {
+  boxNo: number;
+  productName: string;
+  bottlesPerBox: number;
+  batchNo: string;
+};
+
+export function normalizeBatchNo(batchNo: string): string {
+  return batchNo.trim();
+}
+
+export function resolveLitersPerBottle(productName: string, catalog: CatalogProduct[]): number | null {
+  const key = productName.trim().toLowerCase();
+  if (!key) return null;
+
+  for (const p of catalog) {
+    if (p.name.trim().toLowerCase() === key) return p.litersPerBottle;
+    for (const alias of p.aliases ?? []) {
+      if (alias.trim().toLowerCase() === key) return p.litersPerBottle;
+    }
+  }
+  return null;
+}
+
+export function rowLiters(line: VolumeSheetLine, catalog: CatalogProduct[]): number | null {
+  const lp = resolveLitersPerBottle(line.productName, catalog);
+  if (lp === null) return null;
+  return roundLiters(line.bottlesPerBox * lp);
+}
+
+export function roundLiters(n: number): number {
+  return Math.round(n * 1000) / 1000;
+}
+
+export function formatLiters(n: number): string {
+  const rounded = roundLiters(n);
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(3).replace(/\.?0+$/, "");
+}
+
+export type BatchUsageSummary = {
+  batchNo: string;
+  usedLiters: number;
+  totalLiters: number;
+  remainingLiters: number;
+};
+
+export function summarizeBatchUsage(
+  lines: VolumeSheetLine[],
+  batchDefs: BatchDef[],
+  catalog: CatalogProduct[],
+): { summaries: BatchUsageSummary[]; missingProducts: string[] } {
+  const defByBatch = new Map(
+    batchDefs.map((d) => [normalizeBatchNo(d.batchNo).toLowerCase(), d.totalLiters]),
+  );
+  const usedByBatch = new Map<string, number>();
+  const missingProducts = new Set<string>();
+
+  for (const line of lines) {
+    const batchNo = normalizeBatchNo(line.batchNo);
+    if (!batchNo) continue;
+
+    const liters = rowLiters(line, catalog);
+    if (liters === null) {
+      missingProducts.add(line.productName);
+      continue;
+    }
+
+    const key = batchNo.toLowerCase();
+    usedByBatch.set(key, roundLiters((usedByBatch.get(key) ?? 0) + liters));
+  }
+
+  const summaries: BatchUsageSummary[] = [];
+  for (const [key, usedLiters] of usedByBatch) {
+    const batchNo =
+      batchDefs.find((d) => normalizeBatchNo(d.batchNo).toLowerCase() === key)?.batchNo ??
+      lines.find((l) => normalizeBatchNo(l.batchNo).toLowerCase() === key)?.batchNo ??
+      key;
+    const totalLiters = defByBatch.get(key) ?? 0;
+    summaries.push({
+      batchNo,
+      usedLiters,
+      totalLiters,
+      remainingLiters: roundLiters(totalLiters - usedLiters),
+    });
+  }
+
+  summaries.sort((a, b) => a.batchNo.localeCompare(b.batchNo));
+  return { summaries, missingProducts: [...missingProducts] };
+}
+
+export type ValidateResult =
+  | { ok: true; weights: Map<number, number | null> }
+  | {
+      ok: false;
+      error: string;
+      details?: { batchNo: string; usedLiters: number; totalLiters: number };
+      missingProducts?: string[];
+    };
+
+export function validateAndComputeWeights(
+  lines: VolumeSheetLine[],
+  batchDefs: BatchDef[],
+  catalog: CatalogProduct[],
+): ValidateResult {
+  const missingProducts = new Set<string>();
+  const weights = new Map<number, number | null>();
+
+  for (const line of lines) {
+    const batchNo = normalizeBatchNo(line.batchNo);
+    if (!batchNo) {
+      weights.set(line.boxNo, null);
+      continue;
+    }
+
+    const liters = rowLiters(line, catalog);
+    if (liters === null) {
+      missingProducts.add(line.productName);
+      weights.set(line.boxNo, null);
+      continue;
+    }
+    weights.set(line.boxNo, liters);
+  }
+
+  if (missingProducts.size > 0) {
+    return {
+      ok: false,
+      error: `No liters-per-bottle in catalog for: ${[...missingProducts].join(", ")}. Update product catalog or PO product name.`,
+      missingProducts: [...missingProducts],
+    };
+  }
+
+  const defByBatch = new Map<string, number>();
+  for (const d of batchDefs) {
+    const key = normalizeBatchNo(d.batchNo).toLowerCase();
+    if (!key) continue;
+    if (!Number.isFinite(d.totalLiters) || d.totalLiters <= 0) {
+      return {
+        ok: false,
+        error: `Batch "${d.batchNo}" needs a total size in liters greater than 0.`,
+      };
+    }
+    defByBatch.set(key, d.totalLiters);
+  }
+
+  const usedByBatch = new Map<string, number>();
+  const displayBatchNo = new Map<string, string>();
+
+  for (const line of lines) {
+    const batchNo = normalizeBatchNo(line.batchNo);
+    if (!batchNo) continue;
+
+    const key = batchNo.toLowerCase();
+    displayBatchNo.set(key, batchNo);
+
+    if (!defByBatch.has(key)) {
+      return {
+        ok: false,
+        error: `Enter total liters for batch "${batchNo}".`,
+      };
+    }
+
+    const liters = weights.get(line.boxNo);
+    if (liters == null) continue;
+    usedByBatch.set(key, roundLiters((usedByBatch.get(key) ?? 0) + liters));
+  }
+
+  for (const [key, usedLiters] of usedByBatch) {
+    const totalLiters = defByBatch.get(key) ?? 0;
+    if (usedLiters > totalLiters + 1e-9) {
+      return {
+        ok: false,
+        error: `Batch "${displayBatchNo.get(key) ?? key}" over-allocated: ${formatLiters(usedLiters)} L used, batch is ${formatLiters(totalLiters)} L.`,
+        details: {
+          batchNo: displayBatchNo.get(key) ?? key,
+          usedLiters,
+          totalLiters,
+        },
+      };
+    }
+  }
+
+  return { ok: true, weights };
+}

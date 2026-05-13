@@ -5,6 +5,14 @@ import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 
 import { PrintSheetButton } from "@/components/PrintSheetButton";
+import {
+  formatLiters,
+  normalizeBatchNo,
+  summarizeBatchUsage,
+  validateAndComputeWeights,
+  type BatchDef,
+  type CatalogProduct,
+} from "@/lib/batchVolume";
 
 export type LoadingSheetLine = {
   boxNo: number;
@@ -20,10 +28,17 @@ type Props = {
   customerName: string;
   createdDate: string;
   sheetLines: LoadingSheetLine[];
+  catalog: CatalogProduct[];
+  initialBatchDefs: BatchDef[];
   canEditBatches: boolean;
   initialEditMode: boolean;
   backHref: string;
 };
+
+function weightCell(value: number | null | undefined): string {
+  if (value == null) return "";
+  return formatLiters(value);
+}
 
 export function LoadingSheetBatchEditor({
   orderId,
@@ -31,6 +46,8 @@ export function LoadingSheetBatchEditor({
   customerName,
   createdDate,
   sheetLines,
+  catalog,
+  initialBatchDefs,
   canEditBatches,
   initialEditMode,
   backHref,
@@ -44,6 +61,14 @@ export function LoadingSheetBatchEditor({
     }
     return initial;
   });
+  const [batchTotals, setBatchTotals] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const d of initialBatchDefs) {
+      const key = normalizeBatchNo(d.batchNo).toLowerCase();
+      if (key) initial[key] = String(d.totalLiters);
+    }
+    return initial;
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -51,16 +76,62 @@ export function LoadingSheetBatchEditor({
   const sheetUrl = `/orders/${orderId}/loading-sheet`;
   const editUrl = `${sheetUrl}?edit=1`;
 
+  const volumeLines = useMemo(
+    () =>
+      sheetLines.map((line) => ({
+        boxNo: line.boxNo,
+        productName: line.productName,
+        bottlesPerBox: line.bottlesPerBox,
+        batchNo: batches[line.boxNo] ?? "",
+      })),
+    [batches, sheetLines],
+  );
+
+  const distinctBatchNos = useMemo(() => {
+    const set = new Set<string>();
+    for (const line of volumeLines) {
+      const bn = normalizeBatchNo(line.batchNo);
+      if (bn) set.add(bn);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b));
+  }, [volumeLines]);
+
+  const parsedBatchDefs = useMemo((): BatchDef[] => {
+    return distinctBatchNos.map((batchNo) => ({
+      batchNo,
+      totalLiters: Number(batchTotals[batchNo.toLowerCase()] ?? 0),
+    }));
+  }, [batchTotals, distinctBatchNos]);
+
+  const usagePreview = useMemo(
+    () => summarizeBatchUsage(volumeLines, parsedBatchDefs, catalog),
+    [catalog, parsedBatchDefs, volumeLines],
+  );
+
+  const previewWeights = useMemo(() => {
+    const result = validateAndComputeWeights(volumeLines, parsedBatchDefs, catalog);
+    if (!result.ok) return new Map<number, number | null>();
+    return result.weights;
+  }, [catalog, parsedBatchDefs, volumeLines]);
+
   const onSave = useCallback(async () => {
     setSaving(true);
     setError(null);
     setSaved(false);
+
+    const clientCheck = validateAndComputeWeights(volumeLines, parsedBatchDefs, catalog);
+    if (!clientCheck.ok) {
+      setSaving(false);
+      setError(clientCheck.error);
+      return;
+    }
 
     const payload = {
       batches: sheetLines.map((line) => ({
         boxNo: line.boxNo,
         batchNo: batches[line.boxNo] ?? "",
       })),
+      batchDefs: parsedBatchDefs,
     };
 
     const res = await fetch(`/api/orders/${orderId}/batches`, {
@@ -80,7 +151,8 @@ export function LoadingSheetBatchEditor({
     setSaved(true);
     setEditMode(false);
     router.replace(sheetUrl);
-  }, [batches, orderId, router, sheetLines, sheetUrl]);
+    router.refresh();
+  }, [batches, catalog, orderId, parsedBatchDefs, router, sheetLines, sheetUrl, volumeLines]);
 
   const cartonLabel = useMemo(
     () => `${sheetLines.length} carton${sheetLines.length !== 1 ? "s" : ""}`,
@@ -125,7 +197,57 @@ export function LoadingSheetBatchEditor({
       </div>
 
       {error ? <p className="text-sm text-red-700 print:hidden">{error}</p> : null}
-      {saved ? <p className="text-sm text-emerald-700 print:hidden">Batch numbers saved.</p> : null}
+      {saved ? <p className="text-sm text-emerald-700 print:hidden">Batches and liters saved.</p> : null}
+
+      {canEditBatches && editMode && distinctBatchNos.length > 0 ? (
+        <div className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4 print:hidden">
+          <p className="text-sm font-medium text-zinc-900">Batch sizes (liters)</p>
+          <p className="text-xs text-zinc-600">
+            Bottle stickers may show kg; enter and track batch totals in liters. Weight per row is auto-calculated.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {distinctBatchNos.map((batchNo) => (
+              <label key={batchNo} className="block text-sm">
+                <span className="font-medium text-zinc-800">Batch {batchNo} — total liters</span>
+                <input
+                  type="number"
+                  min="0.001"
+                  step="any"
+                  value={batchTotals[batchNo.toLowerCase()] ?? ""}
+                  onChange={(e) => {
+                    setSaved(false);
+                    setBatchTotals((prev) => ({ ...prev, [batchNo.toLowerCase()]: e.target.value }));
+                  }}
+                  className="mt-1 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
+                  placeholder="e.g. 1000"
+                />
+              </label>
+            ))}
+          </div>
+          {usagePreview.summaries.length > 0 ? (
+            <ul className="space-y-1 text-sm text-zinc-700">
+              {usagePreview.summaries.map((s) => (
+                <li key={s.batchNo}>
+                  Batch <span className="font-medium">{s.batchNo}</span>: {formatLiters(s.usedLiters)} /{" "}
+                  {formatLiters(s.totalLiters)} L used
+                  {s.totalLiters > 0 ? (
+                    <span className={s.remainingLiters < 0 ? " text-red-700" : " text-zinc-500"}>
+                      {" "}
+                      ({formatLiters(s.remainingLiters)} L remaining)
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {usagePreview.missingProducts.length > 0 ? (
+            <p className="text-sm text-amber-800">
+              Missing liters-per-bottle for: {usagePreview.missingProducts.join(", ")}. Run{" "}
+              <code className="text-xs">npm run seed:products</code> or fix catalog.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="rounded-xl border border-zinc-900 bg-white p-4 text-black shadow-sm print:border-0 print:p-2 print:shadow-none">
         <div className="mb-4 grid grid-cols-1 gap-2 text-sm md:grid-cols-2 print:text-xs">
@@ -159,7 +281,7 @@ export function LoadingSheetBatchEditor({
                 <th className="border border-black px-1 py-2 font-semibold">PRODUCT NAME</th>
                 <th className="border border-black px-1 py-2 font-semibold">NO OF BOTTLES</th>
                 <th className="border border-black px-1 py-2 font-semibold">Batch No</th>
-                <th className="border border-black px-1 py-2 font-semibold">Weight</th>
+                <th className="border border-black px-1 py-2 font-semibold">Weight (L)</th>
                 <th className="border border-black px-1 py-2 font-semibold">PO NO</th>
                 <th className="border border-black px-1 py-2 font-semibold">Customer Co</th>
               </tr>
@@ -168,6 +290,9 @@ export function LoadingSheetBatchEditor({
               {sheetLines.map((row) => {
                 const batchValue = batches[row.boxNo] ?? "";
                 const showInputs = editMode && canEditBatches;
+                const displayWeight = showInputs
+                  ? previewWeights.get(row.boxNo) ?? row.weight
+                  : row.weight;
                 return (
                   <tr key={row.boxNo}>
                     <td className="border border-black px-1 py-1 text-center">{row.boxNo}</td>
@@ -192,9 +317,7 @@ export function LoadingSheetBatchEditor({
                         batchValue
                       )}
                     </td>
-                    <td className="border border-black px-1 py-1 text-center">
-                      {row.weight != null ? row.weight : ""}
-                    </td>
+                    <td className="border border-black px-1 py-1 text-center">{weightCell(displayWeight)}</td>
                     <td className="border border-black px-1 py-1 text-center">{poNumber}</td>
                     <td className="border border-black px-1 py-1">{customerName}</td>
                   </tr>

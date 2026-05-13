@@ -38,6 +38,12 @@ Sign in at `/login`. Accounts are created only via seed (no signup).
 2. **Nimra** opens `/production/batches` or `/orders`, then **Edit batches** on the loading sheet.
 3. **Anyone** opens **Orders** (`/orders`) → **View loading sheet** to print the sheet (with batches once saved).
 
+### Batch volume (liters)
+
+Bottle stickers may show **kg**; the app tracks **liters** everywhere. Nimra enters **total liters per batch**; **Weight** per row is auto-calculated (`bottles × liters per bottle` from the product catalog). Saves are rejected if a batch is over-allocated.
+
+Re-seed products after catalog updates: `npm run seed:products`.
+
 ```bash
 npm run seed:users
 ```
