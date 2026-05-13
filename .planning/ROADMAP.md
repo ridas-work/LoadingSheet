@@ -16,8 +16,8 @@ Role **`batch_editor`** for Nimra: login, list orders, enter **batch number per 
 
 **Follow-up (plan 02):** ✓ Shared **`/orders`** list + universal loading sheet view; Nimra edits batches on the sheet (edit mode).
 
-## Phase 05: Batch volume & weight validation
-Nimra records **total liters per batch**; system **auto-fills row Weight** from `bottlesPerBox × litersPerBottle`; **rejects** assignments that exceed batch size; shows **used/remaining** on screen (not on print).
+## Phase 05: Batch volume & weight validation ✓
+Nimra records **total liters per batch**; system **auto-fills row Weight** from `bottlesPerBox × litersPerBottle`; **rejects** assignments that exceed batch size; shows **used/remaining** on screen (not on print). Stickers may be kg; operations use **liters**.
 
 ## Phase 06: Dispatch / Delivery Assignment
 Add dispatch workflow to assign delivery details (which PO(s) going out, driver/rider, helper, vehicle) and finalize/lock records.

@@ -141,7 +141,7 @@ Executable plan: `.planning/phases/04-production-batch-entry/02-PLAN.md`.
 
 ---
 
-## Phase 05 (Batch volume & weight validation) — **planned**
+## Phase 05 (Batch volume & weight validation) — **complete**
 
 ### Business rule
 
@@ -174,7 +174,7 @@ Sum of liters for all rows sharing a `batchNo` on an order **must not exceed** t
 
 ### Data
 
-- `ProductPacking.litersPerBottle` (catalog).
+- `ProductPacking.litersPerBottle` (catalog). Stickers may show kg; **liters** used in app.
 - `Order.batchDefs[]`: `{ batchNo, totalLiters }`.
 
 Executable plan: `.planning/phases/05-batch-volume-validation/01-PLAN.md`.
