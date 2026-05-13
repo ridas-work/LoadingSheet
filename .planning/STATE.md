@@ -1,15 +1,19 @@
 # Project State
 
-Phase: **04 complete** (plans 01 + 02) — **05 planned** (Dispatch)
-Status: Ready to plan/execute Phase 05
+Phase: **05 planned** — batch volume & weight validation
+Status: Ready to execute Phase 05 (`/gsd-execute-phase 5`)
 
 ## Context
 - Loading Sheet app: Next.js + MongoDB Atlas + NextAuth (credentials)
+- Nimra assigns batch numbers on loading sheet edit mode (Phase 04).
 
 ## Decisions Made
-- Four **po_creator** users for PO entry.
-- **Nimra** is **batch_editor** — batch numbers on loading sheet edit mode.
-- **Everyone** uses `/orders` → **View loading sheet**; Nimra uses **Edit batches** on same URL.
+- **Batch** = production lot with **total liters** (e.g. 1000 L).
+- **Row consumption** = `bottlesPerBox × litersPerBottle` (one row = one carton).
+- **Weight column** on print = liters per carton (auto-calculated).
+- **Batch total / remaining** = screen-only for Nimra (not printed on paper).
+- Dispatch moved to **Phase 06**.
 
 ## Next
-- **Phase 05:** Dispatch (vehicle, driver, helper, DC no)
+- **Execute Phase 05:** `/gsd-execute-phase 5`
+- **Phase 06:** Dispatch

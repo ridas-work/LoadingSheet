@@ -139,3 +139,49 @@ Executable plan: `.planning/phases/04-production-batch-entry/01-PLAN.md`.
 
 Executable plan: `.planning/phases/04-production-batch-entry/02-PLAN.md`.
 
+---
+
+## Phase 05 (Batch volume & weight validation) — **planned**
+
+### Business rule
+
+A **batch number** identifies one production run with a **fixed total volume** (liters). Cartons filled from that batch consume:
+
+```
+liters per carton = bottles per carton × liters per bottle (from product catalog)
+```
+
+Sum of liters for all rows sharing a `batchNo` on an order **must not exceed** the batch total Nimra entered.
+
+**Example:** Batch `B1` = 1000 L; bottle size 100 L; 10 bottles per carton → one carton row uses 1000 L (entire batch). A second row on `B1` → **error**.
+
+### Nimra enters
+
+- **Batch No** per carton row (existing).
+- **Total batch liters** once per batch number on the order (e.g. `1000`).
+
+### System calculates
+
+- **Weight** per row on the loading sheet (liters per carton) — auto, not typed per row in v1.
+- **Validation** on save — reject over-allocation with clear message.
+
+### Loading sheet display
+
+| Field | Print | Screen (edit) |
+|-------|-------|----------------|
+| Weight per row | Yes | Yes |
+| Batch total / used / remaining | No | Yes (helper for Nimra) |
+
+### Data
+
+- `ProductPacking.litersPerBottle` (catalog).
+- `Order.batchDefs[]`: `{ batchNo, totalLiters }`.
+
+Executable plan: `.planning/phases/05-batch-volume-validation/01-PLAN.md`.
+
+---
+
+## Phase 06 (Dispatch) — **planned**
+
+Vehicle, driver, helper, DC no — see ROADMAP Phase 06.
+
