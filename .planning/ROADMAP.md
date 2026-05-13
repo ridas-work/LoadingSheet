@@ -36,7 +36,7 @@ Executable plans:
 - `.planning/phases/08-production-batch-registry/01-PLAN.md` — Nimra batch registry
 - `.planning/phases/08-production-batch-registry/02-PLAN.md` — Rashid batch-to-PO assignment
 
-## Phase 09: Multi-PO vehicle dispatch — **planned**
+## Phase 09: Multi-PO vehicle dispatch ✓
 One **vehicle / trip** can carry **multiple POs**. Rashid creates a **dispatch trip**, selects several orders, enters vehicle & driver **once**; system syncs header/footer to each PO's loading sheet. Batch assignment stays per PO.
 
 Executable plans:

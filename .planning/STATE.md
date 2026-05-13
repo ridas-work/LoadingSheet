@@ -1,15 +1,16 @@
 # Project State
 
-Phase: **09 planned** — Multi-PO vehicle dispatch
-Status: Ready to execute (`/gsd-execute-phase 9`)
+Phase: **09 complete** — Multi-PO vehicle dispatch
+Status: Verified (`09-VERIFICATION.md` passed)
 
 ## Context
-- Rashid needs one vehicle record shared across multiple POs on the same truck.
-- Batch assignment remains per PO (Phase 08); trip groups dispatch metadata.
+- Rashid groups multiple POs on one vehicle via **Dispatch trips**.
+- Vehicle/driver/footer sync to each linked order; batch assignment stays per PO on the loading sheet.
 
 ## Decisions Made
-- New **`DispatchTrip`** links many `orderIds`; sync dispatch fields to each `Order.dispatch` for print.
-- Rashid home → **`/dispatch/trips`** (planned).
+- **`DispatchTrip`** links many `orderIds`; `syncTripDispatchToOrders` copies fields to `Order.dispatch`.
+- Rashid home → **`/dispatch/trips`**.
 
 ## Next
-- **Execute Phase 09:** `/gsd-execute-phase 9`
+- **Milestone audit:** `/gsd-audit-milestone`
+- Or resume Phase 06 UAT / manual trip testing with Rashid login
