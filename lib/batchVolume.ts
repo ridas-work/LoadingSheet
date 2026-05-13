@@ -211,3 +211,79 @@ export function validateAndComputeWeights(
 
   return { ok: true, weights };
 }
+
+export type RowBatchIssue = {
+  boxNo: number;
+  message: string;
+  kind: "row_exceeds_batch" | "batch_over_allocated" | "missing_product" | "missing_batch_total";
+};
+
+/** Per-row batch problems for live UI (highlights before save). */
+export function getRowBatchIssues(
+  lines: VolumeSheetLine[],
+  batchDefs: BatchDef[],
+  catalog: CatalogProduct[],
+): RowBatchIssue[] {
+  const issues: RowBatchIssue[] = [];
+  const defByBatch = new Map(
+    batchDefs.map((d) => [normalizeBatchNo(d.batchNo).toLowerCase(), d.totalLiters]),
+  );
+  const runningUsed = new Map<string, number>();
+
+  for (const line of lines) {
+    const batchNo = normalizeBatchNo(line.batchNo);
+    if (!batchNo) continue;
+
+    const key = batchNo.toLowerCase();
+    const liters = rowLiters(line, catalog);
+
+    if (liters === null) {
+      issues.push({
+        boxNo: line.boxNo,
+        message: `Unknown bottle size for "${line.productName}".`,
+        kind: "missing_product",
+      });
+      continue;
+    }
+
+    const totalLiters = defByBatch.get(key);
+    if (totalLiters === undefined || !Number.isFinite(totalLiters) || totalLiters <= 0) {
+      issues.push({
+        boxNo: line.boxNo,
+        message: `Enter total liters for batch "${batchNo}".`,
+        kind: "missing_batch_total",
+      });
+      continue;
+    }
+
+    if (liters > totalLiters + 1e-9) {
+      issues.push({
+        boxNo: line.boxNo,
+        message: `Box ${line.boxNo} needs ${formatLiters(liters)} L but batch "${batchNo}" is only ${formatLiters(totalLiters)} L.`,
+        kind: "row_exceeds_batch",
+      });
+      continue;
+    }
+
+    const nextUsed = roundLiters((runningUsed.get(key) ?? 0) + liters);
+    runningUsed.set(key, nextUsed);
+
+    if (nextUsed > totalLiters + 1e-9) {
+      issues.push({
+        boxNo: line.boxNo,
+        message: `Batch "${batchNo}" would exceed ${formatLiters(totalLiters)} L (at ${formatLiters(nextUsed)} L after this row).`,
+        kind: "batch_over_allocated",
+      });
+    }
+  }
+
+  return issues;
+}
+
+export function validationBlocked(
+  lines: VolumeSheetLine[],
+  batchDefs: BatchDef[],
+  catalog: CatalogProduct[],
+): ValidateResult {
+  return validateAndComputeWeights(lines, batchDefs, catalog);
+}

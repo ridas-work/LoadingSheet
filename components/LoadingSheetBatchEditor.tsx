@@ -7,6 +7,7 @@ import { useCallback, useMemo, useState } from "react";
 import { PrintSheetButton } from "@/components/PrintSheetButton";
 import {
   formatLiters,
+  getRowBatchIssues,
   normalizeBatchNo,
   summarizeBatchUsage,
   validateAndComputeWeights,
@@ -114,6 +115,20 @@ export function LoadingSheetBatchEditor({
     return result.weights;
   }, [catalog, parsedBatchDefs, volumeLines]);
 
+  const rowIssues = useMemo(
+    () => getRowBatchIssues(volumeLines, parsedBatchDefs, catalog),
+    [catalog, parsedBatchDefs, volumeLines],
+  );
+
+  const rowIssueByBox = useMemo(() => new Map(rowIssues.map((i) => [i.boxNo, i])), [rowIssues]);
+
+  const validation = useMemo(
+    () => validateAndComputeWeights(volumeLines, parsedBatchDefs, catalog),
+    [catalog, parsedBatchDefs, volumeLines],
+  );
+
+  const canSave = validation.ok && !saving;
+
   const onSave = useCallback(async () => {
     setSaving(true);
     setError(null);
@@ -185,8 +200,8 @@ export function LoadingSheetBatchEditor({
               <button
                 type="button"
                 onClick={onSave}
-                disabled={saving}
-                className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+                disabled={!canSave}
+                className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? "Saving…" : "Save batches"}
               </button>
@@ -196,6 +211,9 @@ export function LoadingSheetBatchEditor({
         </div>
       </div>
 
+      {!validation.ok && editMode && canEditBatches ? (
+        <p className="text-sm text-red-700 print:hidden">{validation.error}</p>
+      ) : null}
       {error ? <p className="text-sm text-red-700 print:hidden">{error}</p> : null}
       {saved ? <p className="text-sm text-emerald-700 print:hidden">Batches and liters saved.</p> : null}
 
@@ -290,34 +308,56 @@ export function LoadingSheetBatchEditor({
               {sheetLines.map((row) => {
                 const batchValue = batches[row.boxNo] ?? "";
                 const showInputs = editMode && canEditBatches;
-                const displayWeight = showInputs
-                  ? previewWeights.get(row.boxNo) ?? row.weight
-                  : row.weight;
+                const rowIssue = rowIssueByBox.get(row.boxNo);
+                const displayWeight =
+                  showInputs && rowIssue
+                    ? null
+                    : showInputs
+                      ? previewWeights.get(row.boxNo) ?? row.weight
+                      : row.weight;
                 return (
-                  <tr key={row.boxNo}>
+                  <tr
+                    key={row.boxNo}
+                    className={rowIssue && showInputs ? "bg-red-50 print:bg-transparent" : undefined}
+                  >
                     <td className="border border-black px-1 py-1 text-center">{row.boxNo}</td>
                     <td className="border border-black px-1 py-1">{row.productName}</td>
                     <td className="border border-black px-1 py-1 text-center">{row.bottlesPerBox}</td>
                     <td className="border border-black px-1 py-1 text-center">
                       {showInputs ? (
-                        <>
+                        <div className="space-y-0.5">
                           <input
                             type="text"
                             value={batchValue}
                             onChange={(e) => {
                               setSaved(false);
+                              setError(null);
                               setBatches((prev) => ({ ...prev, [row.boxNo]: e.target.value }));
                             }}
-                            className="w-full min-w-[4rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
+                            className={`w-full min-w-[4rem] rounded border px-1 py-0.5 text-center text-sm print:hidden ${
+                              rowIssue ? "border-red-500 bg-red-50" : "border-zinc-300"
+                            }`}
                             placeholder="Batch"
+                            aria-invalid={rowIssue ? true : undefined}
                           />
+                          {rowIssue ? (
+                            <p className="text-left text-[10px] leading-tight text-red-700 print:hidden">
+                              {rowIssue.message}
+                            </p>
+                          ) : null}
                           <span className="hidden print:inline">{batchValue}</span>
-                        </>
+                        </div>
                       ) : (
                         batchValue
                       )}
                     </td>
-                    <td className="border border-black px-1 py-1 text-center">{weightCell(displayWeight)}</td>
+                    <td
+                      className={`border border-black px-1 py-1 text-center ${
+                        rowIssue && showInputs ? "text-red-700 line-through print:text-black print:no-underline" : ""
+                      }`}
+                    >
+                      {rowIssue && showInputs ? "—" : weightCell(displayWeight)}
+                    </td>
                     <td className="border border-black px-1 py-1 text-center">{poNumber}</td>
                     <td className="border border-black px-1 py-1">{customerName}</td>
                   </tr>
