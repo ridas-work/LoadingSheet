@@ -181,7 +181,7 @@ Executable plan: `.planning/phases/05-batch-volume-validation/01-PLAN.md`.
 
 ---
 
-## Phase 06 (Dispatch — Rashid) — **planned**
+## Phase 06 (Dispatch — Rashid) — **complete**
 
 ### Who
 

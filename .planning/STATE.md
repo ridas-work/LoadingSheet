@@ -1,14 +1,16 @@
 # Project State
 
-Phase: **06 planned** — Dispatch (Rashid)
-Status: Ready to execute Phase 06 (`/gsd-execute-phase 6`)
+Phase: **06 complete** — Dispatch (Rashid)
+Status: Milestone v1.0 ready for audit
 
 ## Context
-- PO → Nimra batches (liters) → loading sheet ready for dispatch fields.
+- End-to-end: PO → Nimra batches (liters) → Rashid dispatch fields → print loading sheet.
 
 ## Decisions Made
 - **Rashid** = `dispatch_editor`, same `/login`, home `/orders`.
 - Fills header + footer on existing loading sheet URL; everyone prints final sheet.
+- No dispatch lock in v1 — Rashid may re-edit until stakeholders request lock.
 
 ## Next
-- **Execute Phase 06:** `/gsd-execute-phase 6`
+- **Audit milestone:** `/gsd-audit-milestone`
+- Or manual acceptance: `/gsd-verify-work 6`

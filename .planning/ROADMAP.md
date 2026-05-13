@@ -19,7 +19,7 @@ Role **`batch_editor`** for Nimra: login, list orders, enter **batch number per 
 ## Phase 05: Batch volume & weight validation ✓
 Nimra records **total liters per batch**; system **auto-fills row Weight** from `bottlesPerBox × litersPerBottle`; **rejects** assignments that exceed batch size; shows **used/remaining** on screen (not on print). Stickers may be kg; operations use **liters**.
 
-## Phase 06: Dispatch / Delivery Assignment (Rashid)
+## Phase 06: Dispatch / Delivery Assignment (Rashid) ✓
 Role **`dispatch_editor`** for **Rashid**: login (`rashid`), fill loading-sheet **Vehicle, Driver, DC No, Helper**, footer **Production Incharge, Security, Driver**; view/print for all. No PO or batch editing.
 
 Executable plan: `.planning/phases/06-dispatch-assignment/01-PLAN.md`.
