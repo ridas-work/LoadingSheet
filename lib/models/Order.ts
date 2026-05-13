@@ -78,6 +78,13 @@ const OrderSchema = new mongoose.Schema(
     dispatchUpdatedByUserId: { type: String, required: false, default: null },
     dispatchUpdatedByName: { type: String, required: false, default: "" },
     dispatchUpdatedAt: { type: Date, required: false, default: null },
+    dispatchTripId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "DispatchTrip",
+      required: false,
+      default: null,
+      index: true,
+    },
   },
   { timestamps: { createdAt: true, updatedAt: true } },
 );
