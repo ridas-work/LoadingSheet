@@ -287,3 +287,87 @@ export function validationBlocked(
 ): ValidateResult {
   return validateAndComputeWeights(lines, batchDefs, catalog);
 }
+
+export type ProductionBatchPoolItem = {
+  batchNo: string;
+  productName: string;
+  totalLiters: number;
+};
+
+export type OrderSheetLineInput = {
+  batchNo?: string | null;
+  productName?: string;
+  bottlesPerBox?: number;
+};
+
+export function catalogProductKey(productName: string, catalog: CatalogProduct[]): string | null {
+  const key = productName.trim().toLowerCase();
+  if (!key) return null;
+
+  for (const p of catalog) {
+    if (p.name.trim().toLowerCase() === key) return p.name.trim().toLowerCase();
+    for (const alias of p.aliases ?? []) {
+      if (alias.trim().toLowerCase() === key) return p.name.trim().toLowerCase();
+    }
+  }
+
+  return key;
+}
+
+export function productsMatch(a: string, b: string, catalog: CatalogProduct[]): boolean {
+  const keyA = catalogProductKey(a, catalog);
+  const keyB = catalogProductKey(b, catalog);
+  return keyA !== null && keyB !== null && keyA === keyB;
+}
+
+export function accumulateBatchUsageFromOrders(
+  orders: Array<{ _id?: { toString(): string } | string; sheetLines?: OrderSheetLineInput[] }>,
+  catalog: CatalogProduct[],
+  excludeOrderId?: string,
+): Map<string, number> {
+  const used = new Map<string, number>();
+
+  for (const order of orders) {
+    const oid = typeof order._id === "string" ? order._id : order._id?.toString();
+    if (excludeOrderId && oid === excludeOrderId) continue;
+
+    for (const line of order.sheetLines ?? []) {
+      const batchNo = normalizeBatchNo(line.batchNo ?? "");
+      if (!batchNo) continue;
+
+      const liters = rowLiters(
+        {
+          boxNo: 0,
+          productName: line.productName ?? "",
+          bottlesPerBox: line.bottlesPerBox ?? 0,
+          batchNo,
+        },
+        catalog,
+      );
+      if (liters === null) continue;
+
+      const key = batchNo.toLowerCase();
+      used.set(key, roundLiters((used.get(key) ?? 0) + liters));
+    }
+  }
+
+  return used;
+}
+
+export function effectiveBatchDefsForOrder(
+  pool: BatchDef[],
+  usedElsewhere: Map<string, number>,
+): BatchDef[] {
+  return pool.map((pb) => {
+    const key = normalizeBatchNo(pb.batchNo).toLowerCase();
+    const elsewhere = usedElsewhere.get(key) ?? 0;
+    return {
+      batchNo: pb.batchNo,
+      totalLiters: roundLiters(Math.max(0, pb.totalLiters - elsewhere)),
+    };
+  });
+}
+
+export function poolToBatchDefs(pool: ProductionBatchPoolItem[]): BatchDef[] {
+  return pool.map((p) => ({ batchNo: p.batchNo, totalLiters: p.totalLiters }));
+}

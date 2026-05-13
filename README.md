@@ -38,9 +38,9 @@ Sign in at `/login`. Accounts are created only via seed (no signup).
 ### Workflow
 
 1. **PO team** creates orders at `/new-order`.
-2. **Nimra** opens `/production/batches` or `/orders`, then **Edit batches** on the loading sheet.
-3. **Rashid** opens `/orders`, then **Edit dispatch** on the loading sheet (vehicle, driver, DC, helper, footer signatures).
-4. **Anyone** opens **Orders** (`/orders`) → **View loading sheet** to print the completed sheet.
+2. **Nimra** registers **prepared batches** at `/production/batches` (batch number, product, total liters — no PO).
+3. **Rashid** opens `/orders`, **Edit dispatch** on a PO: assigns batches to rows, fills vehicle/driver/footer, saves.
+4. **Anyone** can **View loading sheet** and print.
 
 ### Batch volume (liters)
 

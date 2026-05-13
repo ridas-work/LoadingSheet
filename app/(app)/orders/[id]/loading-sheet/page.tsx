@@ -3,17 +3,17 @@ import mongoose from "mongoose";
 
 import { LoadingSheetBatchEditor, type LoadingSheetLine } from "@/components/LoadingSheetBatchEditor";
 import { auth } from "@/lib/auth";
-import type { BatchDef, CatalogProduct } from "@/lib/batchVolume";
-import { inferLitersPerBottleFromName } from "@/lib/batchVolume";
+import { accumulateBatchUsageFromOrders, inferLitersPerBottleFromName, type CatalogProduct } from "@/lib/batchVolume";
 import { buildSheetLines, type OrderItemInput, type SheetLine } from "@/lib/buildSheetLines";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
+import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
 import { roleFromSession, EMPTY_DISPATCH, type DispatchFields } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ edit?: string; dispatch?: string }>;
+  searchParams: Promise<{ dispatch?: string }>;
 };
 
 function normalizeSheetLines(order: {
@@ -55,20 +55,20 @@ function normalizeSheetLines(order: {
 
 export default async function LoadingSheetPage(props: PageProps) {
   const { id } = await props.params;
-  const { edit, dispatch: dispatchParam } = await props.searchParams;
+  const { dispatch: dispatchParam } = await props.searchParams;
 
   if (!mongoose.Types.ObjectId.isValid(id)) notFound();
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
-  const canEditBatches = role === "batch_editor";
   const canEditDispatch = role === "dispatch_editor";
-  const initialEditMode = canEditBatches && edit === "1";
   const initialDispatchEditMode = canEditDispatch && dispatchParam === "1";
 
   await connectToDatabase();
-  const [order, catalogDocs] = await Promise.all([
+  const [order, allOrders, poolDocs, catalogDocs] = await Promise.all([
     Order.findById(id).lean(),
+    Order.find({}).select({ sheetLines: 1 }).lean(),
+    ProductionBatch.find({}).sort({ preparedAt: -1 }).lean(),
     ProductPacking.find({ active: true }).select({ name: 1, litersPerBottle: 1, aliases: 1 }).lean(),
   ]);
 
@@ -80,15 +80,21 @@ export default async function LoadingSheetPage(props: PageProps) {
     aliases: p.aliases ?? [],
   }));
 
-  const rawBatchDefs = (order as { batchDefs?: Array<{ batchNo?: string; totalLiters?: number }> }).batchDefs ?? [];
-  const initialBatchDefs: BatchDef[] = rawBatchDefs
-    .filter((d) => d.batchNo && typeof d.totalLiters === "number")
-    .map((d) => ({ batchNo: String(d.batchNo).trim(), totalLiters: d.totalLiters as number }));
+  const productionBatches = poolDocs.map((p) => ({
+    batchNo: p.batchNo,
+    productName: p.productName,
+    totalLiters: p.totalLiters,
+  }));
+
+  const usedMap = accumulateBatchUsageFromOrders(allOrders, catalog, id);
+  const usedLitersElsewhere: Record<string, number> = {};
+  for (const [key, liters] of usedMap) {
+    usedLitersElsewhere[key] = liters;
+  }
 
   const sheetLines = normalizeSheetLines(order as Parameters<typeof normalizeSheetLines>[0]);
   const created = order.createdAt ? new Date(order.createdAt).toISOString().slice(0, 10) : "";
-  const backHref =
-    role === "batch_editor" ? "/production/batches" : "/orders";
+  const backHref = role === "batch_editor" ? "/production/batches" : "/orders";
 
   const rawDispatch = (order as { dispatch?: Partial<DispatchFields> }).dispatch;
   const initialDispatch: DispatchFields = {
@@ -110,9 +116,8 @@ export default async function LoadingSheetPage(props: PageProps) {
       createdDate={created}
       sheetLines={sheetLines}
       catalog={catalog}
-      initialBatchDefs={initialBatchDefs}
-      canEditBatches={canEditBatches}
-      initialEditMode={initialEditMode}
+      productionBatches={productionBatches}
+      usedLitersElsewhere={usedLitersElsewhere}
       initialDispatch={initialDispatch}
       canEditDispatch={canEditDispatch}
       initialDispatchEditMode={initialDispatchEditMode}

@@ -6,13 +6,15 @@ import { useCallback, useMemo, useState } from "react";
 
 import { PrintSheetButton } from "@/components/PrintSheetButton";
 import {
+  effectiveBatchDefsForOrder,
   formatLiters,
   getRowBatchIssues,
   normalizeBatchNo,
-  summarizeBatchUsage,
+  poolToBatchDefs,
+  productsMatch,
   validateAndComputeWeights,
-  type BatchDef,
   type CatalogProduct,
+  type ProductionBatchPoolItem,
 } from "@/lib/batchVolume";
 import { type DispatchFields } from "@/lib/roles";
 
@@ -31,9 +33,8 @@ type Props = {
   createdDate: string;
   sheetLines: LoadingSheetLine[];
   catalog: CatalogProduct[];
-  initialBatchDefs: BatchDef[];
-  canEditBatches: boolean;
-  initialEditMode: boolean;
+  productionBatches: ProductionBatchPoolItem[];
+  usedLitersElsewhere: Record<string, number>;
   initialDispatch: DispatchFields;
   canEditDispatch: boolean;
   initialDispatchEditMode: boolean;
@@ -118,16 +119,14 @@ export function LoadingSheetBatchEditor({
   createdDate,
   sheetLines,
   catalog,
-  initialBatchDefs,
-  canEditBatches,
-  initialEditMode,
+  productionBatches,
+  usedLitersElsewhere,
   initialDispatch,
   canEditDispatch,
   initialDispatchEditMode,
   backHref,
 }: Props) {
   const router = useRouter();
-  const [editMode, setEditMode] = useState(initialEditMode);
   const [dispatchEditMode, setDispatchEditMode] = useState(initialDispatchEditMode);
   const [dispatch, setDispatch] = useState<DispatchFields>(initialDispatch);
   const [batches, setBatches] = useState<Record<number, string>>(() => {
@@ -137,22 +136,23 @@ export function LoadingSheetBatchEditor({
     }
     return initial;
   });
-  const [batchTotals, setBatchTotals] = useState<Record<string, string>>(() => {
-    const initial: Record<string, string> = {};
-    for (const d of initialBatchDefs) {
-      const key = normalizeBatchNo(d.batchNo).toLowerCase();
-      if (key) initial[key] = String(d.totalLiters);
-    }
-    return initial;
-  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   const sheetUrl = `/orders/${orderId}/loading-sheet`;
-  const editUrl = `${sheetUrl}?edit=1`;
   const dispatchUrl = `${sheetUrl}?dispatch=1`;
+
+  const usedElsewhereMap = useMemo(
+    () => new Map(Object.entries(usedLitersElsewhere).map(([k, v]) => [k.toLowerCase(), v])),
+    [usedLitersElsewhere],
+  );
+
+  const effectiveBatchDefs = useMemo(
+    () => effectiveBatchDefsForOrder(poolToBatchDefs(productionBatches), usedElsewhereMap),
+    [productionBatches, usedElsewhereMap],
+  );
 
   const volumeLines = useMemo(
     () =>
@@ -165,94 +165,62 @@ export function LoadingSheetBatchEditor({
     [batches, sheetLines],
   );
 
-  const distinctBatchNos = useMemo(() => {
-    const set = new Set<string>();
-    for (const line of volumeLines) {
-      const bn = normalizeBatchNo(line.batchNo);
-      if (bn) set.add(bn);
-    }
-    return [...set].sort((a, b) => a.localeCompare(b));
-  }, [volumeLines]);
-
-  const parsedBatchDefs = useMemo((): BatchDef[] => {
-    return distinctBatchNos.map((batchNo) => ({
-      batchNo,
-      totalLiters: Number(batchTotals[batchNo.toLowerCase()] ?? 0),
-    }));
-  }, [batchTotals, distinctBatchNos]);
-
-  const usagePreview = useMemo(
-    () => summarizeBatchUsage(volumeLines, parsedBatchDefs, catalog),
-    [catalog, parsedBatchDefs, volumeLines],
-  );
-
   const previewWeights = useMemo(() => {
-    const result = validateAndComputeWeights(volumeLines, parsedBatchDefs, catalog);
+    const result = validateAndComputeWeights(volumeLines, effectiveBatchDefs, catalog);
     if (!result.ok) return new Map<number, number | null>();
     return result.weights;
-  }, [catalog, parsedBatchDefs, volumeLines]);
+  }, [catalog, effectiveBatchDefs, volumeLines]);
 
   const rowIssues = useMemo(
-    () => getRowBatchIssues(volumeLines, parsedBatchDefs, catalog),
-    [catalog, parsedBatchDefs, volumeLines],
+    () => getRowBatchIssues(volumeLines, effectiveBatchDefs, catalog),
+    [catalog, effectiveBatchDefs, volumeLines],
   );
 
   const rowIssueByBox = useMemo(() => new Map(rowIssues.map((i) => [i.boxNo, i])), [rowIssues]);
 
   const validation = useMemo(
-    () => validateAndComputeWeights(volumeLines, parsedBatchDefs, catalog),
-    [catalog, parsedBatchDefs, volumeLines],
+    () => validateAndComputeWeights(volumeLines, effectiveBatchDefs, catalog),
+    [catalog, effectiveBatchDefs, volumeLines],
   );
 
-  const canSave = validation.ok && !saving;
+  const batchesForRow = useCallback(
+    (productName: string) =>
+      productionBatches.filter((pb) => productsMatch(pb.productName, productName, catalog)),
+    [catalog, productionBatches],
+  );
 
-  const onSave = useCallback(async () => {
-    setSaving(true);
-    setError(null);
-    setSaved(false);
-
-    const clientCheck = validateAndComputeWeights(volumeLines, parsedBatchDefs, catalog);
-    if (!clientCheck.ok) {
-      setSaving(false);
-      setError(clientCheck.error);
-      return;
-    }
-
-    const payload = {
-      batches: sheetLines.map((line) => ({
-        boxNo: line.boxNo,
-        batchNo: batches[line.boxNo] ?? "",
-      })),
-      batchDefs: parsedBatchDefs,
-    };
-
-    const res = await fetch(`/api/orders/${orderId}/batches`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    setSaving(false);
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError((data as { error?: string }).error ?? "Save failed");
-      return;
-    }
-
-    setSaved(true);
-    setSavedMessage("Batches and liters saved.");
-    setEditMode(false);
-    router.replace(sheetUrl);
-    router.refresh();
-  }, [batches, catalog, orderId, parsedBatchDefs, router, sheetLines, sheetUrl, volumeLines]);
+  const canSaveDispatch = validation.ok && !saving;
 
   const onSaveDispatch = useCallback(async () => {
     setSaving(true);
     setError(null);
     setSaved(false);
 
-    const res = await fetch(`/api/orders/${orderId}/dispatch`, {
+    if (!validation.ok) {
+      setSaving(false);
+      setError(validation.error);
+      return;
+    }
+
+    const assignments = sheetLines.map((line) => ({
+      boxNo: line.boxNo,
+      batchNo: batches[line.boxNo] ?? "",
+    }));
+
+    const batchRes = await fetch(`/api/orders/${orderId}/batch-assignments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ assignments }),
+    });
+
+    if (!batchRes.ok) {
+      const data = await batchRes.json().catch(() => ({}));
+      setSaving(false);
+      setError((data as { error?: string }).error ?? "Batch assignment failed");
+      return;
+    }
+
+    const dispatchRes = await fetch(`/api/orders/${orderId}/dispatch`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(dispatch),
@@ -260,23 +228,25 @@ export function LoadingSheetBatchEditor({
 
     setSaving(false);
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      setError((data as { error?: string }).error ?? "Save failed");
+    if (!dispatchRes.ok) {
+      const data = await dispatchRes.json().catch(() => ({}));
+      setError((data as { error?: string }).error ?? "Dispatch save failed");
       return;
     }
 
     setSaved(true);
-    setSavedMessage("Dispatch details saved.");
+    setSavedMessage("Dispatch and batch assignments saved.");
     setDispatchEditMode(false);
     router.replace(sheetUrl);
     router.refresh();
-  }, [dispatch, orderId, router, sheetUrl]);
+  }, [batches, dispatch, orderId, router, sheetLines, sheetUrl, validation]);
 
   const cartonLabel = useMemo(
     () => `${sheetLines.length} carton${sheetLines.length !== 1 ? "s" : ""}`,
     [sheetLines.length],
   );
+
+  const showDispatchInputs = dispatchEditMode && canEditDispatch;
 
   return (
     <div className="space-y-4">
@@ -285,32 +255,6 @@ export function LoadingSheetBatchEditor({
           ← Back
         </Link>
         <div className="flex flex-wrap items-center gap-2">
-          {canEditBatches && !editMode ? (
-            <Link
-              href={editUrl}
-              className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
-            >
-              Edit batches
-            </Link>
-          ) : null}
-          {canEditBatches && editMode ? (
-            <>
-              <Link
-                href={sheetUrl}
-                className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
-              >
-                View only
-              </Link>
-              <button
-                type="button"
-                onClick={onSave}
-                disabled={!canSave}
-                className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {saving ? "Saving…" : "Save batches"}
-              </button>
-            </>
-          ) : null}
           {canEditDispatch && !dispatchEditMode ? (
             <Link
               href={dispatchUrl}
@@ -330,7 +274,7 @@ export function LoadingSheetBatchEditor({
               <button
                 type="button"
                 onClick={onSaveDispatch}
-                disabled={saving}
+                disabled={!canSaveDispatch}
                 className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {saving ? "Saving…" : "Save dispatch"}
@@ -341,7 +285,7 @@ export function LoadingSheetBatchEditor({
         </div>
       </div>
 
-      {!validation.ok && editMode && canEditBatches ? (
+      {!validation.ok && showDispatchInputs ? (
         <p className="text-sm text-red-700 print:hidden">{validation.error}</p>
       ) : null}
       {error ? <p className="text-sm text-red-700 print:hidden">{error}</p> : null}
@@ -349,62 +293,12 @@ export function LoadingSheetBatchEditor({
         <p className="text-sm text-emerald-700 print:hidden">{savedMessage}</p>
       ) : null}
 
-      {canEditBatches && editMode && distinctBatchNos.length > 0 ? (
-        <div className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4 print:hidden">
-          <p className="text-sm font-medium text-zinc-900">Batch sizes (liters)</p>
-          <p className="text-xs text-zinc-600">
-            Bottle stickers may show kg; enter and track batch totals in liters. Weight per row is auto-calculated.
-          </p>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {distinctBatchNos.map((batchNo) => (
-              <label key={batchNo} className="block text-sm">
-                <span className="font-medium text-zinc-800">Batch {batchNo} — total liters</span>
-                <input
-                  type="number"
-                  min="0.001"
-                  step="any"
-                  value={batchTotals[batchNo.toLowerCase()] ?? ""}
-                  onChange={(e) => {
-                    setSaved(false);
-                    setBatchTotals((prev) => ({ ...prev, [batchNo.toLowerCase()]: e.target.value }));
-                  }}
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-2 py-1.5 text-sm"
-                  placeholder="e.g. 1000"
-                />
-              </label>
-            ))}
-          </div>
-          {usagePreview.summaries.length > 0 ? (
-            <ul className="space-y-1 text-sm text-zinc-700">
-              {usagePreview.summaries.map((s) => (
-                <li key={s.batchNo}>
-                  Batch <span className="font-medium">{s.batchNo}</span>: {formatLiters(s.usedLiters)} /{" "}
-                  {formatLiters(s.totalLiters)} L used
-                  {s.totalLiters > 0 ? (
-                    <span className={s.remainingLiters < 0 ? " text-red-700" : " text-zinc-500"}>
-                      {" "}
-                      ({formatLiters(s.remainingLiters)} L remaining)
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {usagePreview.missingProducts.length > 0 ? (
-            <p className="text-sm text-amber-800">
-              Missing liters-per-bottle for: {usagePreview.missingProducts.join(", ")}. Run{" "}
-              <code className="text-xs">npm run seed:products</code> or fix catalog.
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
       <div className="rounded-xl border border-zinc-900 bg-white p-4 text-black shadow-sm print:border-0 print:p-2 print:shadow-none">
         <div className="mb-4 grid grid-cols-1 gap-2 text-sm md:grid-cols-2 print:text-xs">
           <HeaderField
             label="VEHICLE NO:"
             value={dispatch.vehicleNo}
-            editing={dispatchEditMode && canEditDispatch}
+            editing={showDispatchInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, vehicleNo: v }));
@@ -413,7 +307,7 @@ export function LoadingSheetBatchEditor({
           <HeaderField
             label="DRIVER NAME:"
             value={dispatch.driverName}
-            editing={dispatchEditMode && canEditDispatch}
+            editing={showDispatchInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, driverName: v }));
@@ -422,7 +316,7 @@ export function LoadingSheetBatchEditor({
           <HeaderField
             label="DC NO:"
             value={dispatch.dcNo}
-            editing={dispatchEditMode && canEditDispatch}
+            editing={showDispatchInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, dcNo: v }));
@@ -435,7 +329,7 @@ export function LoadingSheetBatchEditor({
           <HeaderField
             label="HELPER NAME:"
             value={dispatch.helperName}
-            editing={dispatchEditMode && canEditDispatch}
+            editing={showDispatchInputs}
             colSpan
             onChange={(v) => {
               setSaved(false);
@@ -460,39 +354,49 @@ export function LoadingSheetBatchEditor({
             <tbody>
               {sheetLines.map((row) => {
                 const batchValue = batches[row.boxNo] ?? "";
-                const showInputs = editMode && canEditBatches;
                 const rowIssue = rowIssueByBox.get(row.boxNo);
                 const displayWeight =
-                  showInputs && rowIssue
+                  showDispatchInputs && rowIssue
                     ? null
-                    : showInputs
-                      ? previewWeights.get(row.boxNo) ?? row.weight
+                    : showDispatchInputs
+                      ? (previewWeights.get(row.boxNo) ?? row.weight)
                       : row.weight;
+                const options = batchesForRow(row.productName);
+
                 return (
                   <tr
                     key={row.boxNo}
-                    className={rowIssue && showInputs ? "bg-red-50 print:bg-transparent" : undefined}
+                    className={rowIssue && showDispatchInputs ? "bg-red-50 print:bg-transparent" : undefined}
                   >
                     <td className="border border-black px-1 py-1 text-center">{row.boxNo}</td>
                     <td className="border border-black px-1 py-1">{row.productName}</td>
                     <td className="border border-black px-1 py-1 text-center">{row.bottlesPerBox}</td>
                     <td className="border border-black px-1 py-1 text-center">
-                      {showInputs ? (
+                      {showDispatchInputs ? (
                         <div className="space-y-0.5">
-                          <input
-                            type="text"
+                          <select
                             value={batchValue}
                             onChange={(e) => {
                               setSaved(false);
                               setError(null);
                               setBatches((prev) => ({ ...prev, [row.boxNo]: e.target.value }));
                             }}
-                            className={`w-full min-w-[4rem] rounded border px-1 py-0.5 text-center text-sm print:hidden ${
+                            className={`w-full min-w-[5rem] rounded border px-1 py-0.5 text-center text-sm print:hidden ${
                               rowIssue ? "border-red-500 bg-red-50" : "border-zinc-300"
                             }`}
-                            placeholder="Batch"
-                            aria-invalid={rowIssue ? true : undefined}
-                          />
+                          >
+                            <option value="">—</option>
+                            {options.map((pb) => {
+                              const key = normalizeBatchNo(pb.batchNo).toLowerCase();
+                              const elsewhere = usedElsewhereMap.get(key) ?? 0;
+                              const remaining = Math.max(0, pb.totalLiters - elsewhere);
+                              return (
+                                <option key={pb.batchNo} value={pb.batchNo}>
+                                  {pb.batchNo} ({formatLiters(remaining)} L left)
+                                </option>
+                              );
+                            })}
+                          </select>
                           {rowIssue ? (
                             <p className="text-left text-[10px] leading-tight text-red-700 print:hidden">
                               {rowIssue.message}
@@ -506,10 +410,12 @@ export function LoadingSheetBatchEditor({
                     </td>
                     <td
                       className={`border border-black px-1 py-1 text-center ${
-                        rowIssue && showInputs ? "text-red-700 line-through print:text-black print:no-underline" : ""
+                        rowIssue && showDispatchInputs
+                          ? "text-red-700 line-through print:text-black print:no-underline"
+                          : ""
                       }`}
                     >
-                      {rowIssue && showInputs ? "—" : weightCell(displayWeight)}
+                      {rowIssue && showDispatchInputs ? "—" : weightCell(displayWeight)}
                     </td>
                     <td className="border border-black px-1 py-1 text-center">{poNumber}</td>
                     <td className="border border-black px-1 py-1">{customerName}</td>
@@ -524,7 +430,7 @@ export function LoadingSheetBatchEditor({
           <FooterField
             label="PRODUCTION INCHARGE:"
             value={dispatch.productionIncharge}
-            editing={dispatchEditMode && canEditDispatch}
+            editing={showDispatchInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, productionIncharge: v }));
@@ -533,7 +439,7 @@ export function LoadingSheetBatchEditor({
           <FooterField
             label="SECURITY:"
             value={dispatch.securityName}
-            editing={dispatchEditMode && canEditDispatch}
+            editing={showDispatchInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, securityName: v }));
@@ -542,7 +448,7 @@ export function LoadingSheetBatchEditor({
           <FooterField
             label="DRIVER:"
             value={dispatch.driverSignature || dispatch.driverName}
-            editing={dispatchEditMode && canEditDispatch}
+            editing={showDispatchInputs}
             onChange={(v) => {
               setSaved(false);
               setDispatch((d) => ({ ...d, driverSignature: v }));
@@ -557,3 +463,4 @@ export function LoadingSheetBatchEditor({
     </div>
   );
 }
+
