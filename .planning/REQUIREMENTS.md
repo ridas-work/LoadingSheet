@@ -131,7 +131,7 @@ Executable plan: `.planning/phases/03-order-portal-auth/01-PLAN.md`.
 
 Executable plan: `.planning/phases/04-production-batch-entry/01-PLAN.md`.
 
-### Follow-up — orders list + loading sheet for everyone (plan 02) — **planned**
+### Follow-up — orders list + loading sheet for everyone (plan 02) — **complete**
 
 - **`/orders`** — all logged-in users browse orders; **View loading sheet** on every row.
 - **`/orders/[id]/loading-sheet`** — view/print for everyone; Nimra gets **Edit batches** mode (batch column inputs only, same paper layout).

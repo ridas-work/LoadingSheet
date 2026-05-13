@@ -1,21 +1,29 @@
-# Phase 04 Verification — Production batch entry
+# Phase 04 Verification — Production batch entry (incl. plan 02)
 
 **Status:** passed  
 **Date:** 2026-05-13
 
-## Must-haves
+## Plan 01 must-haves
 
 | Item | Result |
 |------|--------|
-| Nimra seeded (`nimra`, `batch_editor`, `Nimra-Batch-01`) | ✓ `scripts/seed-users.ts` |
-| Auth accepts `batch_editor`; session includes `role` | ✓ `lib/auth.ts` callbacks |
-| Post-login redirect by role | ✓ `app/page.tsx`, login → `/` |
-| `GET /api/orders` for batch list | ✓ `batch_editor` only |
-| `PATCH /api/orders/[id]/batches` | ✓ updates `sheetLines[].batchNo` |
-| Production list + batch entry UI | ✓ `/production/batches`, `/production/orders/[id]` |
-| PO creators blocked from batch PATCH | ✓ 403 |
-| Nimra blocked from `/new-order` | ✓ layout redirect |
-| Loading sheet reads saved batches | ✓ existing `sheetLines.batchNo` on print view |
+| Nimra seeded | ✓ |
+| Auth accepts `batch_editor` | ✓ |
+| Post-login redirect by role | ✓ |
+| Batch PATCH API | ✓ |
+| Production batch UI | ✓ |
+
+## Plan 02 must-haves
+
+| Item | Result |
+|------|--------|
+| `GET /api/orders` for both roles | ✓ |
+| `/orders` list with View loading sheet | ✓ |
+| Loading sheet for both roles | ✓ |
+| Nimra edit mode on loading sheet | ✓ `?edit=1` + PATCH |
+| Print hides inputs, shows batch values | ✓ `print:hidden` / `print:inline` |
+| PO users reopen any order sheet | ✓ `/orders` |
+| Nimra rows include View loading sheet | ✓ batches + orders pages |
 
 ## Build
 

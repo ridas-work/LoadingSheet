@@ -14,7 +14,7 @@ Restore **login-only** access (no signup): Nouman, Javeria, Aslam, Ibtisam with 
 ## Phase 04: Production batch entry (Nimra) ✓
 Role **`batch_editor`** for Nimra: login, list orders, enter **batch number per box row** on `sheetLines`; API + UI; loading sheet prints filled batches. PO creators cannot create orders as Nimra; Nimra cannot create POs.
 
-**Follow-up (plan 02):** Shared **`/orders`** list + universal loading sheet view; Nimra edits batches on the sheet (edit mode), not a separate hidden URL.
+**Follow-up (plan 02):** ✓ Shared **`/orders`** list + universal loading sheet view; Nimra edits batches on the sheet (edit mode).
 
 ## Phase 05: Dispatch / Delivery Assignment
 Add dispatch workflow to assign delivery details (which PO(s) going out, driver/rider, helper, vehicle) and finalize/lock records.
