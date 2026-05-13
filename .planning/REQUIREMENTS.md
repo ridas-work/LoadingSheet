@@ -261,3 +261,26 @@ Executable plans:
 - `.planning/phases/08-production-batch-registry/01-PLAN.md`
 - `.planning/phases/08-production-batch-registry/02-PLAN.md`
 
+---
+
+## Phase 09 (Multi-PO vehicle dispatch) — **planned**
+
+### Problem
+
+One truck often carries **multiple POs**. Rashid re-enters the same vehicle, driver, and DC for every PO today.
+
+### Solution
+
+- **`DispatchTrip`** — one record per vehicle load: dispatch fields + `orderIds[]`.
+- Rashid **multi-selects POs** on a trip; save copies header/footer to each linked order (print unchanged).
+- **Batch assignment** still per PO on each loading sheet (`?dispatch=1`).
+
+### Rashid UI
+
+- **`/dispatch/trips`** — list / create / edit trips.
+- Trip page: pick POs, vehicle fields once, links to assign batches & print each sheet.
+
+Executable plans:
+- `.planning/phases/09-multi-po-vehicle-dispatch/01-PLAN.md`
+- `.planning/phases/09-multi-po-vehicle-dispatch/02-PLAN.md`
+
