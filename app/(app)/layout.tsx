@@ -24,9 +24,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <Link href={homeHref} className="text-sm font-semibold text-zinc-900">
               Loading Sheet
             </Link>
-            <Link href="/orders" className="text-sm text-zinc-600 hover:text-zinc-900">
-              Orders
-            </Link>
+            {role !== "batch_editor" ? (
+              <Link href="/orders" className="text-sm text-zinc-600 hover:text-zinc-900">
+                Orders
+              </Link>
+            ) : null}
             {role === "po_creator" ? (
               <Link href="/new-order" className="text-sm text-zinc-600 hover:text-zinc-900">
                 New order

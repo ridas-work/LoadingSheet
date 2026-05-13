@@ -371,3 +371,19 @@ export function effectiveBatchDefsForOrder(
 export function poolToBatchDefs(pool: ProductionBatchPoolItem[]): BatchDef[] {
   return pool.map((p) => ({ batchNo: p.batchNo, totalLiters: p.totalLiters }));
 }
+
+export function usageLitersByBatchFromLines(
+  lines: VolumeSheetLine[],
+  catalog: CatalogProduct[],
+): Map<string, number> {
+  const used = new Map<string, number>();
+  for (const line of lines) {
+    const batchNo = normalizeBatchNo(line.batchNo);
+    if (!batchNo) continue;
+    const liters = rowLiters(line, catalog);
+    if (liters === null) continue;
+    const key = batchNo.toLowerCase();
+    used.set(key, roundLiters((used.get(key) ?? 0) + liters));
+  }
+  return used;
+}

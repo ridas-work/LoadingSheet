@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ProductionBatchRowActions } from "@/components/ProductionBatchRowActions";
 import { auth } from "@/lib/auth";
 import { formatLiters } from "@/lib/batchVolume";
 import { connectToDatabase } from "@/lib/db";
@@ -23,9 +24,6 @@ export default async function ProductionBatchesPage() {
           <p className="mt-1 text-sm text-zinc-600">
             Register each prepared batch (number, product, liters). Rashid assigns batches to POs at dispatch.
           </p>
-          <Link href="/orders" className="mt-2 inline-block text-sm font-medium text-zinc-700 underline">
-            View orders
-          </Link>
         </div>
         {isBatchEditor ? (
           <Link
@@ -52,6 +50,7 @@ export default async function ProductionBatchesPage() {
                 <th className="px-4 py-2 font-medium">Liters</th>
                 <th className="px-4 py-2 font-medium">Prepared</th>
                 <th className="px-4 py-2 font-medium">By</th>
+                {isBatchEditor ? <th className="px-4 py-2 font-medium" /> : null}
               </tr>
             </thead>
             <tbody>
@@ -64,6 +63,15 @@ export default async function ProductionBatchesPage() {
                     {new Date(b.preparedAt).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-2 text-zinc-600">{b.createdByName || "—"}</td>
+                  {isBatchEditor ? (
+                    <td className="px-4 py-2">
+                      <ProductionBatchRowActions
+                        batchId={b._id.toString()}
+                        batchNo={b.batchNo}
+                        canManage={isBatchEditor}
+                      />
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -73,3 +81,4 @@ export default async function ProductionBatchesPage() {
     </div>
   );
 }
+

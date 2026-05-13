@@ -5,14 +5,35 @@ import { useEffect, useMemo, useState } from "react";
 
 type Product = { name: string; bottlesPerCarton: number };
 
-export function ProductionBatchForm() {
+type Props = {
+  batchId?: string;
+  initialBatchNo?: string;
+  initialProductName?: string;
+  initialTotalLiters?: number;
+  initialPreparedAt?: string;
+  initialNotes?: string;
+};
+
+export function ProductionBatchForm({
+  batchId,
+  initialBatchNo = "",
+  initialProductName = "",
+  initialTotalLiters,
+  initialPreparedAt,
+  initialNotes = "",
+}: Props) {
   const router = useRouter();
+  const isEdit = Boolean(batchId);
   const [products, setProducts] = useState<Product[]>([]);
-  const [batchNo, setBatchNo] = useState("");
-  const [productName, setProductName] = useState("");
-  const [totalLiters, setTotalLiters] = useState("");
-  const [preparedAt, setPreparedAt] = useState(() => new Date().toISOString().slice(0, 10));
-  const [notes, setNotes] = useState("");
+  const [batchNo, setBatchNo] = useState(initialBatchNo);
+  const [productName, setProductName] = useState(initialProductName);
+  const [totalLiters, setTotalLiters] = useState(
+    initialTotalLiters != null ? String(initialTotalLiters) : "",
+  );
+  const [preparedAt, setPreparedAt] = useState(
+    initialPreparedAt ?? new Date().toISOString().slice(0, 10),
+  );
+  const [notes, setNotes] = useState(initialNotes);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,17 +54,22 @@ export function ProductionBatchForm() {
     setSubmitting(true);
     setError(null);
 
-    const res = await fetch("/api/production-batches", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        batchNo: batchNo.trim(),
-        productName,
-        totalLiters: Number(totalLiters),
-        preparedAt,
-        notes: notes.trim(),
-      }),
-    });
+    const payload = {
+      batchNo: batchNo.trim(),
+      productName,
+      totalLiters: Number(totalLiters),
+      preparedAt,
+      notes: notes.trim(),
+    };
+
+    const res = await fetch(
+      isEdit ? `/api/production-batches/${batchId}` : "/api/production-batches",
+      {
+        method: isEdit ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      },
+    );
 
     setSubmitting(false);
 
@@ -67,7 +93,8 @@ export function ProductionBatchForm() {
           id="batchNo"
           value={batchNo}
           onChange={(e) => setBatchNo(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          disabled={isEdit}
+          className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-100"
           placeholder="e.g. B-2405-12"
         />
       </div>
@@ -139,8 +166,9 @@ export function ProductionBatchForm() {
         disabled={!canSubmit || submitting}
         className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
       >
-        {submitting ? "Saving…" : "Save batch"}
+        {submitting ? "Saving…" : isEdit ? "Update batch" : "Save batch"}
       </button>
     </form>
   );
 }
+

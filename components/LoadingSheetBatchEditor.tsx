@@ -12,6 +12,7 @@ import {
   normalizeBatchNo,
   poolToBatchDefs,
   productsMatch,
+  usageLitersByBatchFromLines,
   validateAndComputeWeights,
   type CatalogProduct,
   type ProductionBatchPoolItem,
@@ -163,6 +164,11 @@ export function LoadingSheetBatchEditor({
         batchNo: batches[line.boxNo] ?? "",
       })),
     [batches, sheetLines],
+  );
+
+  const currentOrderUsedByBatch = useMemo(
+    () => usageLitersByBatchFromLines(volumeLines, catalog),
+    [catalog, volumeLines],
   );
 
   const previewWeights = useMemo(() => {
@@ -389,7 +395,8 @@ export function LoadingSheetBatchEditor({
                             {options.map((pb) => {
                               const key = normalizeBatchNo(pb.batchNo).toLowerCase();
                               const elsewhere = usedElsewhereMap.get(key) ?? 0;
-                              const remaining = Math.max(0, pb.totalLiters - elsewhere);
+                              const onThisOrder = currentOrderUsedByBatch.get(key) ?? 0;
+                              const remaining = Math.max(0, pb.totalLiters - elsewhere - onThisOrder);
                               return (
                                 <option key={pb.batchNo} value={pb.batchNo}>
                                   {pb.batchNo} ({formatLiters(remaining)} L left)
