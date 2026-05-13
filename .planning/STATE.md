@@ -1,16 +1,20 @@
 # Project State
 
-Phase: **06 complete** — Dispatch (Rashid)
-Status: Milestone v1.0 ready for audit
+Phase: **07 complete** — Session security
+Status: Milestone v1.0 + security ready for audit
 
 ## Context
-- End-to-end: PO → Nimra batches (liters) → Rashid dispatch fields → print loading sheet.
+- Full workflow: PO → batches → dispatch → print.
+- Sessions require login per browser session; no 30-day persistent cookie.
 
 ## Decisions Made
-- **Rashid** = `dispatch_editor`, same `/login`, home `/orders`.
-- Fills header + footer on existing loading sheet URL; everyone prints final sheet.
-- No dispatch lock in v1 — Rashid may re-edit until stakeholders request lock.
+- **Browser-session cookie** — closing browser clears login.
+- **8h max** JWT while browser stays open (`SESSION_MAX_AGE_SECONDS`).
+- **Global middleware** on all routes except `/login` and auth API.
+
+## UAT (paused)
+- Phase 06 UAT: test 1 passed, tests 2–9 pending (`.planning/phases/06-dispatch-assignment/06-UAT.md`).
 
 ## Next
+- **Resume Phase 06 UAT:** `/gsd-verify-work 6`
 - **Audit milestone:** `/gsd-audit-milestone`
-- Or manual acceptance: `/gsd-verify-work 6`

@@ -23,3 +23,8 @@ Nimra records **total liters per batch**; system **auto-fills row Weight** from 
 Role **`dispatch_editor`** for **Rashid**: login (`rashid`), fill loading-sheet **Vehicle, Driver, DC No, Helper**, footer **Production Incharge, Security, Driver**; view/print for all. No PO or batch editing.
 
 Executable plan: `.planning/phases/06-dispatch-assignment/01-PLAN.md`.
+
+## Phase 07: Session security & mandatory login ✓
+**Login required for every browser session.** Global middleware; session cookie expires when the browser closes (no 30-day persistent login). JWT capped to one work shift (default 8h) while the browser stays open.
+
+Executable plan: `.planning/phases/07-session-security/01-PLAN.md`.

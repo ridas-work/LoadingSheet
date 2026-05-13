@@ -204,3 +204,26 @@ Executable plan: `.planning/phases/05-batch-volume-validation/01-PLAN.md`.
 
 Executable plan: `.planning/phases/06-dispatch-assignment/01-PLAN.md`.
 
+---
+
+## Phase 07 (Session security & mandatory login) — **complete**
+
+### Problem
+
+Users open the site and are still logged in from a previous visit (NextAuth default 30-day session). Stakeholder wants **credentials required** when someone opens the app again, even if they did not click **Log out**.
+
+### Requirements
+
+- **Global auth gate:** middleware redirects unauthenticated users to `/login` for all app routes and APIs (except auth endpoints).
+- **No persistent login across browser restarts:** session cookie is browser-session only (expires when browser closes).
+- **In-browser cap:** JWT valid up to **8 hours** per login while the browser stays open (override via `SESSION_MAX_AGE_SECONDS`).
+- **Logout** clears session and returns to `/login`.
+- No public order/product pages without login.
+
+### Out of scope
+
+- Password on every page click within the same browser session.
+- MFA.
+
+Executable plan: `.planning/phases/07-session-security/01-PLAN.md`.
+
