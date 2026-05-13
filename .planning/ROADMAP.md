@@ -29,7 +29,7 @@ Executable plan: `.planning/phases/06-dispatch-assignment/01-PLAN.md`.
 
 Executable plan: `.planning/phases/07-session-security/01-PLAN.md`.
 
-## Phase 08: Production batch registry & dispatch assignment — **planned**
+## Phase 08: Production batch registry & dispatch assignment ✓
 **Workflow change:** Nimra registers **prepared batches** (batch no + product + liters) **without picking a PO**. Rashid assigns batches from that pool to each PO on the loading sheet when dispatching.
 
 Executable plans:

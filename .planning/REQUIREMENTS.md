@@ -229,7 +229,7 @@ Executable plan: `.planning/phases/07-session-security/01-PLAN.md`.
 
 ---
 
-## Phase 08 (Production batch registry & dispatch assignment) — **planned**
+## Phase 08 (Production batch registry & dispatch assignment) — **complete**
 
 ### Workflow change (supersedes Nimra per-PO batch entry)
 
