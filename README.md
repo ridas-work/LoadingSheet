@@ -24,7 +24,7 @@ Open `http://localhost:3000`.
 
 Sign in at `/login`. Accounts are created only via seed (no signup).
 
-**Session security:** You must sign in on each new browser session. Closing the browser clears your login even if you did not click **Log out**. While the browser stays open, sessions last up to **8 hours** (override with `SESSION_MAX_AGE_SECONDS` in `.env.local`).
+**Session security:** Opening `http://localhost:3000` always shows the login screen and clears any previous session, so you must enter username and password each time. Use **Log out** when leaving a shared PC. Optional: set `SESSION_MAX_AGE_SECONDS` in `.env.local` to cap how long a login lasts while the browser stays open (default 8 hours).
 
 | Person  | Username  | Initial password    |
 |---------|-----------|---------------------|

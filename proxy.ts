@@ -2,10 +2,7 @@ import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
 export default withAuth(
-  function proxy(req) {
-    if (req.nextUrl.pathname === "/login" && req.nextauth.token) {
-      return NextResponse.redirect(new URL("/", req.url));
-    }
+  function proxy() {
     return NextResponse.next();
   },
   {

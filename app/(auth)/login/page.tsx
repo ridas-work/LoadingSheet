@@ -1,13 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { signIn } from "next-auth/react";
+import { useEffect, useMemo, useState } from "react";
+import { getSession, signIn, signOut } from "next-auth/react";
+
+import { homePathForRole, roleFromSession } from "@/lib/roles";
 
 export default function LoginPage() {
+  const [ready, setReady] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    signOut({ redirect: false }).finally(() => setReady(true));
+  }, []);
 
   const canSubmit = useMemo(() => username.trim().length > 0 && password.length > 0, [password, username]);
 
@@ -20,22 +27,31 @@ export default function LoginPage() {
       username: username.trim(),
       password,
       redirect: false,
-      callbackUrl: "/",
     });
 
-    setSubmitting(false);
-
     if (!res) {
+      setSubmitting(false);
       setError("Login failed. Please try again.");
       return;
     }
 
     if (res.error) {
+      setSubmitting(false);
       setError("Invalid username or password.");
       return;
     }
 
-    window.location.href = res.url ?? "/";
+    const session = await getSession();
+    const role = roleFromSession(session?.user as { role?: string });
+    window.location.href = role ? homePathForRole(role) : "/orders";
+  }
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-zinc-50 px-4">
+        <p className="text-sm text-zinc-600">Loading…</p>
+      </div>
+    );
   }
 
   return (
