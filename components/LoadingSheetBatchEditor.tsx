@@ -14,6 +14,7 @@ import {
   type BatchDef,
   type CatalogProduct,
 } from "@/lib/batchVolume";
+import { type DispatchFields } from "@/lib/roles";
 
 export type LoadingSheetLine = {
   boxNo: number;
@@ -33,8 +34,77 @@ type Props = {
   initialBatchDefs: BatchDef[];
   canEditBatches: boolean;
   initialEditMode: boolean;
+  initialDispatch: DispatchFields;
+  canEditDispatch: boolean;
+  initialDispatchEditMode: boolean;
   backHref: string;
 };
+
+function HeaderField({
+  label,
+  value,
+  editing,
+  onChange,
+  colSpan,
+}: {
+  label: string;
+  value: string;
+  editing: boolean;
+  onChange: (v: string) => void;
+  colSpan?: boolean;
+}) {
+  return (
+    <div className={`flex gap-2 border-b border-zinc-300 py-1 ${colSpan ? "md:col-span-2" : ""}`}>
+      <span className="font-semibold whitespace-nowrap">{label}</span>
+      {editing ? (
+        <>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="min-h-[1.25rem] flex-1 border-b border-zinc-400 bg-transparent text-sm outline-none print:hidden"
+          />
+          <span className="hidden min-h-[1.25rem] flex-1 border-b border-black print:inline">{value}</span>
+        </>
+      ) : (
+        <span className="min-h-[1.25rem] flex-1 border-b border-dotted border-zinc-400 print:border-black">
+          {value}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function FooterField({
+  label,
+  value,
+  editing,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  editing: boolean;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="font-semibold">{label}</span>
+      {editing ? (
+        <>
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="min-h-[2rem] border-b border-black bg-transparent text-sm outline-none print:hidden"
+          />
+          <span className="hidden min-h-[2rem] border-b border-black print:inline">{value}</span>
+        </>
+      ) : (
+        <span className="min-h-[2rem] border-b border-black">{value}</span>
+      )}
+    </div>
+  );
+}
 
 function weightCell(value: number | null | undefined): string {
   if (value == null) return "";
@@ -51,10 +121,15 @@ export function LoadingSheetBatchEditor({
   initialBatchDefs,
   canEditBatches,
   initialEditMode,
+  initialDispatch,
+  canEditDispatch,
+  initialDispatchEditMode,
   backHref,
 }: Props) {
   const router = useRouter();
   const [editMode, setEditMode] = useState(initialEditMode);
+  const [dispatchEditMode, setDispatchEditMode] = useState(initialDispatchEditMode);
+  const [dispatch, setDispatch] = useState<DispatchFields>(initialDispatch);
   const [batches, setBatches] = useState<Record<number, string>>(() => {
     const initial: Record<number, string> = {};
     for (const line of sheetLines) {
@@ -73,9 +148,11 @@ export function LoadingSheetBatchEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   const sheetUrl = `/orders/${orderId}/loading-sheet`;
   const editUrl = `${sheetUrl}?edit=1`;
+  const dispatchUrl = `${sheetUrl}?dispatch=1`;
 
   const volumeLines = useMemo(
     () =>
@@ -164,10 +241,37 @@ export function LoadingSheetBatchEditor({
     }
 
     setSaved(true);
+    setSavedMessage("Batches and liters saved.");
     setEditMode(false);
     router.replace(sheetUrl);
     router.refresh();
   }, [batches, catalog, orderId, parsedBatchDefs, router, sheetLines, sheetUrl, volumeLines]);
+
+  const onSaveDispatch = useCallback(async () => {
+    setSaving(true);
+    setError(null);
+    setSaved(false);
+
+    const res = await fetch(`/api/orders/${orderId}/dispatch`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(dispatch),
+    });
+
+    setSaving(false);
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setError((data as { error?: string }).error ?? "Save failed");
+      return;
+    }
+
+    setSaved(true);
+    setSavedMessage("Dispatch details saved.");
+    setDispatchEditMode(false);
+    router.replace(sheetUrl);
+    router.refresh();
+  }, [dispatch, orderId, router, sheetUrl]);
 
   const cartonLabel = useMemo(
     () => `${sheetLines.length} carton${sheetLines.length !== 1 ? "s" : ""}`,
@@ -207,6 +311,32 @@ export function LoadingSheetBatchEditor({
               </button>
             </>
           ) : null}
+          {canEditDispatch && !dispatchEditMode ? (
+            <Link
+              href={dispatchUrl}
+              className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
+            >
+              Edit dispatch
+            </Link>
+          ) : null}
+          {canEditDispatch && dispatchEditMode ? (
+            <>
+              <Link
+                href={sheetUrl}
+                className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
+              >
+                View only
+              </Link>
+              <button
+                type="button"
+                onClick={onSaveDispatch}
+                disabled={saving}
+                className="rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save dispatch"}
+              </button>
+            </>
+          ) : null}
           <PrintSheetButton />
         </div>
       </div>
@@ -215,7 +345,9 @@ export function LoadingSheetBatchEditor({
         <p className="text-sm text-red-700 print:hidden">{validation.error}</p>
       ) : null}
       {error ? <p className="text-sm text-red-700 print:hidden">{error}</p> : null}
-      {saved ? <p className="text-sm text-emerald-700 print:hidden">Batches and liters saved.</p> : null}
+      {saved && savedMessage ? (
+        <p className="text-sm text-emerald-700 print:hidden">{savedMessage}</p>
+      ) : null}
 
       {canEditBatches && editMode && distinctBatchNos.length > 0 ? (
         <div className="space-y-3 rounded-xl border border-zinc-200 bg-white p-4 print:hidden">
@@ -269,26 +401,47 @@ export function LoadingSheetBatchEditor({
 
       <div className="rounded-xl border border-zinc-900 bg-white p-4 text-black shadow-sm print:border-0 print:p-2 print:shadow-none">
         <div className="mb-4 grid grid-cols-1 gap-2 text-sm md:grid-cols-2 print:text-xs">
-          <div className="flex gap-2 border-b border-zinc-300 py-1">
-            <span className="font-semibold whitespace-nowrap">VEHICLE NO:</span>
-            <span className="min-h-[1.25rem] flex-1 border-b border-dotted border-zinc-400 print:border-black" />
-          </div>
-          <div className="flex gap-2 border-b border-zinc-300 py-1">
-            <span className="font-semibold whitespace-nowrap">DRIVER NAME:</span>
-            <span className="min-h-[1.25rem] flex-1 border-b border-dotted border-zinc-400 print:border-black" />
-          </div>
-          <div className="flex gap-2 border-b border-zinc-300 py-1">
-            <span className="font-semibold whitespace-nowrap">DC NO:</span>
-            <span className="min-h-[1.25rem] flex-1 border-b border-dotted border-zinc-400 print:border-black" />
-          </div>
+          <HeaderField
+            label="VEHICLE NO:"
+            value={dispatch.vehicleNo}
+            editing={dispatchEditMode && canEditDispatch}
+            onChange={(v) => {
+              setSaved(false);
+              setDispatch((d) => ({ ...d, vehicleNo: v }));
+            }}
+          />
+          <HeaderField
+            label="DRIVER NAME:"
+            value={dispatch.driverName}
+            editing={dispatchEditMode && canEditDispatch}
+            onChange={(v) => {
+              setSaved(false);
+              setDispatch((d) => ({ ...d, driverName: v }));
+            }}
+          />
+          <HeaderField
+            label="DC NO:"
+            value={dispatch.dcNo}
+            editing={dispatchEditMode && canEditDispatch}
+            onChange={(v) => {
+              setSaved(false);
+              setDispatch((d) => ({ ...d, dcNo: v }));
+            }}
+          />
           <div className="flex gap-2 border-b border-zinc-300 py-1">
             <span className="font-semibold whitespace-nowrap">Date:</span>
             <span className="flex-1 border-b border-dotted border-zinc-400 print:border-black">{createdDate}</span>
           </div>
-          <div className="flex gap-2 border-b border-zinc-300 py-1 md:col-span-2">
-            <span className="font-semibold whitespace-nowrap">HELPER NAME:</span>
-            <span className="min-h-[1.25rem] flex-1 border-b border-dotted border-zinc-400 print:border-black" />
-          </div>
+          <HeaderField
+            label="HELPER NAME:"
+            value={dispatch.helperName}
+            editing={dispatchEditMode && canEditDispatch}
+            colSpan
+            onChange={(v) => {
+              setSaved(false);
+              setDispatch((d) => ({ ...d, helperName: v }));
+            }}
+          />
         </div>
 
         <div className="overflow-x-auto">
@@ -368,18 +521,33 @@ export function LoadingSheetBatchEditor({
         </div>
 
         <div className="mt-8 grid grid-cols-1 gap-6 text-sm md:grid-cols-3 print:mt-6 print:text-xs">
-          <div className="flex flex-col gap-1">
-            <span className="font-semibold">PRODUCTION INCHARGE:</span>
-            <span className="min-h-[2rem] border-b border-black" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="font-semibold">SECURITY:</span>
-            <span className="min-h-[2rem] border-b border-black" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <span className="font-semibold">DRIVER:</span>
-            <span className="min-h-[2rem] border-b border-black" />
-          </div>
+          <FooterField
+            label="PRODUCTION INCHARGE:"
+            value={dispatch.productionIncharge}
+            editing={dispatchEditMode && canEditDispatch}
+            onChange={(v) => {
+              setSaved(false);
+              setDispatch((d) => ({ ...d, productionIncharge: v }));
+            }}
+          />
+          <FooterField
+            label="SECURITY:"
+            value={dispatch.securityName}
+            editing={dispatchEditMode && canEditDispatch}
+            onChange={(v) => {
+              setSaved(false);
+              setDispatch((d) => ({ ...d, securityName: v }));
+            }}
+          />
+          <FooterField
+            label="DRIVER:"
+            value={dispatch.driverSignature || dispatch.driverName}
+            editing={dispatchEditMode && canEditDispatch}
+            onChange={(v) => {
+              setSaved(false);
+              setDispatch((d) => ({ ...d, driverSignature: v }));
+            }}
+          />
         </div>
 
         <p className="mt-6 text-center text-xs text-zinc-600 print:text-[10px]">

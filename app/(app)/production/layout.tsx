@@ -9,5 +9,8 @@ export default async function ProductionLayout({ children }: { children: React.R
   if (role === "po_creator") {
     redirect("/new-order");
   }
+  if (role === "dispatch_editor") {
+    redirect("/orders");
+  }
   return children;
 }

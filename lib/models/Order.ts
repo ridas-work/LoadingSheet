@@ -17,6 +17,19 @@ const BatchDefSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const DispatchSchema = new mongoose.Schema(
+  {
+    vehicleNo: { type: String, required: false, default: "" },
+    driverName: { type: String, required: false, default: "" },
+    dcNo: { type: String, required: false, default: "" },
+    helperName: { type: String, required: false, default: "" },
+    productionIncharge: { type: String, required: false, default: "" },
+    securityName: { type: String, required: false, default: "" },
+    driverSignature: { type: String, required: false, default: "" },
+  },
+  { _id: false },
+);
+
 const SheetLineSchema = new mongoose.Schema(
   {
     boxNo: { type: Number, required: true, min: 1 },
@@ -57,6 +70,14 @@ const OrderSchema = new mongoose.Schema(
       required: false,
       default: [],
     },
+    dispatch: {
+      type: DispatchSchema,
+      required: false,
+      default: () => ({}),
+    },
+    dispatchUpdatedByUserId: { type: String, required: false, default: null },
+    dispatchUpdatedByName: { type: String, required: false, default: "" },
+    dispatchUpdatedAt: { type: Date, required: false, default: null },
   },
   { timestamps: { createdAt: true, updatedAt: true } },
 );

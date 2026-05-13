@@ -31,12 +31,14 @@ Sign in at `/login`. Accounts are created only via seed (no signup).
 | Aslam   | `aslam`   | `Aslam-Order-03`    |
 | Ibtisam | `ibtisam` | `Ibtisam-Order-04`  |
 | Nimra   | `nimra`   | `Nimra-Batch-01`    | Production — batch numbers only |
+| Rashid  | `rashid`  | `Rashid-Dispatch-01`| Dispatch — vehicle, driver, DC, signatures |
 
 ### Workflow
 
 1. **PO team** creates orders at `/new-order`.
 2. **Nimra** opens `/production/batches` or `/orders`, then **Edit batches** on the loading sheet.
-3. **Anyone** opens **Orders** (`/orders`) → **View loading sheet** to print the sheet (with batches once saved).
+3. **Rashid** opens `/orders`, then **Edit dispatch** on the loading sheet (vehicle, driver, DC, helper, footer signatures).
+4. **Anyone** opens **Orders** (`/orders`) → **View loading sheet** to print the completed sheet.
 
 ### Batch volume (liters)
 

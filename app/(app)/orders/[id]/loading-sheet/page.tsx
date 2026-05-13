@@ -9,11 +9,11 @@ import { buildSheetLines, type OrderItemInput, type SheetLine } from "@/lib/buil
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
 import { ProductPacking } from "@/lib/models/ProductPacking";
-import { roleFromSession } from "@/lib/roles";
+import { roleFromSession, EMPTY_DISPATCH, type DispatchFields } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ edit?: string }>;
+  searchParams: Promise<{ edit?: string; dispatch?: string }>;
 };
 
 function normalizeSheetLines(order: {
@@ -55,14 +55,16 @@ function normalizeSheetLines(order: {
 
 export default async function LoadingSheetPage(props: PageProps) {
   const { id } = await props.params;
-  const { edit } = await props.searchParams;
+  const { edit, dispatch: dispatchParam } = await props.searchParams;
 
   if (!mongoose.Types.ObjectId.isValid(id)) notFound();
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
   const canEditBatches = role === "batch_editor";
+  const canEditDispatch = role === "dispatch_editor";
   const initialEditMode = canEditBatches && edit === "1";
+  const initialDispatchEditMode = canEditDispatch && dispatchParam === "1";
 
   await connectToDatabase();
   const [order, catalogDocs] = await Promise.all([
@@ -85,7 +87,20 @@ export default async function LoadingSheetPage(props: PageProps) {
 
   const sheetLines = normalizeSheetLines(order as Parameters<typeof normalizeSheetLines>[0]);
   const created = order.createdAt ? new Date(order.createdAt).toISOString().slice(0, 10) : "";
-  const backHref = role === "batch_editor" ? "/production/batches" : "/orders";
+  const backHref =
+    role === "batch_editor" ? "/production/batches" : "/orders";
+
+  const rawDispatch = (order as { dispatch?: Partial<DispatchFields> }).dispatch;
+  const initialDispatch: DispatchFields = {
+    ...EMPTY_DISPATCH,
+    vehicleNo: rawDispatch?.vehicleNo ?? "",
+    driverName: rawDispatch?.driverName ?? "",
+    dcNo: rawDispatch?.dcNo ?? "",
+    helperName: rawDispatch?.helperName ?? "",
+    productionIncharge: rawDispatch?.productionIncharge ?? "",
+    securityName: rawDispatch?.securityName ?? "",
+    driverSignature: rawDispatch?.driverSignature ?? "",
+  };
 
   return (
     <LoadingSheetBatchEditor
@@ -98,6 +113,9 @@ export default async function LoadingSheetPage(props: PageProps) {
       initialBatchDefs={initialBatchDefs}
       canEditBatches={canEditBatches}
       initialEditMode={initialEditMode}
+      initialDispatch={initialDispatch}
+      canEditDispatch={canEditDispatch}
+      initialDispatchEditMode={initialDispatchEditMode}
       backHref={backHref}
     />
   );
