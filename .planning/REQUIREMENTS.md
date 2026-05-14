@@ -306,7 +306,7 @@ Executable plans:
 
 ---
 
-## Phase 11 (Lock production batches for Nimra) — **planned**
+## Phase 11 (Lock production batches for Nimra) — **complete**
 
 ### Problem
 

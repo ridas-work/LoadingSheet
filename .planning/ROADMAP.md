@@ -50,7 +50,7 @@ Executable plans:
 - `.planning/phases/10-production-batch-qc-fields/01-PLAN.md` — schema, API, product families
 - `.planning/phases/10-production-batch-qc-fields/02-PLAN.md` — Nimra form, list, detail view
 
-## Phase 11: Lock production batches for Nimra — **planned**
+## Phase 11: Lock production batches for Nimra ✓
 Once Rashid assigns a batch on a loading sheet, Nimra **cannot edit or delete** it (QC audit preserved). List shows **Available / In use / Empty** so depleted batches are clearly **done**, not open for edit.
 
 Executable plans:

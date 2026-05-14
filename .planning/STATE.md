@@ -1,15 +1,11 @@
 # Project State
 
-Phase: **11 planned** — Lock production batches for Nimra
-Status: Ready to execute (`/gsd-execute-phase 11`)
+Phase: **11 complete** — Lock production batches for Nimra
+Status: Verified (`11-VERIFICATION.md` passed)
 
 ## Context
-- DELETE already blocks when batch liters are on loading sheets; PATCH does not — Nimra can still change QC data after dispatch.
-- Nimra should see **Empty** / **In use** / **Available** instead of Edit on done batches.
-
-## Decisions Made
-- Lock when `usedLiters > 0` (any assignment on a PO).
-- **Empty** = `remainingLiters <= 0`; still locked, distinct badge from **In use**.
+- Nimra cannot edit/delete batches once Rashid has assigned liters on loading sheets.
+- List shows Available / In use / Empty.
 
 ## Next
-- **Execute Phase 11:** `/gsd-execute-phase 11`
+- **Milestone audit:** `/gsd-audit-milestone`
