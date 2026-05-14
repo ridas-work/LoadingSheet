@@ -63,3 +63,10 @@ Executable plans:
 Executable plans:
 - `.planning/phases/12-admin-pending-summary/01-PLAN.md` — admin role, Waleed Intisar seed, order city/deadline, summary labels
 - `.planning/phases/12-admin-pending-summary/02-PLAN.md` — summary API + admin dashboard UI
+
+## Phase 13: Admin oversight (boss expanded access) — **planned**
+**Waleed Intisar** gets **read-only oversight** across the app: pending orders summary plus **who entered each PO**, **what Nimra registered** (production batches + QC detail), and **dispatch trips** — without edit rights on POs, batches, or dispatch.
+
+Executable plans:
+- `.planning/phases/13-admin-oversight/01-PLAN.md` — admin route access + layout/API guards
+- `.planning/phases/13-admin-oversight/02-PLAN.md` — nav, orders creator column, read-only batch & dispatch UI

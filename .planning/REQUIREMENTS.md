@@ -339,3 +339,20 @@ Executable plans:
 - `.planning/phases/12-admin-pending-summary/01-PLAN.md`
 - `.planning/phases/12-admin-pending-summary/02-PLAN.md`
 
+---
+
+## Phase 13 (Admin oversight) — **planned**
+
+### Problem
+
+Waleed has the pending-orders grid only. He cannot easily see **which PO team member created each order** or **browse Nimra’s production batch registry** and dispatch activity without direct URLs.
+
+### Solution
+
+- Expand **`admin`** read-only access: **Orders** (with **Entered by**), **Production batches** (list + QC detail), **Dispatch trips** (view only).
+- Keep **Summary** at `/admin`; no PO/batch/dispatch **editing** for admin in v1.
+
+Executable plans:
+- `.planning/phases/13-admin-oversight/01-PLAN.md`
+- `.planning/phases/13-admin-oversight/02-PLAN.md`
+
