@@ -1,12 +1,11 @@
 # Project State
 
-Phase: **13 planned** — Admin oversight (boss expanded access)
-Status: Ready to execute (`/gsd-execute-phase 13`)
+Phase: **13 complete** — Admin oversight
+Status: Milestone v1.0 ready for audit
 
 ## Context
-- Phase 12 gave Waleed the **pending orders summary** at `/admin` (read-only).
-- User wants **almost all access** to **see** operations: **who entered POs**, **what Nimra is adding** (batches/QC), plus dispatch visibility.
-- v1 approach: **read-only oversight** — view everything, mutate nothing (audit-safe).
+- **Waleed Intisar** has read-only oversight: summary, orders (with **Entered by**), production batches, dispatch trips.
+- Cannot create POs, batches, or dispatch trips.
 
 ## Next
-- **Execute Phase 13:** `/gsd-execute-phase 13`
+- **Audit milestone:** `/gsd-audit-milestone`
