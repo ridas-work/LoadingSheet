@@ -7,7 +7,7 @@ import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { loadBatchUsageContext, usageForBatchNo } from "@/lib/productionBatchStatus";
-import { roleFromSession } from "@/lib/roles";
+import { canEditProductionBatches, roleFromSession } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -19,7 +19,7 @@ export default async function EditProductionBatchPage(props: PageProps) {
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
-  if (role !== "batch_editor") {
+  if (!canEditProductionBatches(role)) {
     redirect("/production/batches");
   }
 

@@ -13,7 +13,7 @@ export default async function NewOrderLayout({ children }: { children: React.Rea
     redirect("/orders");
   }
   if (role === "admin") {
-    redirect("/admin");
+    redirect("/orders");
   }
   return children;
 }

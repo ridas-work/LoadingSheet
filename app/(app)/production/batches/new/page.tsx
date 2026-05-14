@@ -2,13 +2,13 @@ import Link from "next/link";
 
 import { ProductionBatchForm } from "@/components/ProductionBatchForm";
 import { auth } from "@/lib/auth";
-import { roleFromSession } from "@/lib/roles";
+import { canEditProductionBatches, roleFromSession } from "@/lib/roles";
 import { redirect } from "next/navigation";
 
 export default async function NewProductionBatchPage() {
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
-  if (role !== "batch_editor") {
+  if (!canEditProductionBatches(role)) {
     redirect("/production/batches");
   }
 

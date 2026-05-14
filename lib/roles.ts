@@ -18,6 +18,27 @@ export function roleFromSession(user: { role?: unknown } | undefined): AppRole |
   return isAppRole(role) ? role : null;
 }
 
+export function isAdmin(role: AppRole | null): boolean {
+  return role === "admin";
+}
+
+/** Boss / management read-only oversight across orders, batches, and dispatch. */
+export function adminCanViewOperations(role: AppRole | null): boolean {
+  return isAdmin(role);
+}
+
+export function canCreateOrders(role: AppRole | null): boolean {
+  return role === "po_creator";
+}
+
+export function canEditProductionBatches(role: AppRole | null): boolean {
+  return role === "batch_editor";
+}
+
+export function canEditDispatch(role: AppRole | null): boolean {
+  return role === "dispatch_editor";
+}
+
 export type DispatchFields = {
   vehicleNo: string;
   driverName: string;
