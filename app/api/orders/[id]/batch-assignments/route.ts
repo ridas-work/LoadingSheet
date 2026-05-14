@@ -3,16 +3,15 @@ import mongoose from "mongoose";
 
 import { auth } from "@/lib/auth";
 import {
-  accumulateBatchUsageFromOrders,
-  effectiveBatchDefsForOrder,
-  inferLitersPerBottleFromName,
-  normalizeBatchNo,
-  poolToBatchDefs,
-  productsMatch,
-  validateAndComputeWeights,
-  type CatalogProduct,
-  type VolumeSheetLine,
-} from "@/lib/batchVolume";
+  accumulateBatchUsageFromSheetLines,
+  isBundleProduct,
+  lineBatchAllocations,
+  type ComponentBatch,
+  type PackingCatalogRow,
+  validateSheetBatchAllocations,
+} from "@/lib/bundleCatalog";
+import { effectiveBatchDefsForOrder, normalizeBatchNo, poolToBatchDefs, productsMatch } from "@/lib/batchVolume";
+import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
 import { isBatchAssignmentLocked } from "@/lib/orderBatchStatus";
@@ -20,7 +19,11 @@ import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
 import { roleFromSession } from "@/lib/roles";
 
-type AssignmentInput = { boxNo?: unknown; batchNo?: unknown };
+type AssignmentInput = {
+  boxNo?: unknown;
+  batchNo?: unknown;
+  componentBatches?: unknown;
+};
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -46,11 +49,28 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "assignments array is required" }, { status: 400 });
   }
 
-  const assignmentMap = new Map<number, string>();
+  const assignmentMap = new Map<
+    number,
+    { batchNo: string; componentBatches: ComponentBatch[] }
+  >();
+
   for (const raw of body.assignments as AssignmentInput[]) {
     const boxNo = typeof raw.boxNo === "number" ? raw.boxNo : Number(raw.boxNo);
     if (!Number.isInteger(boxNo) || boxNo < 1) continue;
-    assignmentMap.set(boxNo, typeof raw.batchNo === "string" ? normalizeBatchNo(raw.batchNo) : "");
+
+    const componentBatches = Array.isArray(raw.componentBatches)
+      ? (raw.componentBatches as Array<{ productName?: unknown; batchNo?: unknown }>)
+          .map((c) => ({
+            productName: typeof c.productName === "string" ? c.productName.trim() : "",
+            batchNo: typeof c.batchNo === "string" ? normalizeBatchNo(c.batchNo) : "",
+          }))
+          .filter((c) => c.productName)
+      : [];
+
+    assignmentMap.set(boxNo, {
+      batchNo: typeof raw.batchNo === "string" ? normalizeBatchNo(raw.batchNo) : "",
+      componentBatches,
+    });
   }
 
   await connectToDatabase();
@@ -59,26 +79,23 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     Order.findById(id),
     Order.find({}).select({ sheetLines: 1 }).lean(),
     ProductionBatch.find({}).lean(),
-    ProductPacking.find({ active: true }).select({ name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1 }).lean(),
+    ProductPacking.find({ active: true })
+      .select({ code: 1, name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1, bundleComponents: 1 })
+      .lean(),
   ]);
 
   if (!order) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (isBatchAssignmentLocked(order.sheetLines)) {
+  const catalog: PackingCatalogRow[] = packingCatalogFromDocs(catalogDocs);
+
+  if (isBatchAssignmentLocked(order.sheetLines, catalog)) {
     return NextResponse.json(
       { error: "Batch assignments are locked — all rows already have batches assigned." },
       { status: 403 },
     );
   }
-
-  const catalog: CatalogProduct[] = catalogDocs.map((p) => ({
-    name: p.name,
-    litersPerBottle: inferLitersPerBottleFromName(p.name, p.litersPerBottle),
-    aliases: p.aliases ?? [],
-    batchFamily: p.batchFamily?.trim() || p.name,
-  }));
 
   const pool = poolDocs.map((p) => ({
     batchNo: p.batchNo,
@@ -86,50 +103,80 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     totalLiters: p.totalLiters,
   }));
 
-  const poolByKey = new Map(
-    pool.map((p) => [normalizeBatchNo(p.batchNo).toLowerCase(), p]),
-  );
+  const poolByKey = new Map(pool.map((p) => [normalizeBatchNo(p.batchNo).toLowerCase(), p]));
 
-  const volumeLines: VolumeSheetLine[] = (order.sheetLines ?? []).map((line) => ({
-    boxNo: line.boxNo,
-    productName: line.productName,
-    bottlesPerBox: line.bottlesPerBox,
-    batchNo: assignmentMap.has(line.boxNo)
-      ? (assignmentMap.get(line.boxNo) ?? "")
-      : (line.batchNo ?? ""),
-  }));
+  const workingLines = (order.sheetLines ?? []).map((line) => {
+    const incoming = assignmentMap.get(line.boxNo);
+    const bundle = isBundleProduct(line.productName, catalog);
 
-  for (const line of volumeLines) {
-    const batchNo = normalizeBatchNo(line.batchNo);
-    if (!batchNo) continue;
-
-    const batch = poolByKey.get(batchNo.toLowerCase());
-    if (!batch) {
-      return NextResponse.json({ error: `Unknown batch "${batchNo}".` }, { status: 400 });
+    if (bundle) {
+      const componentBatches =
+        incoming?.componentBatches ??
+        (line.componentBatches ?? []).map((c) => ({
+          productName: c.productName,
+          batchNo: c.batchNo ?? "",
+        }));
+      return {
+        boxNo: line.boxNo,
+        productName: line.productName,
+        bottlesPerBox: line.bottlesPerBox,
+        batchNo: "",
+        componentBatches,
+      };
     }
-    if (!productsMatch(batch.productName, line.productName, catalog)) {
-      return NextResponse.json(
-        {
-          error: `Batch "${batchNo}" is for ${batch.productName}, not ${line.productName} (box ${line.boxNo}).`,
-        },
-        { status: 400 },
-      );
+
+    const batchNo = incoming ? incoming.batchNo : (line.batchNo ?? "");
+    return {
+      boxNo: line.boxNo,
+      productName: line.productName,
+      bottlesPerBox: line.bottlesPerBox,
+      batchNo,
+      componentBatches: [],
+    };
+  });
+
+  for (const line of workingLines) {
+    for (const alloc of lineBatchAllocations(line, catalog)) {
+      const batch = poolByKey.get(alloc.batchNo.toLowerCase());
+      if (!batch) {
+        return NextResponse.json({ error: `Unknown batch "${alloc.batchNo}".` }, { status: 400 });
+      }
+      if (!productsMatch(batch.productName, alloc.productName, catalog)) {
+        return NextResponse.json(
+          {
+            error: `Batch "${alloc.batchNo}" is for ${batch.productName}, not ${alloc.productName} (box ${line.boxNo}).`,
+          },
+          { status: 400 },
+        );
+      }
     }
   }
 
-  const usedElsewhere = accumulateBatchUsageFromOrders(allOrders, catalog, id);
+  const usedElsewhere = accumulateBatchUsageFromSheetLines(allOrders, catalog, id);
   const effectiveDefs = effectiveBatchDefsForOrder(poolToBatchDefs(pool), usedElsewhere);
 
-  const validation = validateAndComputeWeights(volumeLines, effectiveDefs, catalog);
+  const validation = validateSheetBatchAllocations(workingLines, effectiveDefs, catalog);
   if (!validation.ok) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
   for (const line of order.sheetLines ?? []) {
-    const batchNo = assignmentMap.has(line.boxNo)
-      ? (assignmentMap.get(line.boxNo) ?? "")
-      : (line.batchNo ?? "");
-    line.batchNo = batchNo;
+    const working = workingLines.find((w) => w.boxNo === line.boxNo);
+    if (!working) continue;
+
+    if (isBundleProduct(line.productName, catalog)) {
+      line.set("batchNo", "");
+      line.set(
+        "componentBatches",
+        (working.componentBatches ?? []).map((c) => ({
+          productName: c.productName,
+          batchNo: c.batchNo,
+        })),
+      );
+    } else {
+      line.set("batchNo", working.batchNo);
+      line.set("componentBatches", []);
+    }
     line.weight = validation.weights.get(line.boxNo) ?? null;
   }
 

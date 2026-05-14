@@ -3,8 +3,9 @@ import mongoose from "mongoose";
 
 import { LoadingSheetBatchEditor, type LoadingSheetLine } from "@/components/LoadingSheetBatchEditor";
 import { auth } from "@/lib/auth";
-import { accumulateBatchUsageFromOrders, inferLitersPerBottleFromName, type CatalogProduct } from "@/lib/batchVolume";
+import { accumulateBatchUsageFromOrders, type CatalogProduct } from "@/lib/batchVolume";
 import { buildSheetLines, type OrderItemInput, type SheetLine } from "@/lib/buildSheetLines";
+import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
@@ -50,6 +51,11 @@ function normalizeSheetLines(order: {
     productName: row.productName,
     bottlesPerBox: row.bottlesPerBox,
     batchNo: row.batchNo ?? "",
+    componentBatches: (row as { componentBatches?: Array<{ productName: string; batchNo?: string }> })
+      .componentBatches?.map((c) => ({
+        productName: c.productName,
+        batchNo: c.batchNo ?? "",
+      })),
     weight: row.weight ?? null,
   }));
 }
@@ -69,19 +75,22 @@ export default async function LoadingSheetPage(props: PageProps) {
     Order.findById(id).lean(),
     Order.find({}).select({ sheetLines: 1 }).lean(),
     ProductionBatch.find({}).sort({ preparedAt: -1 }).lean(),
-    ProductPacking.find({ active: true }).select({ name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1 }).lean(),
+    ProductPacking.find({ active: true })
+      .select({ code: 1, name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1, bundleComponents: 1 })
+      .lean(),
   ]);
 
   if (!order) notFound();
 
-  const batchesLocked = isBatchAssignmentLocked(order.sheetLines);
+  const catalog = packingCatalogFromDocs(catalogDocs);
+  const batchesLocked = isBatchAssignmentLocked(order.sheetLines, catalog);
   const initialDispatchEditMode = canEditDispatch && dispatchParam === "1" && !batchesLocked;
 
-  const catalog: CatalogProduct[] = catalogDocs.map((p) => ({
+  const catalogForUsage: CatalogProduct[] = catalog.map((p) => ({
     name: p.name,
-    litersPerBottle: inferLitersPerBottleFromName(p.name, p.litersPerBottle),
-    aliases: p.aliases ?? [],
-    batchFamily: p.batchFamily?.trim() || p.name,
+    litersPerBottle: p.litersPerBottle,
+    aliases: p.aliases,
+    batchFamily: p.batchFamily,
   }));
 
   const productionBatches = poolDocs.map((p) => ({
@@ -90,7 +99,7 @@ export default async function LoadingSheetPage(props: PageProps) {
     totalLiters: p.totalLiters,
   }));
 
-  const usedMap = accumulateBatchUsageFromOrders(allOrders, catalog, id);
+  const usedMap = accumulateBatchUsageFromOrders(allOrders, catalogForUsage, id);
   const usedLitersElsewhere: Record<string, number> = {};
   for (const [key, liters] of usedMap) {
     usedLitersElsewhere[key] = liters;

@@ -1,17 +1,19 @@
 [
-  { "code": "brighten-laundry-detergent-pouch", "name": "Brighten Laundry Detergent (pouch)", "summaryLabel": "BRIGHTEN POUCH", "bottlesPerCarton": 20, "litersPerBottle": 1 },
-  { "code": "brighten-fabrito-bundle-1l", "name": "Brighten Laundry Detergent + Fabrito Fabric Softener bundle (1 litre each)", "summaryLabel": "BRIGHTEN+FABRITO", "bottlesPerCarton": 5, "litersPerBottle": 1 },
-  { "code": "brighten-liquid-laundry-detergent", "name": "Brighten Liquid Laundry Detergent", "summaryLabel": "BRIGHTEN BOTTLE", "bottlesPerCarton": 10, "litersPerBottle": 1 },
-  { "code": "degrease-spray", "name": "Degrease Spray", "summaryLabel": "DEGREASE SPRAY", "bottlesPerCarton": 10, "litersPerBottle": 0.5 },
+  { "code": "brighten-laundry-detergent-pouch", "name": "Brighten Laundry Detergent (pouch)", "summaryLabel": "BRIGHTEN POUCH", "batchFamily": "Brighten", "bottlesPerCarton": 20, "litersPerBottle": 1 },
+  { "code": "brighten-liquid-laundry-detergent", "name": "Brighten Liquid Laundry Detergent", "summaryLabel": "BRIGHTEN BOTTLE", "batchFamily": "Brighten", "bottlesPerCarton": 10, "litersPerBottle": 1 },
+  { "code": "brighten-fabrito-bundle-1l", "name": "Brighten Laundry Detergent + Fabrito Fabric Softener bundle (1 litre each)", "summaryLabel": "BRIGHTEN+FABRITO", "bottlesPerCarton": 5, "litersPerBottle": 1, "bundleComponents": [{ "code": "brighten-liquid-laundry-detergent", "bottlesPerUnit": 1 }, { "code": "fabrito-fabric-softener", "bottlesPerUnit": 1 }] },
+  { "code": "degrease-spray", "name": "Degrease Spray", "summaryLabel": "DEGREASE SPRAY", "batchFamily": "Degrease Spray", "bottlesPerCarton": 10, "litersPerBottle": 0.5 },
   { "code": "fabrito-fabric-softener", "name": "Fabrito Fabric Softener", "summaryLabel": "FABRITO BOTTLE", "batchFamily": "Fabrito", "bottlesPerCarton": 10, "litersPerBottle": 1 },
   { "code": "fabrito-fabric-softener-pouch", "name": "Fabrito Fabric Softener (pouch)", "summaryLabel": "FABRITO POUCH", "batchFamily": "Fabrito", "bottlesPerCarton": 20, "litersPerBottle": 1 },
-  { "code": "power-wash", "name": "Power Wash", "summaryLabel": "POWER WASH", "bottlesPerCarton": 10, "litersPerBottle": 1, "batchFamily": "Power Wash" },
-  { "code": "power-wash-pouch", "name": "Power Wash (pouch)", "summaryLabel": "POWER WASH POUCH", "bottlesPerCarton": 20, "litersPerBottle": 1, "batchFamily": "Power Wash" },
-  { "code": "power-wash-dish-degrease-bundle", "name": "Power Wash Dish Wash + Degrease Spray Bundle", "summaryLabel": "PW+DEGREASE", "bottlesPerCarton": 5, "litersPerBottle": 1 },
+  { "code": "power-wash", "name": "Power Wash", "summaryLabel": "POWER WASH", "batchFamily": "Power Wash", "bottlesPerCarton": 10, "litersPerBottle": 1 },
+  { "code": "power-wash-pouch", "name": "Power Wash (pouch)", "summaryLabel": "POWER WASH POUCH", "batchFamily": "Power Wash", "bottlesPerCarton": 20, "litersPerBottle": 1 },
+  { "code": "power-wash-dish-degrease-bundle", "name": "Power Wash Dish Wash + Degrease Spray Bundle", "summaryLabel": "PW+DEGREASE", "bottlesPerCarton": 5, "litersPerBottle": 1, "bundleComponents": [{ "code": "power-wash", "bottlesPerUnit": 1 }, { "code": "degrease-spray", "bottlesPerUnit": 1 }] },
   { "code": "rhino-250ml", "name": "Rhino 250ml", "summaryLabel": "RHINO 250", "batchFamily": "Rhino", "bottlesPerCarton": 20, "litersPerBottle": 0.25 },
   { "code": "rhino-500ml", "name": "Rhino 500ml", "summaryLabel": "RHINO 500", "batchFamily": "Rhino", "bottlesPerCarton": 30, "litersPerBottle": 0.5 },
   { "code": "rhino-750ml", "name": "Rhino 750ml", "summaryLabel": "RHINO 750", "batchFamily": "Rhino", "bottlesPerCarton": 10, "litersPerBottle": 0.75 },
   { "code": "rhino-2x2-750ml", "name": "Rhino 2x2 750ml", "summaryLabel": "RHINO SET 2x2", "batchFamily": "Rhino", "bottlesPerCarton": 5, "litersPerBottle": 0.75 },
-  { "code": "titan", "name": "Titan", "summaryLabel": "TITAN", "bottlesPerCarton": 8, "litersPerBottle": 1 },
-  { "code": "washouts", "name": "Washouts", "summaryLabel": "WASHOUTS", "bottlesPerCarton": 10, "litersPerBottle": 1 }
+  { "code": "titan", "name": "Titan Stain Remover", "summaryLabel": "TITAN", "batchFamily": "Titan", "bottlesPerCarton": 8, "litersPerBottle": 1 },
+  { "code": "washout-floral", "name": "Washout Multi-surface Disinfectant Floral Red", "summaryLabel": "WASHOUT FLORAL", "batchFamily": "Washout Floral Red", "bottlesPerCarton": 10, "litersPerBottle": 1 },
+  { "code": "washout-lemon", "name": "Washout Multi-surface Disinfectant Lemon Yellow", "summaryLabel": "WASHOUT LEMON", "batchFamily": "Washout Lemon Yellow", "bottlesPerCarton": 10, "litersPerBottle": 1 },
+  { "code": "washout-ocean", "name": "Washout Multi-surface Disinfectant Ocean Blue", "summaryLabel": "WASHOUT OCEAN", "batchFamily": "Washout Ocean Blue", "bottlesPerCarton": 10, "litersPerBottle": 1 }
 ]

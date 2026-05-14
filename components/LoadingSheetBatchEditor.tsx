@@ -8,15 +8,20 @@ import { PrintSheetButton } from "@/components/PrintSheetButton";
 import {
   effectiveBatchDefsForOrder,
   formatLiters,
-  getRowBatchIssues,
   normalizeBatchNo,
   poolToBatchDefs,
   productsMatch,
-  usageLitersByBatchFromLines,
-  validateAndComputeWeights,
-  type CatalogProduct,
   type ProductionBatchPoolItem,
 } from "@/lib/batchVolume";
+import {
+  formatBatchDisplay,
+  isBundleProduct,
+  resolveBundleParts,
+  usageLitersByBatchFromSheetLines,
+  validateSheetBatchAllocations,
+  type ComponentBatch,
+  type PackingCatalogRow,
+} from "@/lib/bundleCatalog";
 import { type DispatchFields } from "@/lib/roles";
 
 export type LoadingSheetLine = {
@@ -24,6 +29,7 @@ export type LoadingSheetLine = {
   productName: string;
   bottlesPerBox: number;
   batchNo: string;
+  componentBatches?: ComponentBatch[];
   weight: number | null;
 };
 
@@ -33,7 +39,7 @@ type Props = {
   customerName: string;
   createdDate: string;
   sheetLines: LoadingSheetLine[];
-  catalog: CatalogProduct[];
+  catalog: PackingCatalogRow[];
   productionBatches: ProductionBatchPoolItem[];
   usedLitersElsewhere: Record<string, number>;
   initialDispatch: DispatchFields;
@@ -143,6 +149,19 @@ export function LoadingSheetBatchEditor({
     }
     return initial;
   });
+  const [componentBatches, setComponentBatches] = useState<Record<number, Record<string, string>>>(
+    () => {
+      const initial: Record<number, Record<string, string>> = {};
+      for (const line of sheetLines) {
+        const map: Record<string, string> = {};
+        for (const cb of line.componentBatches ?? []) {
+          map[cb.productName] = cb.batchNo ?? "";
+        }
+        initial[line.boxNo] = map;
+      }
+      return initial;
+    },
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -161,38 +180,47 @@ export function LoadingSheetBatchEditor({
     [productionBatches, usedElsewhereMap],
   );
 
-  const volumeLines = useMemo(
+  const workingLines = useMemo(
     () =>
-      sheetLines.map((line) => ({
-        boxNo: line.boxNo,
-        productName: line.productName,
-        bottlesPerBox: line.bottlesPerBox,
-        batchNo: batches[line.boxNo] ?? "",
-      })),
-    [batches, sheetLines],
+      sheetLines.map((line) => {
+        if (isBundleProduct(line.productName, catalog)) {
+          const parts = resolveBundleParts(line.productName, catalog);
+          return {
+            boxNo: line.boxNo,
+            productName: line.productName,
+            bottlesPerBox: line.bottlesPerBox,
+            batchNo: "",
+            componentBatches: parts.map((part) => ({
+              productName: part.productName,
+              batchNo: componentBatches[line.boxNo]?.[part.productName] ?? "",
+            })),
+          };
+        }
+        return {
+          boxNo: line.boxNo,
+          productName: line.productName,
+          bottlesPerBox: line.bottlesPerBox,
+          batchNo: batches[line.boxNo] ?? "",
+          componentBatches: [],
+        };
+      }),
+    [batches, catalog, componentBatches, sheetLines],
   );
 
   const currentOrderUsedByBatch = useMemo(
-    () => usageLitersByBatchFromLines(volumeLines, catalog),
-    [catalog, volumeLines],
+    () => usageLitersByBatchFromSheetLines(workingLines, catalog),
+    [catalog, workingLines],
   );
 
   const previewWeights = useMemo(() => {
-    const result = validateAndComputeWeights(volumeLines, effectiveBatchDefs, catalog);
+    const result = validateSheetBatchAllocations(workingLines, effectiveBatchDefs, catalog);
     if (!result.ok) return new Map<number, number | null>();
     return result.weights;
-  }, [catalog, effectiveBatchDefs, volumeLines]);
-
-  const rowIssues = useMemo(
-    () => getRowBatchIssues(volumeLines, effectiveBatchDefs, catalog),
-    [catalog, effectiveBatchDefs, volumeLines],
-  );
-
-  const rowIssueByBox = useMemo(() => new Map(rowIssues.map((i) => [i.boxNo, i])), [rowIssues]);
+  }, [catalog, effectiveBatchDefs, workingLines]);
 
   const validation = useMemo(
-    () => validateAndComputeWeights(volumeLines, effectiveBatchDefs, catalog),
-    [catalog, effectiveBatchDefs, volumeLines],
+    () => validateSheetBatchAllocations(workingLines, effectiveBatchDefs, catalog),
+    [catalog, effectiveBatchDefs, workingLines],
   );
 
   const batchesForRow = useCallback(
@@ -214,10 +242,22 @@ export function LoadingSheetBatchEditor({
       return;
     }
 
-    const assignments = sheetLines.map((line) => ({
-      boxNo: line.boxNo,
-      batchNo: batches[line.boxNo] ?? "",
-    }));
+    const assignments = sheetLines.map((line) => {
+      if (isBundleProduct(line.productName, catalog)) {
+        const parts = resolveBundleParts(line.productName, catalog);
+        return {
+          boxNo: line.boxNo,
+          componentBatches: parts.map((part) => ({
+            productName: part.productName,
+            batchNo: componentBatches[line.boxNo]?.[part.productName] ?? "",
+          })),
+        };
+      }
+      return {
+        boxNo: line.boxNo,
+        batchNo: batches[line.boxNo] ?? "",
+      };
+    });
 
     const batchRes = await fetch(`/api/orders/${orderId}/batch-assignments`, {
       method: "PATCH",
@@ -263,7 +303,7 @@ export function LoadingSheetBatchEditor({
     setDispatchEditMode(false);
     router.replace(sheetUrl);
     router.refresh();
-  }, [batches, dispatch, dispatchTripId, orderId, router, sheetLines, sheetUrl, validation]);
+  }, [batches, componentBatches, catalog, dispatch, dispatchTripId, orderId, router, sheetLines, sheetUrl, validation]);
 
   const cartonLabel = useMemo(
     () => `${sheetLines.length} carton${sheetLines.length !== 1 ? "s" : ""}`,
@@ -400,70 +440,107 @@ export function LoadingSheetBatchEditor({
             </thead>
             <tbody>
               {sheetLines.map((row) => {
-                const batchValue = batches[row.boxNo] ?? "";
-                const rowIssue = rowIssueByBox.get(row.boxNo);
-                const displayWeight =
-                  showBatchInputs && rowIssue
-                    ? null
-                    : showBatchInputs
-                      ? (previewWeights.get(row.boxNo) ?? row.weight)
-                      : row.weight;
-                const options = batchesForRow(row.productName);
+                const bundle = isBundleProduct(row.productName, catalog);
+                const parts = bundle ? resolveBundleParts(row.productName, catalog) : [];
+                const batchValue = bundle
+                  ? formatBatchDisplay(
+                      {
+                        ...row,
+                        componentBatches: parts.map((part) => ({
+                          productName: part.productName,
+                          batchNo: componentBatches[row.boxNo]?.[part.productName] ?? "",
+                        })),
+                      },
+                      catalog,
+                    )
+                  : (batches[row.boxNo] ?? "");
+                const displayWeight = showBatchInputs
+                  ? (previewWeights.get(row.boxNo) ?? row.weight)
+                  : row.weight;
 
                 return (
-                  <tr
-                    key={row.boxNo}
-                    className={rowIssue && showBatchInputs ? "bg-red-50 print:bg-transparent" : undefined}
-                  >
+                  <tr key={row.boxNo}>
                     <td className="border border-black px-1 py-1 text-center">{row.boxNo}</td>
                     <td className="border border-black px-1 py-1">{row.productName}</td>
                     <td className="border border-black px-1 py-1 text-center">{row.bottlesPerBox}</td>
                     <td className="border border-black px-1 py-1 text-center">
                       {showBatchInputs ? (
-                        <div className="space-y-0.5">
-                          <select
-                            value={batchValue}
-                            onChange={(e) => {
-                              setSaved(false);
-                              setError(null);
-                              setBatches((prev) => ({ ...prev, [row.boxNo]: e.target.value }));
-                            }}
-                            className={`w-full min-w-[5rem] rounded border px-1 py-0.5 text-center text-sm print:hidden ${
-                              rowIssue ? "border-red-500 bg-red-50" : "border-zinc-300"
-                            }`}
-                          >
-                            <option value="">—</option>
-                            {options.map((pb) => {
-                              const key = normalizeBatchNo(pb.batchNo).toLowerCase();
-                              const elsewhere = usedElsewhereMap.get(key) ?? 0;
-                              const onThisOrder = currentOrderUsedByBatch.get(key) ?? 0;
-                              const remaining = Math.max(0, pb.totalLiters - elsewhere - onThisOrder);
+                        <div className="space-y-1">
+                          {bundle ? (
+                            parts.map((part) => {
+                              const options = batchesForRow(part.productName);
+                              const value = componentBatches[row.boxNo]?.[part.productName] ?? "";
                               return (
-                                <option key={pb.batchNo} value={pb.batchNo}>
-                                  {pb.batchNo} ({formatLiters(remaining)} L left)
-                                </option>
+                                <div key={part.productName} className="text-left">
+                                  <div className="text-[10px] font-medium text-zinc-600 print:hidden">
+                                    {part.productName}
+                                  </div>
+                                  <select
+                                    value={value}
+                                    onChange={(e) => {
+                                      setSaved(false);
+                                      setError(null);
+                                      setComponentBatches((prev) => ({
+                                        ...prev,
+                                        [row.boxNo]: {
+                                          ...(prev[row.boxNo] ?? {}),
+                                          [part.productName]: e.target.value,
+                                        },
+                                      }));
+                                    }}
+                                    className="w-full min-w-[5rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
+                                  >
+                                    <option value="">—</option>
+                                    {options.map((pb) => {
+                                      const key = normalizeBatchNo(pb.batchNo).toLowerCase();
+                                      const elsewhere = usedElsewhereMap.get(key) ?? 0;
+                                      const onThisOrder = currentOrderUsedByBatch.get(key) ?? 0;
+                                      const remaining = Math.max(
+                                        0,
+                                        pb.totalLiters - elsewhere - onThisOrder,
+                                      );
+                                      return (
+                                        <option key={pb.batchNo} value={pb.batchNo}>
+                                          {pb.batchNo} ({formatLiters(remaining)} L left)
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                </div>
                               );
-                            })}
-                          </select>
-                          {rowIssue ? (
-                            <p className="text-left text-[10px] leading-tight text-red-700 print:hidden">
-                              {rowIssue.message}
-                            </p>
-                          ) : null}
+                            })
+                          ) : (
+                            <select
+                              value={batches[row.boxNo] ?? ""}
+                              onChange={(e) => {
+                                setSaved(false);
+                                setError(null);
+                                setBatches((prev) => ({ ...prev, [row.boxNo]: e.target.value }));
+                              }}
+                              className="w-full min-w-[5rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
+                            >
+                              <option value="">—</option>
+                              {batchesForRow(row.productName).map((pb) => {
+                                const key = normalizeBatchNo(pb.batchNo).toLowerCase();
+                                const elsewhere = usedElsewhereMap.get(key) ?? 0;
+                                const onThisOrder = currentOrderUsedByBatch.get(key) ?? 0;
+                                const remaining = Math.max(0, pb.totalLiters - elsewhere - onThisOrder);
+                                return (
+                                  <option key={pb.batchNo} value={pb.batchNo}>
+                                    {pb.batchNo} ({formatLiters(remaining)} L left)
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          )}
                           <span className="hidden print:inline">{batchValue}</span>
                         </div>
                       ) : (
                         batchValue
                       )}
                     </td>
-                    <td
-                      className={`border border-black px-1 py-1 text-center ${
-                        rowIssue && showBatchInputs
-                          ? "text-red-700 line-through print:text-black print:no-underline"
-                          : ""
-                      }`}
-                    >
-                      {rowIssue && showBatchInputs ? "—" : weightCell(displayWeight)}
+                    <td className="border border-black px-1 py-1 text-center">
+                      {weightCell(displayWeight)}
                     </td>
                     <td className="border border-black px-1 py-1 text-center">{poNumber}</td>
                     <td className="border border-black px-1 py-1">{customerName}</td>

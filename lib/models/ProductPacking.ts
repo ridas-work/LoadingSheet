@@ -10,6 +10,15 @@ const ProductPackingSchema = new mongoose.Schema(
     aliases: { type: [String], default: [] },
     batchFamily: { type: String, required: false, default: "" },
     summaryLabel: { type: String, required: false, default: "", trim: true },
+    bundleComponents: {
+      type: [
+        {
+          code: { type: String, required: true, trim: true, lowercase: true },
+          bottlesPerUnit: { type: Number, required: true, min: 0.001 },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true },
 );

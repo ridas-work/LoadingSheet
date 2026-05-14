@@ -17,6 +17,7 @@ type SeedRow = {
   aliases?: string[];
   batchFamily?: string;
   summaryLabel?: string;
+  bundleComponents?: Array<{ code: string; bottlesPerUnit: number }>;
 };
 
 function loadSeedRows(): SeedRow[] {
@@ -47,7 +48,12 @@ async function main() {
     const name = r.name.trim();
     const bottlesPerCarton = r.bottlesPerCarton;
     const litersPerBottle = inferLitersPerBottleFromName(name, r.litersPerBottle);
-    const batchFamily = typeof r.batchFamily === "string" && r.batchFamily.trim() ? r.batchFamily.trim() : name;
+    const hasBundle = Array.isArray(r.bundleComponents) && r.bundleComponents.length > 0;
+    const batchFamily = hasBundle
+      ? ""
+      : typeof r.batchFamily === "string" && r.batchFamily.trim()
+        ? r.batchFamily.trim()
+        : name;
     const summaryLabel =
       typeof r.summaryLabel === "string" && r.summaryLabel.trim()
         ? r.summaryLabel.trim()
@@ -66,6 +72,12 @@ async function main() {
           litersPerBottle,
           batchFamily,
           summaryLabel,
+          bundleComponents: hasBundle
+            ? r.bundleComponents!.map((c) => ({
+                code: c.code.trim().toLowerCase(),
+                bottlesPerUnit: c.bottlesPerUnit,
+              }))
+            : [],
           active: true,
           aliases: Array.isArray(r.aliases) ? r.aliases : [],
         },
@@ -74,6 +86,9 @@ async function main() {
     );
     n += 1;
   }
+
+  await ProductPacking.updateOne({ code: "washouts" }, { $set: { active: false } });
+
   // eslint-disable-next-line no-console
   console.log(`Upserted ${n} product packing(s).`);
 }

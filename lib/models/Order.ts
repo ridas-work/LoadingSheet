@@ -36,6 +36,16 @@ const SheetLineSchema = new mongoose.Schema(
     productName: { type: String, required: true, trim: true },
     bottlesPerBox: { type: Number, required: true, min: 1 },
     batchNo: { type: String, required: false, default: "" },
+    componentBatches: {
+      type: [
+        {
+          productName: { type: String, required: true, trim: true },
+          batchNo: { type: String, required: false, default: "", trim: true },
+        },
+      ],
+      required: false,
+      default: [],
+    },
     weight: { type: Number, required: false, default: null },
   },
   { _id: false },
