@@ -15,6 +15,7 @@ import {
 } from "@/lib/batchVolume";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
+import { isBatchAssignmentLocked } from "@/lib/orderBatchStatus";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
 import { roleFromSession } from "@/lib/roles";
@@ -63,6 +64,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   if (!order) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (isBatchAssignmentLocked(order.sheetLines)) {
+    return NextResponse.json(
+      { error: "Batch assignments are locked — all rows already have batches assigned." },
+      { status: 403 },
+    );
   }
 
   const catalog: CatalogProduct[] = catalogDocs.map((p) => ({

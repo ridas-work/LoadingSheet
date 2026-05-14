@@ -9,6 +9,7 @@ import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
+import { isBatchAssignmentLocked } from "@/lib/orderBatchStatus";
 import { roleFromSession, EMPTY_DISPATCH, type DispatchFields } from "@/lib/roles";
 
 type PageProps = {
@@ -62,7 +63,6 @@ export default async function LoadingSheetPage(props: PageProps) {
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
   const canEditDispatch = role === "dispatch_editor";
-  const initialDispatchEditMode = canEditDispatch && dispatchParam === "1";
 
   await connectToDatabase();
   const [order, allOrders, poolDocs, catalogDocs] = await Promise.all([
@@ -73,6 +73,9 @@ export default async function LoadingSheetPage(props: PageProps) {
   ]);
 
   if (!order) notFound();
+
+  const batchesLocked = isBatchAssignmentLocked(order.sheetLines);
+  const initialDispatchEditMode = canEditDispatch && dispatchParam === "1" && !batchesLocked;
 
   const catalog: CatalogProduct[] = catalogDocs.map((p) => ({
     name: p.name,
@@ -129,6 +132,7 @@ export default async function LoadingSheetPage(props: PageProps) {
       backHref={backHref}
       dispatchTripId={dispatchTripId}
       dispatchTripHref={dispatchTripHref}
+      batchesLocked={batchesLocked}
     />
   );
 }

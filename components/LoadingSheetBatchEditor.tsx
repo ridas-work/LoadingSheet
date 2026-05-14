@@ -42,6 +42,7 @@ type Props = {
   backHref: string;
   dispatchTripId?: string | null;
   dispatchTripHref?: string | null;
+  batchesLocked?: boolean;
 };
 
 function HeaderField({
@@ -130,6 +131,7 @@ export function LoadingSheetBatchEditor({
   backHref,
   dispatchTripId,
   dispatchTripHref,
+  batchesLocked = false,
 }: Props) {
   const router = useRouter();
   const [dispatchEditMode, setDispatchEditMode] = useState(initialDispatchEditMode);
@@ -268,7 +270,7 @@ export function LoadingSheetBatchEditor({
     [sheetLines.length],
   );
 
-  const showDispatchInputs = dispatchEditMode && canEditDispatch;
+  const showDispatchInputs = dispatchEditMode && canEditDispatch && !batchesLocked;
   const onTrip = Boolean(dispatchTripId);
   const showVehicleInputs = showDispatchInputs && !onTrip;
   const showBatchInputs = showDispatchInputs;
@@ -280,13 +282,18 @@ export function LoadingSheetBatchEditor({
           ← Back
         </Link>
         <div className="flex flex-wrap items-center gap-2">
-          {canEditDispatch && !dispatchEditMode ? (
+          {canEditDispatch && !dispatchEditMode && !batchesLocked ? (
             <Link
               href={dispatchUrl}
               className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
             >
               Edit dispatch
             </Link>
+          ) : null}
+          {batchesLocked ? (
+            <span className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
+              Batches assigned
+            </span>
           ) : null}
           {canEditDispatch && dispatchEditMode ? (
             <>
@@ -318,6 +325,11 @@ export function LoadingSheetBatchEditor({
         <p className="text-sm text-emerald-700 print:hidden">{savedMessage}</p>
       ) : null}
 
+      {batchesLocked ? (
+        <p className="text-sm text-emerald-800 print:hidden">
+          All batches are assigned for this PO. Batch rows are locked; use View / print only.
+        </p>
+      ) : null}
       {onTrip && showBatchInputs && dispatchTripHref ? (
         <p className="text-sm text-amber-800 print:hidden">
           Vehicle and driver are managed on the{" "}
