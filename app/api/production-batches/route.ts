@@ -9,6 +9,7 @@ import {
   serializeProductionBatch,
   trimQcField,
 } from "@/lib/productionBatchApi";
+import { loadBatchUsageContext, usageForBatchNo } from "@/lib/productionBatchStatus";
 import { roleFromSession } from "@/lib/roles";
 
 export async function GET() {
@@ -18,9 +19,15 @@ export async function GET() {
   }
 
   await connectToDatabase();
+  const { usedMap } = await loadBatchUsageContext();
   const batches = await ProductionBatch.find({}).sort({ preparedAt: -1, createdAt: -1 }).lean();
 
-  return NextResponse.json(batches.map(serializeProductionBatch));
+  return NextResponse.json(
+    batches.map((b) => {
+      const usage = usageForBatchNo(b.batchNo, b.totalLiters, usedMap);
+      return serializeProductionBatch({ ...b, ...usage });
+    }),
+  );
 }
 
 export async function POST(req: Request) {

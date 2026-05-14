@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 
 import { auth } from "@/lib/auth";
-import { accumulateBatchUsageFromOrders, inferLitersPerBottleFromName, normalizeBatchNo } from "@/lib/batchVolume";
+import { normalizeBatchNo } from "@/lib/batchVolume";
 import { connectToDatabase } from "@/lib/db";
-import { Order } from "@/lib/models/Order";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
-import { ProductPacking } from "@/lib/models/ProductPacking";
 import { parseQcBody, resolveBatchFamily, trimQcField } from "@/lib/productionBatchApi";
+import {
+  isProductionBatchLocked,
+  loadBatchUsageContext,
+  usageForBatchNo,
+} from "@/lib/productionBatchStatus";
 import { roleFromSession } from "@/lib/roles";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -27,6 +30,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const { usedMap } = await loadBatchUsageContext();
+  const usage = usageForBatchNo(batch.batchNo, batch.totalLiters, usedMap);
+
   return NextResponse.json({
     id: batch._id.toString(),
     batchNo: batch.batchNo,
@@ -43,6 +49,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     createdByName: batch.createdByName ?? "",
     createdAt: batch.createdAt,
     updatedAt: batch.updatedAt,
+    ...usage,
   });
 }
 
@@ -69,6 +76,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const batch = await ProductionBatch.findById(id);
   if (!batch) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const { usedMap } = await loadBatchUsageContext();
+  const usedLiters = usedMap.get(normalizeBatchNo(batch.batchNo).toLowerCase()) ?? 0;
+  if (isProductionBatchLocked(usedLiters)) {
+    return NextResponse.json(
+      {
+        error: `Batch "${batch.batchNo}" is locked — already assigned on loading sheets (${usedLiters} L in use).`,
+      },
+      { status: 403 },
+    );
   }
 
   if (body.productName !== undefined) {
@@ -130,21 +148,8 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const [allOrders, catalogDocs] = await Promise.all([
-    Order.find({}).select({ sheetLines: 1 }).lean(),
-    ProductPacking.find({ active: true }).select({ name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1 }).lean(),
-  ]);
-
-  const catalog = catalogDocs.map((p) => ({
-    name: p.name,
-    litersPerBottle: inferLitersPerBottleFromName(p.name, p.litersPerBottle),
-    aliases: p.aliases ?? [],
-    batchFamily: p.batchFamily?.trim() || p.name,
-  }));
-
-  const usedMap = accumulateBatchUsageFromOrders(allOrders, catalog);
-  const key = normalizeBatchNo(batch.batchNo).toLowerCase();
-  const usedLiters = usedMap.get(key) ?? 0;
+  const { usedMap } = await loadBatchUsageContext();
+  const usedLiters = usedMap.get(normalizeBatchNo(batch.batchNo).toLowerCase()) ?? 0;
 
   if (usedLiters > 0) {
     return NextResponse.json(

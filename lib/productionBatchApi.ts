@@ -21,6 +21,10 @@ export function serializeProductionBatch(b: {
   createdByName?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
+  usedLiters?: number;
+  remainingLiters?: number;
+  status?: string;
+  locked?: boolean;
 }) {
   return {
     id: b._id.toString(),
@@ -38,6 +42,14 @@ export function serializeProductionBatch(b: {
     createdByName: b.createdByName ?? "",
     createdAt: b.createdAt,
     updatedAt: b.updatedAt,
+    ...(b.usedLiters !== undefined
+      ? {
+          usedLiters: b.usedLiters,
+          remainingLiters: b.remainingLiters,
+          status: b.status,
+          locked: b.locked,
+        }
+      : {}),
   };
 }
 
