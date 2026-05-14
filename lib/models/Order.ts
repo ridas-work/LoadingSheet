@@ -45,6 +45,8 @@ const OrderSchema = new mongoose.Schema(
   {
     poNumber: { type: String, required: true, trim: true },
     customerName: { type: String, required: true, trim: true },
+    city: { type: String, required: false, default: "", trim: true },
+    deadlineDate: { type: Date, required: false, default: null },
     items: {
       type: [OrderItemSchema],
       required: true,

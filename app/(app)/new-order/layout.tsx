@@ -12,5 +12,8 @@ export default async function NewOrderLayout({ children }: { children: React.Rea
   if (role === "dispatch_editor") {
     redirect("/orders");
   }
+  if (role === "admin") {
+    redirect("/admin");
+  }
   return children;
 }

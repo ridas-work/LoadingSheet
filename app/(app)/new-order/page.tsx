@@ -35,6 +35,8 @@ function emptyRow(): ItemRow {
 export default function NewOrderPage() {
   const [poNumber, setPoNumber] = useState("");
   const [customerName, setCustomerName] = useState("");
+  const [city, setCity] = useState("");
+  const [deadlineDate, setDeadlineDate] = useState("");
   const [items, setItems] = useState<ItemRow[]>([emptyRow()]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
@@ -162,6 +164,8 @@ export default function NewOrderPage() {
         body: JSON.stringify({
           poNumber: poNumber.trim(),
           customerName: customerName.trim(),
+          city: city.trim(),
+          deadlineDate: deadlineDate.trim() || undefined,
           items: items.map((it) => ({
             productName: it.productName.trim(),
             boxes: Number(it.boxes),
@@ -189,6 +193,8 @@ export default function NewOrderPage() {
       setSuccessId(String(data?.id ?? ""));
       setPoNumber("");
       setCustomerName("");
+      setCity("");
+      setDeadlineDate("");
       setItems([emptyRow()]);
       setErrors({});
     } finally {
@@ -293,6 +299,34 @@ export default function NewOrderPage() {
           {errors.customerName ? (
             <div className="mt-1 text-sm text-red-700">{errors.customerName}</div>
           ) : null}
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium text-zinc-800" htmlFor="city">
+              City
+            </label>
+            <input
+              id="city"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="e.g. LAHORE"
+              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-zinc-800" htmlFor="deadlineDate">
+              Deadline date
+            </label>
+            <input
+              id="deadlineDate"
+              type="date"
+              value={deadlineDate}
+              onChange={(e) => setDeadlineDate(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            />
+          </div>
         </div>
 
         <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">

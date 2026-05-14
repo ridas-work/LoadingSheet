@@ -9,6 +9,8 @@ import { roleFromSession } from "@/lib/roles";
 type CreateOrderBody = {
   poNumber?: unknown;
   customerName?: unknown;
+  city?: unknown;
+  deadlineDate?: unknown;
   items?: unknown;
   productName?: unknown;
   bottles?: unknown;
@@ -131,9 +133,18 @@ export async function POST(req: Request) {
 
   const sheetLines = buildSheetLines(parsedItems);
 
+  const city = typeof body.city === "string" ? body.city.trim() : "";
+  let deadlineDate: Date | null = null;
+  if (typeof body.deadlineDate === "string" && body.deadlineDate.trim()) {
+    const parsed = new Date(body.deadlineDate.trim());
+    if (!Number.isNaN(parsed.getTime())) deadlineDate = parsed;
+  }
+
   const created = await Order.create({
     poNumber: String(body.poNumber).trim(),
     customerName: String(body.customerName).trim(),
+    city,
+    deadlineDate,
     items: parsedItems,
     sheetLines,
     createdByUserId: userId,

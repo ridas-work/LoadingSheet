@@ -16,6 +16,7 @@ type SeedRow = {
   litersPerBottle?: number;
   aliases?: string[];
   batchFamily?: string;
+  summaryLabel?: string;
 };
 
 function loadSeedRows(): SeedRow[] {
@@ -47,6 +48,12 @@ async function main() {
     const bottlesPerCarton = r.bottlesPerCarton;
     const litersPerBottle = inferLitersPerBottleFromName(name, r.litersPerBottle);
     const batchFamily = typeof r.batchFamily === "string" && r.batchFamily.trim() ? r.batchFamily.trim() : name;
+    const summaryLabel =
+      typeof r.summaryLabel === "string" && r.summaryLabel.trim()
+        ? r.summaryLabel.trim()
+        : name.length > 24
+          ? name.slice(0, 22) + "…"
+          : name;
     if (!code || !name || !Number.isInteger(bottlesPerCarton) || bottlesPerCarton < 1) {
       throw new Error(`Invalid row: ${JSON.stringify(r)}`);
     }
@@ -58,6 +65,7 @@ async function main() {
           bottlesPerCarton,
           litersPerBottle,
           batchFamily,
+          summaryLabel,
           active: true,
           aliases: Array.isArray(r.aliases) ? r.aliases : [],
         },

@@ -1,12 +1,13 @@
-export type AppRole = "po_creator" | "batch_editor" | "dispatch_editor";
+export type AppRole = "po_creator" | "batch_editor" | "dispatch_editor" | "admin";
 
-const ALLOWED_ROLES: AppRole[] = ["po_creator", "batch_editor", "dispatch_editor"];
+const ALLOWED_ROLES: AppRole[] = ["po_creator", "batch_editor", "dispatch_editor", "admin"];
 
 export function isAppRole(role: unknown): role is AppRole {
   return typeof role === "string" && ALLOWED_ROLES.includes(role as AppRole);
 }
 
 export function homePathForRole(role: AppRole): string {
+  if (role === "admin") return "/admin";
   if (role === "batch_editor") return "/production/batches";
   if (role === "dispatch_editor") return "/dispatch/trips";
   return "/new-order";
