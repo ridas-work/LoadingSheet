@@ -33,8 +33,8 @@ export default async function EditProductionBatchPage(props: PageProps) {
   return (
     <div className="mx-auto max-w-md space-y-6">
       <div>
-        <Link href="/production/batches" className="text-sm font-medium text-zinc-700 underline">
-          ← Back to batches
+        <Link href={`/production/batches/${id}`} className="text-sm font-medium text-zinc-700 underline">
+          ← Back to batch detail
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Edit batch</h1>
         <p className="mt-1 text-sm text-zinc-600">{batch.batchNo}</p>
@@ -46,7 +46,12 @@ export default async function EditProductionBatchPage(props: PageProps) {
           initialProductName={batch.productName}
           initialTotalLiters={batch.totalLiters}
           initialPreparedAt={preparedAt}
-          initialNotes={batch.notes ?? ""}
+          initialPh={batch.ph ?? ""}
+          initialSolids={batch.solids ?? ""}
+          initialAppearance={batch.appearance ?? ""}
+          initialProvider={batch.provider ?? ""}
+          initialDrum={batch.drum ?? ""}
+          initialQuantity={batch.quantity ?? ""}
         />
       </div>
     </div>

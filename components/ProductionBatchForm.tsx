@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-type Product = { name: string; bottlesPerCarton: number };
+type BatchFamily = { name: string; batchFamily: string };
 
 type Props = {
   batchId?: string;
@@ -11,8 +11,45 @@ type Props = {
   initialProductName?: string;
   initialTotalLiters?: number;
   initialPreparedAt?: string;
-  initialNotes?: string;
+  initialPh?: string;
+  initialSolids?: string;
+  initialAppearance?: string;
+  initialProvider?: string;
+  initialDrum?: string;
+  initialQuantity?: string;
 };
+
+function Field({
+  id,
+  label,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-zinc-800" htmlFor={id}>
+        {label}
+      </label>
+      <input
+        id={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder={placeholder}
+        className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-100"
+      />
+    </div>
+  );
+}
 
 export function ProductionBatchForm({
   batchId,
@@ -20,11 +57,16 @@ export function ProductionBatchForm({
   initialProductName = "",
   initialTotalLiters,
   initialPreparedAt,
-  initialNotes = "",
+  initialPh = "",
+  initialSolids = "",
+  initialAppearance = "",
+  initialProvider = "",
+  initialDrum = "",
+  initialQuantity = "",
 }: Props) {
   const router = useRouter();
   const isEdit = Boolean(batchId);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [families, setFamilies] = useState<BatchFamily[]>([]);
   const [batchNo, setBatchNo] = useState(initialBatchNo);
   const [productName, setProductName] = useState(initialProductName);
   const [totalLiters, setTotalLiters] = useState(
@@ -33,20 +75,44 @@ export function ProductionBatchForm({
   const [preparedAt, setPreparedAt] = useState(
     initialPreparedAt ?? new Date().toISOString().slice(0, 10),
   );
-  const [notes, setNotes] = useState(initialNotes);
+  const [ph, setPh] = useState(initialPh);
+  const [solids, setSolids] = useState(initialSolids);
+  const [appearance, setAppearance] = useState(initialAppearance);
+  const [provider, setProvider] = useState(initialProvider);
+  const [drum, setDrum] = useState(initialDrum);
+  const [quantity, setQuantity] = useState(initialQuantity);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetch("/api/products")
       .then((r) => r.json())
-      .then((data) => setProducts(Array.isArray(data) ? data : []))
-      .catch(() => setProducts([]));
+      .then((data: { batchFamilies?: BatchFamily[]; products?: BatchFamily[] }) => {
+        const list = Array.isArray(data.batchFamilies)
+          ? data.batchFamilies
+          : Array.isArray(data.products)
+            ? data.products.map((p) => ({
+                name: (p as { batchFamily?: string; name: string }).batchFamily ?? p.name,
+                batchFamily: (p as { batchFamily?: string; name: string }).batchFamily ?? p.name,
+              }))
+            : [];
+        setFamilies(list);
+      })
+      .catch(() => setFamilies([]));
   }, []);
 
   const canSubmit = useMemo(
-    () => batchNo.trim().length > 0 && productName.length > 0 && Number(totalLiters) > 0,
-    [batchNo, productName, totalLiters],
+    () =>
+      batchNo.trim().length > 0 &&
+      productName.length > 0 &&
+      Number(totalLiters) > 0 &&
+      ph.trim().length > 0 &&
+      solids.trim().length > 0 &&
+      appearance.trim().length > 0 &&
+      provider.trim().length > 0 &&
+      drum.trim().length > 0 &&
+      quantity.trim().length > 0,
+    [appearance, batchNo, drum, ph, productName, provider, quantity, solids, totalLiters],
   );
 
   async function onSubmit(e: React.FormEvent) {
@@ -59,7 +125,12 @@ export function ProductionBatchForm({
       productName,
       totalLiters: Number(totalLiters),
       preparedAt,
-      notes: notes.trim(),
+      ph: ph.trim(),
+      solids: solids.trim(),
+      appearance: appearance.trim(),
+      provider: provider.trim(),
+      drum: drum.trim(),
+      quantity: quantity.trim(),
     };
 
     const res = await fetch(
@@ -85,19 +156,14 @@ export function ProductionBatchForm({
 
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
-      <div>
-        <label className="block text-sm font-medium text-zinc-800" htmlFor="batchNo">
-          Batch number
-        </label>
-        <input
-          id="batchNo"
-          value={batchNo}
-          onChange={(e) => setBatchNo(e.target.value)}
-          disabled={isEdit}
-          className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-100"
-          placeholder="e.g. B-2405-12"
-        />
-      </div>
+      <Field
+        id="batchNo"
+        label="Batch number"
+        value={batchNo}
+        onChange={setBatchNo}
+        disabled={isEdit}
+        placeholder="e.g. 250728-1"
+      />
 
       <div>
         <label className="block text-sm font-medium text-zinc-800" htmlFor="productName">
@@ -110,33 +176,20 @@ export function ProductionBatchForm({
           className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
         >
           <option value="">Select product…</option>
-          {products.map((p) => (
-            <option key={p.name} value={p.name}>
-              {p.name}
+          {families.map((f) => (
+            <option key={f.batchFamily} value={f.batchFamily}>
+              {f.batchFamily}
             </option>
           ))}
         </select>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-zinc-800" htmlFor="totalLiters">
-          Total liters
-        </label>
-        <input
-          id="totalLiters"
-          type="number"
-          min="0.001"
-          step="any"
-          value={totalLiters}
-          onChange={(e) => setTotalLiters(e.target.value)}
-          className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
-          placeholder="e.g. 1000"
-        />
+        <p className="mt-1 text-xs text-zinc-500">
+          One batch covers all packings in the family (e.g. Power Wash and Power Wash pouch).
+        </p>
       </div>
 
       <div>
         <label className="block text-sm font-medium text-zinc-800" htmlFor="preparedAt">
-          Prepared date
+          Date
         </label>
         <input
           id="preparedAt"
@@ -147,15 +200,29 @@ export function ProductionBatchForm({
         />
       </div>
 
+      <Field id="ph" label="pH" value={ph} onChange={setPh} placeholder="e.g. 7 or 6.5-7" />
+      <Field id="solids" label="Solids" value={solids} onChange={setSolids} placeholder="e.g. 29-30% (sinking 17)" />
+      <Field id="appearance" label="Appearance" value={appearance} onChange={setAppearance} placeholder="e.g. Clear liquid" />
+      <Field id="provider" label="Provider" value={provider} onChange={setProvider} placeholder="e.g. Ramzan" />
+      <Field id="drum" label="Drum" value={drum} onChange={setDrum} placeholder="e.g. 6 * 150" />
+      <Field id="quantity" label="Quantity" value={quantity} onChange={setQuantity} placeholder="e.g. 450L or 750kg" />
+      <p className="text-xs text-zinc-500">
+        Quantity is stored exactly as entered for future reference. Total liters below is used for dispatch remaining-volume checks.
+      </p>
+
       <div>
-        <label className="block text-sm font-medium text-zinc-800" htmlFor="notes">
-          Notes (optional)
+        <label className="block text-sm font-medium text-zinc-800" htmlFor="totalLiters">
+          Total liters (dispatch pool)
         </label>
         <input
-          id="notes"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
+          id="totalLiters"
+          type="number"
+          min="0.001"
+          step="any"
+          value={totalLiters}
+          onChange={(e) => setTotalLiters(e.target.value)}
           className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+          placeholder="e.g. 1000"
         />
       </div>
 
@@ -171,4 +238,3 @@ export function ProductionBatchForm({
     </form>
   );
 }
-

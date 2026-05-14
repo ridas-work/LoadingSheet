@@ -22,7 +22,7 @@ export default async function ProductionBatchesPage() {
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900">Production batches</h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Register each prepared batch (number, product, liters). Rashid assigns batches to POs at dispatch.
+            Register each prepared batch with QC details. Rashid assigns batches to POs at dispatch.
           </p>
         </div>
         {isBatchEditor ? (
@@ -42,38 +42,49 @@ export default async function ProductionBatchesPage() {
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[48rem] text-sm">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50 text-left">
                 <th className="px-4 py-2 font-medium">Batch no</th>
                 <th className="px-4 py-2 font-medium">Product</th>
+                <th className="px-4 py-2 font-medium">Date</th>
+                <th className="px-4 py-2 font-medium">pH</th>
+                <th className="px-4 py-2 font-medium">Quantity</th>
                 <th className="px-4 py-2 font-medium">Liters</th>
-                <th className="px-4 py-2 font-medium">Prepared</th>
                 <th className="px-4 py-2 font-medium">By</th>
                 {isBatchEditor ? <th className="px-4 py-2 font-medium" /> : null}
               </tr>
             </thead>
             <tbody>
-              {batches.map((b) => (
-                <tr key={b._id.toString()} className="border-b border-zinc-100 last:border-0">
-                  <td className="px-4 py-2 font-medium text-zinc-900">{b.batchNo}</td>
-                  <td className="px-4 py-2 text-zinc-700">{b.productName}</td>
-                  <td className="px-4 py-2 text-zinc-700">{formatLiters(b.totalLiters)} L</td>
-                  <td className="px-4 py-2 text-zinc-600">
-                    {new Date(b.preparedAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-2 text-zinc-600">{b.createdByName || "—"}</td>
-                  {isBatchEditor ? (
-                    <td className="px-4 py-2">
-                      <ProductionBatchRowActions
-                        batchId={b._id.toString()}
-                        batchNo={b.batchNo}
-                        canManage={isBatchEditor}
-                      />
+              {batches.map((b) => {
+                const id = b._id.toString();
+                return (
+                  <tr key={id} className="border-b border-zinc-100 last:border-0">
+                    <td className="px-4 py-2 font-medium text-zinc-900">
+                      <Link href={`/production/batches/${id}`} className="underline hover:text-zinc-700">
+                        {b.batchNo}
+                      </Link>
                     </td>
-                  ) : null}
-                </tr>
-              ))}
+                    <td className="px-4 py-2 text-zinc-700">{b.productName}</td>
+                    <td className="px-4 py-2 text-zinc-600">
+                      {new Date(b.preparedAt).toLocaleDateString()}
+                    </td>
+                    <td className="px-4 py-2 text-zinc-700">{b.ph?.trim() || "—"}</td>
+                    <td className="px-4 py-2 text-zinc-700">{b.quantity?.trim() || "—"}</td>
+                    <td className="px-4 py-2 text-zinc-700">{formatLiters(b.totalLiters)} L</td>
+                    <td className="px-4 py-2 text-zinc-600">{b.createdByName || "—"}</td>
+                    {isBatchEditor ? (
+                      <td className="px-4 py-2">
+                        <ProductionBatchRowActions
+                          batchId={id}
+                          batchNo={b.batchNo}
+                          canManage={isBatchEditor}
+                        />
+                      </td>
+                    ) : null}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -81,4 +92,3 @@ export default async function ProductionBatchesPage() {
     </div>
   );
 }
-

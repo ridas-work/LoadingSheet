@@ -38,7 +38,7 @@ Sign in at `/login`. Accounts are created only via seed (no signup).
 ### Workflow
 
 1. **PO team** creates orders at `/new-order`.
-2. **Nimra** registers **prepared batches** at `/production/batches` (batch number, product, total liters — no PO).
+2. **Nimra** registers **prepared batches** at `/production/batches` with **batch number, product, date, pH, solids, appearance, provider, drum, quantity** (stored for audit). One **Power Wash** batch covers both Power Wash and Power Wash (pouch) packings. **Total liters** sets the dispatch pool size.
 3. **Rashid** lands on **`/dispatch/trips`**: create a **vehicle trip** with one or more POs, enter vehicle/driver/footer once (synced to every linked sheet). Per PO, use **Assign batches** on the trip page or **Edit dispatch** on the loading sheet for batch rows only when the order is on a trip.
 4. **Anyone** can **View loading sheet** and print.
 
