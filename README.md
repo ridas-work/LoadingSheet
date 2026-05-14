@@ -34,13 +34,15 @@ Sign in at `/login`. Accounts are created only via seed (no signup).
 | Ibtisam | `ibtisam` | `Ibtisam-Order-04`  |
 | Nimra   | `nimra`   | `Nimra-Batch-01`    | Production — batch numbers only |
 | Rashid  | `rashid`  | `Rashid-Dispatch-01`| Dispatch — vehicle, driver, DC, signatures |
+| Waleed Intisar | `waleed` | `Waleed-Admin-01` | Admin — pending orders summary (read-only) |
 
 ### Workflow
 
-1. **PO team** creates orders at `/new-order`.
+1. **PO team** creates orders at `/new-order` (include **city** and **deadline** for the management report).
 2. **Nimra** registers **prepared batches** at `/production/batches` with **batch number, product, date, pH, solids, appearance, provider, drum, quantity** (stored for audit). One **Power Wash** batch covers both Power Wash and Power Wash (pouch) packings. **Total liters** sets the dispatch pool size.
 3. **Rashid** lands on **`/dispatch/trips`**: create a **vehicle trip** with one or more POs, enter vehicle/driver/footer once (synced to every linked sheet). Per PO, use **Assign batches** on the trip page or **Edit dispatch** on the loading sheet for batch rows only when the order is on a trip.
 4. **Anyone** can **View loading sheet** and print.
+5. **Waleed Intisar** signs in at `/admin` for the **pending orders** grid — carton counts per product, row/column totals, **BUILTY DONE** when a PO is on a dispatched vehicle trip.
 
 ### Batch volume (liters)
 

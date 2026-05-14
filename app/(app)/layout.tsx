@@ -15,16 +15,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const role = roleFromSession(session.user as { role?: string });
   const homeHref = role ? homePathForRole(role) : "/new-order";
+  const isAdmin = role === "admin";
 
   return (
     <div className="min-h-dvh bg-zinc-50">
       <header className="border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
+        <div className={`mx-auto flex items-center justify-between px-4 py-3 ${isAdmin ? "max-w-[1600px]" : "max-w-4xl"}`}>
           <div className="flex items-center gap-4">
             <Link href={homeHref} className="text-sm font-semibold text-zinc-900">
               Loading Sheet
             </Link>
-            {role !== "batch_editor" ? (
+            {isAdmin ? (
+              <Link href="/admin" className="text-sm text-zinc-600 hover:text-zinc-900">
+                Summary
+              </Link>
+            ) : null}
+            {role !== "batch_editor" && !isAdmin ? (
               <Link href="/orders" className="text-sm text-zinc-600 hover:text-zinc-900">
                 Orders
               </Link>
@@ -46,7 +52,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-4xl px-4 py-6">{children}</main>
+      <main className={`mx-auto px-4 py-6 ${isAdmin ? "max-w-[1600px]" : "max-w-4xl"}`}>{children}</main>
     </div>
   );
 }
