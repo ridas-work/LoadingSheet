@@ -304,3 +304,20 @@ Executable plans:
 - `.planning/phases/10-production-batch-qc-fields/01-PLAN.md`
 - `.planning/phases/10-production-batch-qc-fields/02-PLAN.md`
 
+---
+
+## Phase 11 (Lock production batches for Nimra) — **planned**
+
+### Problem
+
+Nimra can still **edit** a production batch after Rashid has assigned it on a loading sheet. QC audit fields must not change post-dispatch. Fully **empty** (depleted) batches should show as **done**, not editable.
+
+### Solution
+
+- Lock edit/delete when `usedLiters > 0` (PATCH 403; UI hides actions).
+- Status on Nimra list: **Available** | **In use (X L left)** | **Empty**.
+
+Executable plans:
+- `.planning/phases/11-lock-production-batches/01-PLAN.md`
+- `.planning/phases/11-lock-production-batches/02-PLAN.md`
+

@@ -1,13 +1,15 @@
 # Project State
 
-Phase: **10 complete** — Production batch QC fields
-Status: Verified (`10-VERIFICATION.md` passed)
+Phase: **11 planned** — Lock production batches for Nimra
+Status: Ready to execute (`/gsd-execute-phase 11`)
 
 ## Context
-- Nimra registers batches with pH, solids, appearance, provider, drum, quantity + date/product/batch no.
-- Power Wash family covers both Power Wash packings for Rashid assignment.
-- Batch detail page supports future feedback audit.
+- DELETE already blocks when batch liters are on loading sheets; PATCH does not — Nimra can still change QC data after dispatch.
+- Nimra should see **Empty** / **In use** / **Available** instead of Edit on done batches.
+
+## Decisions Made
+- Lock when `usedLiters > 0` (any assignment on a PO).
+- **Empty** = `remainingLiters <= 0`; still locked, distinct badge from **In use**.
 
 ## Next
-- **Milestone audit:** `/gsd-audit-milestone`
-- Run `npm run seed:products` if batchFamily not yet in DB
+- **Execute Phase 11:** `/gsd-execute-phase 11`
