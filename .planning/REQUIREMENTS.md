@@ -327,11 +327,11 @@ Executable plans:
 
 ### Problem
 
-The boss tracks workload in a spreadsheet/PDF: pending POs with city, deadline, and **carton counts per product**. The app has no admin view.
+Management (Waleed Intisar) tracks workload in a spreadsheet/PDF: pending POs with city, deadline, and **carton counts per product**. The app has no admin view.
 
 ### Solution
 
-- Role **`admin`** (boss login).
+- Role **`admin`** — user **Waleed Intisar** (`waleed` / `Waleed-Admin-01`).
 - **`/admin`** dashboard replicating the PDF grid: product columns, totals, **BUILTY DONE** for dispatched orders.
 - Extend orders with **city** and **deadline date** on PO entry.
 

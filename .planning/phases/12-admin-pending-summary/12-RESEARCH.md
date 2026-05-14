@@ -43,8 +43,8 @@ Examples from PDF headers:
 
 ## Proposed `admin` role
 
-- New role: **`admin`** (boss / management read-only dashboard)
-- Seed user e.g. `boss` / `Boss-Admin-01` (document in README)
+- New role: **`admin`** (management read-only dashboard)
+- Seed user **Waleed Intisar** — username `waleed`, password `Waleed-Admin-01` (document in README)
 - Home: **`/admin`**
 - Cannot create POs, batches, or dispatch — **view summary only**
 

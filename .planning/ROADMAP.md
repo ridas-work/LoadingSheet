@@ -58,8 +58,8 @@ Executable plans:
 - `.planning/phases/11-lock-production-batches/02-PLAN.md` — Nimra status UI + hide edit when locked
 
 ## Phase 12: Admin pending orders summary — **planned**
-**Boss admin panel** (`admin` role): login and view a **PDF-style pending orders grid** — customer, city, deadline, PO no, carton counts per product column, row/column/grand totals, **BUILTY DONE** when dispatched on a vehicle trip.
+**Admin panel** (`admin` role) for **Waleed Intisar**: login and view a **PDF-style pending orders grid** — customer, city, deadline, PO no, carton counts per product column, row/column/grand totals, **BUILTY DONE** when dispatched on a vehicle trip.
 
 Executable plans:
-- `.planning/phases/12-admin-pending-summary/01-PLAN.md` — admin role, boss seed, order city/deadline, summary labels
+- `.planning/phases/12-admin-pending-summary/01-PLAN.md` — admin role, Waleed Intisar seed, order city/deadline, summary labels
 - `.planning/phases/12-admin-pending-summary/02-PLAN.md` — summary API + admin dashboard UI

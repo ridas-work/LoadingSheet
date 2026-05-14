@@ -12,11 +12,11 @@ autonomous: true
 ---
 
 <phase_goal>
-Boss **admin dashboard**: spreadsheet-style **PENDING ORDERS** summary matching the PDF — customer, city, deadline / BUILTY DONE, PO no, product carton columns, row totals, column totals, grand total. Print-friendly.
+**Waleed Intisar** admin dashboard: spreadsheet-style **PENDING ORDERS** summary matching the PDF — customer, city, deadline / BUILTY DONE, PO no, product carton columns, row totals, column totals, grand total. Print-friendly.
 </phase_goal>
 
 <user_flow>
-1. Boss logs in → **`/admin`**.
+1. Waleed logs in → **`/admin`**.
 2. Sees title **Pending orders** + today’s date.
 3. Table: one row per open PO; product columns from catalog `summaryLabel`; **Total** column.
 4. Rows with vehicle dispatched show **BUILTY DONE** in deadline cell.
@@ -30,7 +30,7 @@ Boss **admin dashboard**: spreadsheet-style **PENDING ORDERS** summary matching 
 - [ ] `/admin` page — horizontal-scroll table, matches PDF structure closely.
 - [ ] Print stylesheet or print button.
 - [ ] Nav: admin sees **Summary** only (no PO/batch/dispatch links).
-- [ ] README: boss credentials + workflow bullet.
+- [ ] README: Waleed Intisar admin credentials + workflow bullet.
 </must_haves>
 
 <tasks>
@@ -47,7 +47,7 @@ Boss **admin dashboard**: spreadsheet-style **PENDING ORDERS** summary matching 
   <task id="3" name="ui">
     <step>Admin dashboard page + `AdminSummaryTable` component.</step>
     <step>Update app layout nav for admin role.</step>
-    <step>README boss section.</step>
+    <step>README admin (Waleed Intisar) section.</step>
   </task>
 </tasks>
 
