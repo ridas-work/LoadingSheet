@@ -42,3 +42,10 @@ One **vehicle / trip** can carry **multiple POs**. Rashid creates a **dispatch t
 Executable plans:
 - `.planning/phases/09-multi-po-vehicle-dispatch/01-PLAN.md` — DispatchTrip model + API
 - `.planning/phases/09-multi-po-vehicle-dispatch/02-PLAN.md` — Rashid trip UI + orders integration
+
+## Phase 10: Production batch QC fields — **planned**
+Nimra's batch registry gains **structured QC/logistics fields** (pH, solids, appearance, provider, drum, quantity, product, date) stored for **future feedback audit**. **Product batch families** — e.g. one **Power Wash** batch covers both Power Wash and Power Wash (pouch) packings on POs.
+
+Executable plans:
+- `.planning/phases/10-production-batch-qc-fields/01-PLAN.md` — schema, API, product families
+- `.planning/phases/10-production-batch-qc-fields/02-PLAN.md` — Nimra form, list, detail view

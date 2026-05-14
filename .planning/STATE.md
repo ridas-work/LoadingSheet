@@ -1,16 +1,16 @@
 # Project State
 
-Phase: **09 complete** — Multi-PO vehicle dispatch
-Status: Verified (`09-VERIFICATION.md` passed)
+Phase: **10 planned** — Production batch QC fields
+Status: Ready to execute (`/gsd-execute-phase 10`)
 
 ## Context
-- Rashid groups multiple POs on one vehicle via **Dispatch trips**.
-- Vehicle/driver/footer sync to each linked order; batch assignment stays per PO on the loading sheet.
+- Nimra's manual spreadsheet tracks pH, solids, appearance, provider, drum, quantity per batch — app must store the same for dispute lookup.
+- Power Wash + Power Wash (pouch) share one **batch family** for registration and Rashid assignment.
 
 ## Decisions Made
-- **`DispatchTrip`** links many `orderIds`; `syncTripDispatchToOrders` copies fields to `Order.dispatch`.
-- Rashid home → **`/dispatch/trips`**.
+- Structured string fields on `ProductionBatch` (not unstructured notes).
+- `totalLiters` kept for dispatch liter pool; `quantity` is Nimra's label as typed.
+- `ProductPacking.batchFamily` drives Nimra dropdown and `productsMatch`.
 
 ## Next
-- **Milestone audit:** `/gsd-audit-milestone`
-- Or resume Phase 06 UAT / manual trip testing with Rashid login
+- **Execute Phase 10:** `/gsd-execute-phase 10`

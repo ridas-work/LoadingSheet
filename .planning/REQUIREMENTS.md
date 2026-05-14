@@ -284,3 +284,23 @@ Executable plans:
 - `.planning/phases/09-multi-po-vehicle-dispatch/01-PLAN.md`
 - `.planning/phases/09-multi-po-vehicle-dispatch/02-PLAN.md`
 
+---
+
+## Phase 10 (Production batch QC fields) — **planned**
+
+### Problem
+
+Nimra records batch QC data in a spreadsheet (pH, solids, appearance, provider, drum, quantity). The app only stores batch no, product, liters, and optional notes — not enough to verify what was registered if feedback is wrong later.
+
+Power Wash and Power Wash (pouch) are the same liquid; separate catalog packings should not require duplicate batches.
+
+### Solution
+
+- Add structured fields on **`ProductionBatch`**: ph, solids, appearance, provider, drum, quantity (+ existing batch no, product, date, totalLiters).
+- **`ProductPacking.batchFamily`** — Nimra selects family; Rashid can assign that batch to any packing in the family.
+- Batch **detail view** for audit / dispute lookup.
+
+Executable plans:
+- `.planning/phases/10-production-batch-qc-fields/01-PLAN.md`
+- `.planning/phases/10-production-batch-qc-fields/02-PLAN.md`
+
