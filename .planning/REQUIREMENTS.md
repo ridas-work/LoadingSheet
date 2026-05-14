@@ -323,7 +323,7 @@ Executable plans:
 
 ---
 
-## Phase 12 (Admin pending orders summary) — **planned**
+## Phase 12 (Admin pending orders summary) — **complete**
 
 ### Problem
 
