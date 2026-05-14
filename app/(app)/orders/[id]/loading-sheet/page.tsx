@@ -69,7 +69,7 @@ export default async function LoadingSheetPage(props: PageProps) {
     Order.findById(id).lean(),
     Order.find({}).select({ sheetLines: 1 }).lean(),
     ProductionBatch.find({}).sort({ preparedAt: -1 }).lean(),
-    ProductPacking.find({ active: true }).select({ name: 1, litersPerBottle: 1, aliases: 1 }).lean(),
+    ProductPacking.find({ active: true }).select({ name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1 }).lean(),
   ]);
 
   if (!order) notFound();
@@ -78,6 +78,7 @@ export default async function LoadingSheetPage(props: PageProps) {
     name: p.name,
     litersPerBottle: inferLitersPerBottleFromName(p.name, p.litersPerBottle),
     aliases: p.aliases ?? [],
+    batchFamily: p.batchFamily?.trim() || p.name,
   }));
 
   const productionBatches = poolDocs.map((p) => ({

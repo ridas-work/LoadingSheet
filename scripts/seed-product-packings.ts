@@ -9,7 +9,14 @@ import { ProductPacking } from "@/lib/models/ProductPacking";
 dotenv.config({ path: path.join(process.cwd(), ".env.local"), override: false });
 dotenv.config({ path: path.join(process.cwd(), ".env"), override: false });
 
-type SeedRow = { code: string; name: string; bottlesPerCarton: number; litersPerBottle?: number; aliases?: string[] };
+type SeedRow = {
+  code: string;
+  name: string;
+  bottlesPerCarton: number;
+  litersPerBottle?: number;
+  aliases?: string[];
+  batchFamily?: string;
+};
 
 function loadSeedRows(): SeedRow[] {
   const raw = process.env.SEED_PRODUCTS_JSON;
@@ -39,6 +46,7 @@ async function main() {
     const name = r.name.trim();
     const bottlesPerCarton = r.bottlesPerCarton;
     const litersPerBottle = inferLitersPerBottleFromName(name, r.litersPerBottle);
+    const batchFamily = typeof r.batchFamily === "string" && r.batchFamily.trim() ? r.batchFamily.trim() : name;
     if (!code || !name || !Number.isInteger(bottlesPerCarton) || bottlesPerCarton < 1) {
       throw new Error(`Invalid row: ${JSON.stringify(r)}`);
     }
@@ -49,6 +57,7 @@ async function main() {
           name,
           bottlesPerCarton,
           litersPerBottle,
+          batchFamily,
           active: true,
           aliases: Array.isArray(r.aliases) ? r.aliases : [],
         },

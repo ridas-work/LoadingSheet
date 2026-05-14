@@ -2,6 +2,7 @@ export type CatalogProduct = {
   name: string;
   litersPerBottle: number;
   aliases?: string[];
+  batchFamily?: string;
 };
 
 export type BatchDef = {
@@ -305,10 +306,16 @@ export function catalogProductKey(productName: string, catalog: CatalogProduct[]
   if (!key) return null;
 
   for (const p of catalog) {
-    if (p.name.trim().toLowerCase() === key) return p.name.trim().toLowerCase();
+    const family = (p.batchFamily?.trim() || p.name.trim()).toLowerCase();
+    if (p.name.trim().toLowerCase() === key) return family;
     for (const alias of p.aliases ?? []) {
-      if (alias.trim().toLowerCase() === key) return p.name.trim().toLowerCase();
+      if (alias.trim().toLowerCase() === key) return family;
     }
+  }
+
+  for (const p of catalog) {
+    const family = (p.batchFamily?.trim() || p.name.trim()).toLowerCase();
+    if (family === key) return family;
   }
 
   return key;

@@ -8,6 +8,7 @@ const ProductPackingSchema = new mongoose.Schema(
     litersPerBottle: { type: Number, required: true, min: 0.001 },
     active: { type: Boolean, required: true, default: true },
     aliases: { type: [String], default: [] },
+    batchFamily: { type: String, required: false, default: "" },
   },
   { timestamps: true },
 );

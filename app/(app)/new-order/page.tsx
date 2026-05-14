@@ -49,8 +49,9 @@ export default function NewOrderPage() {
     (async () => {
       try {
         const res = await fetch("/api/products", { credentials: "same-origin" });
-        const data = (await res.json()) as CatalogProduct[];
-        if (!cancelled && Array.isArray(data)) setCatalog(data);
+        const data = (await res.json()) as { products?: CatalogProduct[] } | CatalogProduct[];
+        const list = Array.isArray(data) ? data : Array.isArray(data.products) ? data.products : [];
+        if (!cancelled) setCatalog(list);
       } catch {
         if (!cancelled) setCatalog([]);
       } finally {

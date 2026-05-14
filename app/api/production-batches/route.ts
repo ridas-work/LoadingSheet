@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
-import { ProductPacking } from "@/lib/models/ProductPacking";
+import {
+  parseQcBody,
+  resolveBatchFamily,
+  serializeProductionBatch,
+  trimQcField,
+} from "@/lib/productionBatchApi";
 import { roleFromSession } from "@/lib/roles";
 
 export async function GET() {
@@ -15,17 +20,7 @@ export async function GET() {
   await connectToDatabase();
   const batches = await ProductionBatch.find({}).sort({ preparedAt: -1, createdAt: -1 }).lean();
 
-  return NextResponse.json(
-    batches.map((b) => ({
-      id: b._id.toString(),
-      batchNo: b.batchNo,
-      productName: b.productName,
-      totalLiters: b.totalLiters,
-      preparedAt: b.preparedAt,
-      notes: b.notes ?? "",
-      createdByName: b.createdByName ?? "",
-    })),
-  );
+  return NextResponse.json(batches.map(serializeProductionBatch));
 }
 
 export async function POST(req: Request) {
@@ -47,34 +42,33 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const batchNo = typeof body.batchNo === "string" ? body.batchNo.trim() : "";
-  const productName = typeof body.productName === "string" ? body.productName.trim() : "";
+  const batchNo = trimQcField(body.batchNo);
+  const productInput = trimQcField(body.productName);
   const totalLiters = typeof body.totalLiters === "number" ? body.totalLiters : Number(body.totalLiters);
-  const notes = typeof body.notes === "string" ? body.notes.trim() : "";
   const preparedAt =
-    typeof body.preparedAt === "string" && body.preparedAt
-      ? new Date(body.preparedAt)
-      : new Date();
+    typeof body.preparedAt === "string" && body.preparedAt ? new Date(body.preparedAt) : new Date();
 
   if (!batchNo) {
     return NextResponse.json({ error: "Batch number is required" }, { status: 400 });
   }
-  if (!productName) {
+  if (!productInput) {
     return NextResponse.json({ error: "Product is required" }, { status: 400 });
   }
   if (!Number.isFinite(totalLiters) || totalLiters <= 0) {
     return NextResponse.json({ error: "Total liters must be greater than 0" }, { status: 400 });
   }
 
-  await connectToDatabase();
+  const qc = parseQcBody(body, true);
+  if (!qc.ok) {
+    return NextResponse.json({ error: qc.error }, { status: 400 });
+  }
 
-  const catalogHit = await ProductPacking.findOne({
-    active: true,
-    $or: [{ name: productName }, { aliases: productName }],
-  }).lean();
-  if (!catalogHit) {
+  const batchFamily = await resolveBatchFamily(productInput);
+  if (!batchFamily) {
     return NextResponse.json({ error: "Product must exist in catalog" }, { status: 400 });
   }
+
+  await connectToDatabase();
 
   const existing = await ProductionBatch.findOne({ batchNo }).lean();
   if (existing) {
@@ -83,10 +77,10 @@ export async function POST(req: Request) {
 
   const doc = await ProductionBatch.create({
     batchNo,
-    productName: catalogHit.name,
+    productName: batchFamily,
     totalLiters,
     preparedAt,
-    notes,
+    ...qc.fields,
     createdByUserId: userId,
     createdByName: session.user.name ?? "",
   });

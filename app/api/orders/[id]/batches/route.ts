@@ -83,6 +83,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     name: p.name,
     litersPerBottle: inferLitersPerBottleFromName(p.name, p.litersPerBottle),
     aliases: p.aliases ?? [],
+    batchFamily: p.batchFamily?.trim() || p.name,
   }));
 
   const lines = order.sheetLines ?? [];

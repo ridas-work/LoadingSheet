@@ -58,7 +58,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     Order.findById(id),
     Order.find({}).select({ sheetLines: 1 }).lean(),
     ProductionBatch.find({}).lean(),
-    ProductPacking.find({ active: true }).select({ name: 1, litersPerBottle: 1, aliases: 1 }).lean(),
+    ProductPacking.find({ active: true }).select({ name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1 }).lean(),
   ]);
 
   if (!order) {
@@ -69,6 +69,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     name: p.name,
     litersPerBottle: inferLitersPerBottleFromName(p.name, p.litersPerBottle),
     aliases: p.aliases ?? [],
+    batchFamily: p.batchFamily?.trim() || p.name,
   }));
 
   const pool = poolDocs.map((p) => ({
