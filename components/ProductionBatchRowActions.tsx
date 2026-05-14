@@ -8,14 +8,15 @@ type Props = {
   batchId: string;
   batchNo: string;
   canManage: boolean;
+  locked: boolean;
 };
 
-export function ProductionBatchRowActions({ batchId, batchNo, canManage }: Props) {
+export function ProductionBatchRowActions({ batchId, batchNo, canManage, locked }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (!canManage) return null;
+  if (!canManage || locked) return null;
 
   async function onDelete() {
     if (!confirm(`Delete batch "${batchNo}"? This cannot be undone.`)) return;

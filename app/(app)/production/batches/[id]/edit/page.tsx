@@ -6,6 +6,7 @@ import { ProductionBatchForm } from "@/components/ProductionBatchForm";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
+import { loadBatchUsageContext, usageForBatchNo } from "@/lib/productionBatchStatus";
 import { roleFromSession } from "@/lib/roles";
 
 type PageProps = {
@@ -25,6 +26,12 @@ export default async function EditProductionBatchPage(props: PageProps) {
   await connectToDatabase();
   const batch = await ProductionBatch.findById(id).lean();
   if (!batch) notFound();
+
+  const { usedMap } = await loadBatchUsageContext();
+  const usage = usageForBatchNo(batch.batchNo, batch.totalLiters, usedMap);
+  if (usage.locked) {
+    redirect(`/production/batches/${id}`);
+  }
 
   const preparedAt = batch.preparedAt
     ? new Date(batch.preparedAt).toISOString().slice(0, 10)
