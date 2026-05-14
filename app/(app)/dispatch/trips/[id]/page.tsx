@@ -1,22 +1,53 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import mongoose from "mongoose";
 
 import { DispatchTripForm } from "@/components/DispatchTripForm";
 import type { PickerOrder } from "@/components/DispatchTripOrderPicker";
+import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
 import { batchProgress } from "@/lib/orderBatchStatus";
-import { EMPTY_DISPATCH, type DispatchFields } from "@/lib/roles";
+import { canEditDispatch, EMPTY_DISPATCH, roleFromSession, type DispatchFields } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ id: string }>;
 };
 
+function ReadOnlyDispatchSummary({ dispatch }: { dispatch: DispatchFields }) {
+  const rows: Array<[string, string]> = [
+    ["Vehicle", dispatch.vehicleNo],
+    ["Driver", dispatch.driverName],
+    ["DC no", dispatch.dcNo],
+    ["Helper", dispatch.helperName],
+    ["Production incharge", dispatch.productionIncharge],
+    ["Security", dispatch.securityName],
+    ["Driver signature", dispatch.driverSignature],
+  ];
+
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-4">
+      <h2 className="text-lg font-semibold text-zinc-900">Trip details</h2>
+      <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+        {rows.map(([label, value]) => (
+          <div key={label}>
+            <dt className="font-medium text-zinc-600">{label}</dt>
+            <dd className="text-zinc-900">{value?.trim() || "—"}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 export default async function DispatchTripDetailPage(props: PageProps) {
   const { id } = await props.params;
   if (!mongoose.Types.ObjectId.isValid(id)) notFound();
+
+  const session = await auth();
+  const role = roleFromSession(session?.user as { role?: string });
+  const canEdit = canEditDispatch(role);
 
   await connectToDatabase();
   const trip = await DispatchTrip.findById(id).lean();
@@ -59,6 +90,7 @@ export default async function DispatchTripDetailPage(props: PageProps) {
         <p className="mt-1 text-sm text-zinc-600">
           Vehicle {trip.vehicleNo?.trim() || "—"} · {initialOrderIds.length} PO
           {initialOrderIds.length !== 1 ? "s" : ""}
+          {!canEdit ? " · Read-only" : ""}
         </p>
       </div>
 
@@ -87,18 +119,18 @@ export default async function DispatchTripDetailPage(props: PageProps) {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {complete ? (
-                      <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
-                        Batches assigned
-                      </span>
-                    ) : (
+                    {canEdit && !complete ? (
                       <Link
                         href={`/orders/${oid}/loading-sheet?dispatch=1`}
                         className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white"
                       >
                         Assign batches
                       </Link>
-                    )}
+                    ) : canEdit && complete ? (
+                      <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
+                        Batches assigned
+                      </span>
+                    ) : null}
                     <Link
                       href={`/orders/${oid}/loading-sheet`}
                       className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
@@ -113,12 +145,16 @@ export default async function DispatchTripDetailPage(props: PageProps) {
         </div>
       ) : null}
 
-      <DispatchTripForm
-        tripId={id}
-        initialOrderIds={initialOrderIds}
-        orders={orders}
-        initialDispatch={initialDispatch}
-      />
+      {canEdit ? (
+        <DispatchTripForm
+          tripId={id}
+          initialOrderIds={initialOrderIds}
+          orders={orders}
+          initialDispatch={initialDispatch}
+        />
+      ) : (
+        <ReadOnlyDispatchSummary dispatch={initialDispatch} />
+      )}
     </div>
   );
 }

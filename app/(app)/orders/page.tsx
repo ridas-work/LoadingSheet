@@ -2,7 +2,7 @@ import { OrdersListWithTrips } from "@/components/OrdersListWithTrips";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
-import { roleFromSession } from "@/lib/roles";
+import { isAdmin, roleFromSession } from "@/lib/roles";
 
 export default async function OrdersPage() {
   await connectToDatabase();
@@ -10,10 +10,11 @@ export default async function OrdersPage() {
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
   const isDispatchEditor = role === "dispatch_editor";
+  const showEnteredBy = isAdmin(role);
 
   const orders = await Order.find({})
     .sort({ createdAt: -1 })
-    .select("_id poNumber customerName createdAt sheetLines.batchNo dispatchTripId dispatch.vehicleNo")
+    .select("_id poNumber customerName createdAt createdByName sheetLines.batchNo dispatchTripId dispatch.vehicleNo")
     .lean();
 
   const rows = orders.map((o) => {
@@ -28,6 +29,7 @@ export default async function OrdersPage() {
       poNumber: o.poNumber,
       customerName: o.customerName,
       createdAt: o.createdAt ? new Date(o.createdAt).toISOString() : "",
+      createdByName: (o as { createdByName?: string }).createdByName?.trim() ?? "",
       filled,
       total,
       dispatchTripId: o.dispatchTripId ? o.dispatchTripId.toString() : null,
@@ -42,6 +44,7 @@ export default async function OrdersPage() {
         <p className="mt-1 text-sm text-zinc-600">
           Open the loading sheet for any order.
           {isDispatchEditor ? " Select multiple POs to create a vehicle trip." : ""}
+          {showEnteredBy ? " See who entered each PO." : ""}
         </p>
       </div>
 
@@ -50,7 +53,7 @@ export default async function OrdersPage() {
           No orders yet.
         </p>
       ) : (
-        <OrdersListWithTrips orders={rows} isDispatchEditor={isDispatchEditor} />
+        <OrdersListWithTrips orders={rows} isDispatchEditor={isDispatchEditor} showEnteredBy={showEnteredBy} />
       )}
     </div>
   );

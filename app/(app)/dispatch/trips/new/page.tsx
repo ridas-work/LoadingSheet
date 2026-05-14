@@ -1,14 +1,23 @@
+import { redirect } from "next/navigation";
+
 import { DispatchTripForm } from "@/components/DispatchTripForm";
 import type { PickerOrder } from "@/components/DispatchTripOrderPicker";
+import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
-import { EMPTY_DISPATCH } from "@/lib/roles";
+import { canEditDispatch, EMPTY_DISPATCH, roleFromSession } from "@/lib/roles";
 
 type PageProps = {
   searchParams: Promise<{ orderIds?: string }>;
 };
 
 export default async function NewDispatchTripPage(props: PageProps) {
+  const session = await auth();
+  const role = roleFromSession(session?.user as { role?: string });
+  if (!canEditDispatch(role)) {
+    redirect("/dispatch/trips");
+  }
+
   const { orderIds: orderIdsParam } = await props.searchParams;
   const preselected =
     typeof orderIdsParam === "string"

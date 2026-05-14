@@ -1,11 +1,17 @@
 import Link from "next/link";
 
+import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
+import { canEditDispatch, roleFromSession } from "@/lib/roles";
 
 export default async function DispatchTripsPage() {
   await connectToDatabase();
+
+  const session = await auth();
+  const role = roleFromSession(session?.user as { role?: string });
+  const canEdit = canEditDispatch(role);
 
   const trips = await DispatchTrip.find({}).sort({ updatedAt: -1 }).lean();
   const allOrderIds = trips.flatMap((t) => t.orderIds ?? []);
@@ -23,16 +29,19 @@ export default async function DispatchTripsPage() {
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900">Dispatch trips</h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Group multiple POs on one vehicle. Enter vehicle and driver once; assign batches per PO on each loading
-            sheet.
+            {canEdit
+              ? "Group multiple POs on one vehicle. Enter vehicle and driver once; assign batches per PO on each loading sheet."
+              : "View vehicle trips and linked POs (read-only)."}
           </p>
         </div>
-        <Link
-          href="/dispatch/trips/new"
-          className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
-        >
-          New trip
-        </Link>
+        {canEdit ? (
+          <Link
+            href="/dispatch/trips/new"
+            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
+          >
+            New trip
+          </Link>
+        ) : null}
       </div>
 
       {trips.length === 0 ? (

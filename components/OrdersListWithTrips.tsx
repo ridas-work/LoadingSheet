@@ -8,6 +8,7 @@ type OrderRow = {
   poNumber: string;
   customerName: string;
   createdAt: string;
+  createdByName?: string;
   filled: number;
   total: number;
   dispatchTripId: string | null;
@@ -17,9 +18,10 @@ type OrderRow = {
 type Props = {
   orders: OrderRow[];
   isDispatchEditor: boolean;
+  showEnteredBy?: boolean;
 };
 
-export function OrdersListWithTrips({ orders, isDispatchEditor }: Props) {
+export function OrdersListWithTrips({ orders, isDispatchEditor, showEnteredBy = false }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
 
   const toggle = (id: string) => {
@@ -70,6 +72,7 @@ export function OrdersListWithTrips({ orders, isDispatchEditor }: Props) {
                     <p className="text-sm text-zinc-600">{o.customerName}</p>
                     <p className="text-xs text-zinc-500">
                       {new Date(o.createdAt).toLocaleDateString()} · {o.filled}/{o.total} batches
+                      {showEnteredBy && o.createdByName ? ` · Entered by ${o.createdByName}` : ""}
                     </p>
                     {onTrip ? (
                       <p className="mt-1 text-xs font-medium text-emerald-800">

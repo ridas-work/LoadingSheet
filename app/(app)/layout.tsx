@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
-import { homePathForRole, roleFromSession } from "@/lib/roles";
+import { homePathForRole, isAdmin, roleFromSession } from "@/lib/roles";
 
 import { LogoutButton } from "./logout-button";
 
@@ -15,22 +15,33 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const role = roleFromSession(session.user as { role?: string });
   const homeHref = role ? homePathForRole(role) : "/new-order";
-  const isAdmin = role === "admin";
+  const admin = isAdmin(role);
 
   return (
     <div className="min-h-dvh bg-zinc-50">
       <header className="border-b border-zinc-200 bg-white">
-        <div className={`mx-auto flex items-center justify-between px-4 py-3 ${isAdmin ? "max-w-[1600px]" : "max-w-4xl"}`}>
-          <div className="flex items-center gap-4">
+        <div className={`mx-auto flex items-center justify-between px-4 py-3 ${admin ? "max-w-[1600px]" : "max-w-4xl"}`}>
+          <div className="flex flex-wrap items-center gap-4">
             <Link href={homeHref} className="text-sm font-semibold text-zinc-900">
               Loading Sheet
             </Link>
-            {isAdmin ? (
-              <Link href="/admin" className="text-sm text-zinc-600 hover:text-zinc-900">
-                Summary
-              </Link>
+            {admin ? (
+              <>
+                <Link href="/admin" className="text-sm text-zinc-600 hover:text-zinc-900">
+                  Summary
+                </Link>
+                <Link href="/orders" className="text-sm text-zinc-600 hover:text-zinc-900">
+                  Orders
+                </Link>
+                <Link href="/production/batches" className="text-sm text-zinc-600 hover:text-zinc-900">
+                  Production batches
+                </Link>
+                <Link href="/dispatch/trips" className="text-sm text-zinc-600 hover:text-zinc-900">
+                  Dispatch trips
+                </Link>
+              </>
             ) : null}
-            {role !== "batch_editor" && !isAdmin ? (
+            {role !== "batch_editor" && !admin ? (
               <Link href="/orders" className="text-sm text-zinc-600 hover:text-zinc-900">
                 Orders
               </Link>
@@ -52,7 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
-      <main className={`mx-auto px-4 py-6 ${isAdmin ? "max-w-[1600px]" : "max-w-4xl"}`}>{children}</main>
+      <main className={`mx-auto px-4 py-6 ${admin ? "max-w-[1600px]" : "max-w-4xl"}`}>{children}</main>
     </div>
   );
 }
