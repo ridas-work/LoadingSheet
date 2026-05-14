@@ -321,3 +321,21 @@ Executable plans:
 - `.planning/phases/11-lock-production-batches/01-PLAN.md`
 - `.planning/phases/11-lock-production-batches/02-PLAN.md`
 
+---
+
+## Phase 12 (Admin pending orders summary) — **planned**
+
+### Problem
+
+The boss tracks workload in a spreadsheet/PDF: pending POs with city, deadline, and **carton counts per product**. The app has no admin view.
+
+### Solution
+
+- Role **`admin`** (boss login).
+- **`/admin`** dashboard replicating the PDF grid: product columns, totals, **BUILTY DONE** for dispatched orders.
+- Extend orders with **city** and **deadline date** on PO entry.
+
+Executable plans:
+- `.planning/phases/12-admin-pending-summary/01-PLAN.md`
+- `.planning/phases/12-admin-pending-summary/02-PLAN.md`
+

@@ -1,11 +1,12 @@
 # Project State
 
-Phase: **11 complete** — Lock production batches for Nimra
-Status: Verified (`11-VERIFICATION.md` passed)
+Phase: **12 planned** — Admin pending orders summary
+Status: Ready to execute (`/gsd-execute-phase 12`)
 
 ## Context
-- Nimra cannot edit/delete batches once Rashid has assigned liters on loading sheets.
-- List shows Available / In use / Empty.
+- Boss PDF is a **pending orders matrix**: customers × product carton columns with totals.
+- New **`admin`** role; seed user `boss`; dashboard at `/admin`.
+- Orders need **city** + **deadline**; dispatched POs show **BUILTY DONE**.
 
 ## Next
-- **Milestone audit:** `/gsd-audit-milestone`
+- **Execute Phase 12:** `/gsd-execute-phase 12`
