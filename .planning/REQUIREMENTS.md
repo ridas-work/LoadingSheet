@@ -286,7 +286,7 @@ Executable plans:
 
 ---
 
-## Phase 10 (Production batch QC fields) — **planned**
+## Phase 10 (Production batch QC fields) — **complete**
 
 ### Problem
 

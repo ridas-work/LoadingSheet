@@ -1,16 +1,13 @@
 # Project State
 
-Phase: **10 planned** — Production batch QC fields
-Status: Ready to execute (`/gsd-execute-phase 10`)
+Phase: **10 complete** — Production batch QC fields
+Status: Verified (`10-VERIFICATION.md` passed)
 
 ## Context
-- Nimra's manual spreadsheet tracks pH, solids, appearance, provider, drum, quantity per batch — app must store the same for dispute lookup.
-- Power Wash + Power Wash (pouch) share one **batch family** for registration and Rashid assignment.
-
-## Decisions Made
-- Structured string fields on `ProductionBatch` (not unstructured notes).
-- `totalLiters` kept for dispatch liter pool; `quantity` is Nimra's label as typed.
-- `ProductPacking.batchFamily` drives Nimra dropdown and `productsMatch`.
+- Nimra registers batches with pH, solids, appearance, provider, drum, quantity + date/product/batch no.
+- Power Wash family covers both Power Wash packings for Rashid assignment.
+- Batch detail page supports future feedback audit.
 
 ## Next
-- **Execute Phase 10:** `/gsd-execute-phase 10`
+- **Milestone audit:** `/gsd-audit-milestone`
+- Run `npm run seed:products` if batchFamily not yet in DB
