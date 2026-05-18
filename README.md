@@ -40,7 +40,7 @@ Sign in at `/login`. Accounts are created only via seed (no signup).
 
 1. **PO team** creates orders at `/new-order`. The page lists **every catalog product**; type **carton counts** for a normal order, or choose **Mixed sample box** to ship several products in **one physical carton** (enter **bottles per product** + how many identical mixed boxes). Leave unused products blank. Toggle **Sample / custom** on standard orders for non-default bottles per carton. Include **city** and **deadline** for the management report.
 2. **Nimra** registers **prepared batches** at `/production/batches` with **batch number, product, date, pH, solids, appearance, provider, HCL, quantity** (stored for audit). **Viscosity** is optional and shown only for **Rhino** batches. One batch per **family** covers related packings: **Brighten** (bottle + pouch), **Fabrito** (bottle + pouch), **Power Wash** (bottle + pouch), **Rhino** (all sizes), **Titan**, **Degrease Spray**, and each **Washout** scent separately (Floral / Lemon / Ocean). **Combo bundles** (e.g. Power Wash + Degrease) use **two batch picks per carton** on the loading sheet — one from each component family. **Total liters** sets the dispatch pool size.
-3. **Rashid** lands on **`/dispatch/trips`**: create a **vehicle trip** with one or more POs, enter vehicle/driver/footer once (synced to every linked sheet). Per PO, use **Assign batches** on the trip page or **Edit dispatch** on the loading sheet for batch rows only when the order is on a trip.
+3. **Rashid** lands on **`/dispatch/trips`**: create a **vehicle trip** with one or more POs, enter vehicle/driver/footer once (synced to every linked sheet). Per PO, use **Assign batches** on the trip page or **Edit dispatch** on the loading sheet for batch rows only when the order is on a trip. **`/dispatch/inventory`** — record on-hand **packaging** (empty bottles, caps, stickers, labels); physical count updates with audit log. Automatic deduction when filling bottles is planned for a later phase.
 4. **Anyone** can **View loading sheet** and print.
 5. **Waleed Intisar** signs in at `/admin` for the **pending orders** grid, and can browse **Orders** (who entered each PO), **Production batches** (what Nimra registered), and **Dispatch trips** — all read-only.
 
@@ -62,5 +62,6 @@ Catalog lives in `data/product-packings.json` (array of `{ "code", "name", "bott
 
 ```bash
 npm run seed:products
+npm run seed:packaging
 ```
 

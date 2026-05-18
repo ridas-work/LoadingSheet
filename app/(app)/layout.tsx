@@ -39,6 +39,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 <Link href="/dispatch/trips" className="text-sm text-zinc-600 hover:text-zinc-900">
                   Dispatch trips
                 </Link>
+                <Link href="/dispatch/inventory" className="text-sm text-zinc-600 hover:text-zinc-900">
+                  Packaging inventory
+                </Link>
               </>
             ) : null}
             {role !== "batch_editor" && !admin ? (
@@ -47,9 +50,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </Link>
             ) : null}
             {role === "dispatch_editor" ? (
-              <Link href="/dispatch/trips" className="text-sm text-zinc-600 hover:text-zinc-900">
-                Dispatch trips
-              </Link>
+              <>
+                <Link href="/dispatch/trips" className="text-sm text-zinc-600 hover:text-zinc-900">
+                  Dispatch trips
+                </Link>
+                <Link href="/dispatch/inventory" className="text-sm text-zinc-600 hover:text-zinc-900">
+                  Packaging inventory
+                </Link>
+              </>
             ) : null}
             {role === "po_creator" ? (
               <Link href="/new-order" className="text-sm text-zinc-600 hover:text-zinc-900">
