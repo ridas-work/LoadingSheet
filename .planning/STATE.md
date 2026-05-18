@@ -1,13 +1,13 @@
 # Project State
 
-Phase: **15 complete** — Mixed sample box
-Status: Verified ✓
+Phase: **17 planned** — Packaging auto-deduct
+Status: Phase 16 complete ✓
 
 ## Context
-- PO team can choose **Mixed sample box** on `/new-order`: bottles per product in one shared carton (or N identical mixed boxes).
-- Loading sheet: one row per physical mixed box; Rashid assigns a batch per product inside the mix.
-- Waleed's admin summary counts **bottles** (× box count) for mixed sample orders.
+- Rashid tracks packaging at **`/dispatch/inventory`** (bottles, caps, stickers, labels).
+- Physical count + movement audit (Phase 16).
+- **Next:** Phase 17 — auto-deduct packaging when filling bottles / dispatch (BOM from product packings).
 
 ## Next
-- Manual test on dev: create mixed order (e.g. 5 + 2 bottles, 1 box) and confirm loading sheet shows 1 row.
-- `/gsd-audit-milestone` or plan next phase.
+- **Plan Phase 17** when ready: `/gsd-plan-phase 17`
+- Or **discuss** first: `/gsd-discuss-phase 17`

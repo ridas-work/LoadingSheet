@@ -390,3 +390,26 @@ Executable plans:
 - `.planning/phases/15-mixed-sample-box/01-PLAN.md`
 - `.planning/phases/15-mixed-sample-box/02-PLAN.md`
 
+---
+
+## Phase 16 (Packaging inventory — Rashid) — **complete**
+
+### Problem
+
+Factory needs to track **empty packaging** (bottles, caps, stickers) on the shelf. Rashid should enter current quantities; later the system should deduct when bottles are filled or orders ship.
+
+### Solution (v1)
+
+- Dedicated route **`/dispatch/inventory`** for Rashid (`dispatch_editor`).
+- Seeded **packaging item catalog** by category; Rashid updates **on-hand count** (physical count) with audit movements.
+- Admin read-only oversight.
+
+### Future (Phase 17)
+
+- Auto-deduct from inventory when production/dispatch consumes packaging; BOM link to product packings.
+
+Executable plans:
+- `.planning/phases/16-packaging-inventory/01-PLAN.md`
+- `.planning/phases/16-packaging-inventory/02-PLAN.md`
+- `.planning/phases/16-packaging-inventory/03-PLAN.md`
+

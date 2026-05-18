@@ -83,3 +83,14 @@ Sample orders often need **partial bottle counts** across several SKUs (e.g. 5 b
 Executable plans:
 - `.planning/phases/15-mixed-sample-box/01-PLAN.md` — schema, build lines, batch validation
 - `.planning/phases/15-mixed-sample-box/02-PLAN.md` — new-order UI, loading sheet, admin summary
+
+## Phase 16: Packaging inventory (Rashid) ✓
+**Rashid** maintains on-hand counts for **packaging materials** — bottles, caps, stickers, labels — on **`/dispatch/inventory`**, separate from dispatch trips and production batches. Physical **stock count** updates with audit log. Catalog seeded from JSON (v1: dev adds new item types; Rashid updates quantities only). Admin read-only.
+
+Executable plans:
+- `.planning/phases/16-packaging-inventory/01-PLAN.md` — models, seed, API
+- `.planning/phases/16-packaging-inventory/02-PLAN.md` — inventory UI + nav
+- `.planning/phases/16-packaging-inventory/03-PLAN.md` — future auto-deduct hook (schema stub + Phase 17 roadmap)
+
+## Phase 17: Packaging auto-deduct — **planned** (after 16)
+When bottles are filled or orders dispatch, **automatically deduct** caps/stickers/bottles from packaging inventory using a BOM map (`ProductPacking` → packaging components). Warn on insufficient stock. Depends on Phase 16 inventory baseline.
