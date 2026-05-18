@@ -356,3 +356,20 @@ Executable plans:
 - `.planning/phases/13-admin-oversight/01-PLAN.md`
 - `.planning/phases/13-admin-oversight/02-PLAN.md`
 
+---
+
+## Phase 14 (PO product entry table) — **planned**
+
+### Problem
+
+On `/new-order`, each product line is a separate card. With several SKUs, the PO team cannot quickly scan whether every product and carton count is correct.
+
+### Solution
+
+- Refactor product entry into a **table**: one row per line, columns for product, cartons, bottles/carton, remove.
+- Show **total cartons** before submit.
+- No API changes — same `items[]` on create.
+
+Executable plans:
+- `.planning/phases/14-po-product-entry-table/01-PLAN.md`
+

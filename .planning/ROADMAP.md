@@ -70,3 +70,9 @@ Executable plans:
 Executable plans:
 - `.planning/phases/13-admin-oversight/01-PLAN.md` — admin route access + layout/API guards
 - `.planning/phases/13-admin-oversight/02-PLAN.md` — nav, orders creator column, read-only batch & dispatch UI
+
+## Phase 14: PO product entry table — **planned**
+When **Nouman, Javeria, Aslam, or Ibtisam** add products on **`/new-order`**, lines appear in a **single review table** (product, cartons, bottles/carton) so they can confirm the right SKUs and quantities before saving.
+
+Executable plans:
+- `.planning/phases/14-po-product-entry-table/01-PLAN.md` — table UI component + new-order integration

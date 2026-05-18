@@ -1,11 +1,11 @@
 # Project State
 
-Phase: **13 complete** — Admin oversight
-Status: Milestone v1.0 ready for audit
+Phase: **14 planned** — PO product entry table
+Status: Ready to execute (`/gsd-execute-phase 14`)
 
 ## Context
-- **Waleed Intisar** has read-only oversight: summary, orders (with **Entered by**), production batches, dispatch trips.
-- Cannot create POs, batches, or dispatch trips.
+- PO creators want a **table view** when adding products on `/new-order` — easier to verify product names and carton counts before save.
+- Replaces stacked product cards with one scannable grid + total cartons footer.
 
 ## Next
-- **Audit milestone:** `/gsd-audit-milestone`
+- **Execute Phase 14:** `/gsd-execute-phase 14`
