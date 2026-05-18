@@ -3,57 +3,61 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type CatalogProduct = { code: string; name: string; bottlesPerCarton: number };
+import {
+  NewOrderProductGrid,
+  defaultGridRow,
+  makeOtherRow,
+  otherRowIsActive,
+  rowIsActive,
+  type CatalogProduct,
+  type GridErrors,
+  type GridState,
+  type OtherRow,
+} from "@/components/NewOrderProductGrid";
 
-type ItemRow = {
-  id: string;
-  /** Empty = not chosen; "__custom__" = other product */
-  catalogCode: string;
-  productName: string;
-  boxes: string;
-  bottlesPerBox: string;
-  /** When true, bottles/carton follows catalog default when a catalog line is selected */
-  useDefaultPacking: boolean;
-};
-
-type FieldErrors = Partial<Record<"poNumber" | "customerName" | "items", string>> & Record<string, string>;
-
-const INITIAL_ITEM_ROW_ID = "item-0";
-const CUSTOM_CODE = "__custom__";
-
-function emptyRow(): ItemRow {
-  return {
-    id: INITIAL_ITEM_ROW_ID,
-    catalogCode: "",
-    productName: "",
-    boxes: "",
-    bottlesPerBox: "10",
-    useDefaultPacking: true,
-  };
-}
+type FieldErrors = Partial<Record<"poNumber" | "customerName" | "items", string>> &
+  Record<string, string>;
 
 export default function NewOrderPage() {
   const [poNumber, setPoNumber] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [city, setCity] = useState("");
   const [deadlineDate, setDeadlineDate] = useState("");
-  const [items, setItems] = useState<ItemRow[]>([emptyRow()]);
+  const [grid, setGrid] = useState<GridState>({});
+  const [otherRows, setOtherRows] = useState<OtherRow[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [successId, setSuccessId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const customerRef = useRef<HTMLInputElement | null>(null);
-  const firstSelectRef = useRef<HTMLSelectElement | null>(null);
+  const firstGridInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch("/api/products", { credentials: "same-origin" });
-        const data = (await res.json()) as { products?: CatalogProduct[] } | CatalogProduct[];
-        const list = Array.isArray(data) ? data : Array.isArray(data.products) ? data.products : [];
-        if (!cancelled) setCatalog(list);
+        const data = (await res.json()) as
+          | { products?: CatalogProduct[] }
+          | CatalogProduct[];
+        const list = Array.isArray(data)
+          ? data
+          : Array.isArray(data.products)
+            ? data.products
+            : [];
+        if (!cancelled) {
+          setCatalog(list);
+          setGrid((prev) => {
+            const next: GridState = { ...prev };
+            for (const p of list) {
+              if (!next[p.code]) {
+                next[p.code] = defaultGridRow(p.bottlesPerCarton);
+              }
+            }
+            return next;
+          });
+        }
       } catch {
         if (!cancelled) setCatalog([]);
       } finally {
@@ -65,9 +69,27 @@ export default function NewOrderPage() {
     };
   }, []);
 
-  const catalogByCode = useMemo(() => new Map(catalog.map((p) => [p.code, p])), [catalog]);
+  const catalogByCode = useMemo(
+    () => new Map(catalog.map((p) => [p.code, p])),
+    [catalog],
+  );
 
-  const canSubmit = useMemo(() => poNumber.trim() && customerName.trim(), [customerName, poNumber]);
+  const activeCount = useMemo(() => {
+    let n = 0;
+    for (const p of catalog) {
+      const row = grid[p.code];
+      if (row && rowIsActive(row)) n += 1;
+    }
+    for (const r of otherRows) {
+      if (otherRowIsActive(r)) n += 1;
+    }
+    return n;
+  }, [catalog, grid, otherRows]);
+
+  const canSubmit = useMemo(
+    () => Boolean(poNumber.trim() && customerName.trim() && activeCount > 0),
+    [activeCount, customerName, poNumber],
+  );
 
   function validate(): FieldErrors {
     const next: FieldErrors = {};
@@ -75,76 +97,147 @@ export default function NewOrderPage() {
     if (!customerName.trim()) next.customerName = "Customer name is required.";
 
     let validCount = 0;
-    items.forEach((it, idx) => {
-      const pn = it.productName.trim();
-      const boxCount = Number(it.boxes);
-      const bpb = Number(it.bottlesPerBox);
+    for (const p of catalog) {
+      const row = grid[p.code];
+      if (!row) continue;
+      const cartonsRaw = row.cartons.trim();
+      if (!cartonsRaw) continue;
 
-      if (!it.catalogCode) next[`items.${idx}.catalog`] = "Choose a product or Other.";
-      if (it.catalogCode === CUSTOM_CODE && !pn) next[`items.${idx}.productName`] = "Enter product name.";
-      if (it.catalogCode && it.catalogCode !== CUSTOM_CODE && !pn) next[`items.${idx}.productName`] = "Product name is required.";
+      const cartons = Number(cartonsRaw);
+      const bpb = Number(row.bottlesPerBox);
+      if (!Number.isInteger(cartons) || cartons < 1) {
+        next[`item.${p.code}.cartons`] = "Must be an integer ≥ 1.";
+      }
+      if (!row.bottlesPerBox.trim()) {
+        next[`item.${p.code}.bottlesPerBox`] = "Required.";
+      } else if (!Number.isInteger(bpb) || bpb < 1) {
+        next[`item.${p.code}.bottlesPerBox`] = "Must be an integer ≥ 1.";
+      }
 
-      if (!it.boxes.trim()) next[`items.${idx}.boxes`] = "Number of cartons is required.";
-      else if (!Number.isInteger(boxCount) || boxCount < 1)
-        next[`items.${idx}.boxes`] = "Cartons must be an integer ≥ 1.";
-      if (!it.bottlesPerBox.trim()) next[`items.${idx}.bottlesPerBox`] = "Bottles per carton is required.";
-      else if (!Number.isInteger(bpb) || bpb < 1)
-        next[`items.${idx}.bottlesPerBox`] = "Must be an integer ≥ 1.";
+      if (
+        Number.isInteger(cartons) &&
+        cartons >= 1 &&
+        Number.isInteger(bpb) &&
+        bpb >= 1
+      ) {
+        validCount += 1;
+      }
+    }
 
-      const nameOk = it.catalogCode === CUSTOM_CODE ? !!pn : it.catalogCode && !!pn;
-      if (nameOk && Number.isInteger(boxCount) && boxCount >= 1 && Number.isInteger(bpb) && bpb >= 1) {
+    otherRows.forEach((r) => {
+      const hasName = r.productName.trim().length > 0;
+      const cartonsRaw = r.cartons.trim();
+      if (!hasName && !cartonsRaw) return;
+
+      const cartons = Number(cartonsRaw);
+      const bpb = Number(r.bottlesPerBox);
+      if (!hasName) next[`item.${r.code}.productName`] = "Product name is required.";
+      if (!cartonsRaw) {
+        next[`item.${r.code}.cartons`] = "Cartons is required.";
+      } else if (!Number.isInteger(cartons) || cartons < 1) {
+        next[`item.${r.code}.cartons`] = "Must be an integer ≥ 1.";
+      }
+      if (!r.bottlesPerBox.trim()) {
+        next[`item.${r.code}.bottlesPerBox`] = "Required.";
+      } else if (!Number.isInteger(bpb) || bpb < 1) {
+        next[`item.${r.code}.bottlesPerBox`] = "Must be an integer ≥ 1.";
+      }
+
+      if (
+        hasName &&
+        Number.isInteger(cartons) &&
+        cartons >= 1 &&
+        Number.isInteger(bpb) &&
+        bpb >= 1
+      ) {
         validCount += 1;
       }
     });
-    if (validCount === 0) next.items = "Add at least one complete product line.";
+
+    if (validCount === 0) {
+      next.items = "Enter cartons for at least one product.";
+    }
     return next;
   }
 
-  function onCatalogChange(rowId: string, value: string) {
-    setItems((prev) =>
-      prev.map((row) => {
-        if (row.id !== rowId) return row;
-        if (!value) {
-          return { ...row, catalogCode: "", productName: "", useDefaultPacking: true, bottlesPerBox: "10" };
-        }
-        if (value === CUSTOM_CODE) {
-          return {
-            ...row,
-            catalogCode: CUSTOM_CODE,
-            productName: "",
-            useDefaultPacking: false,
-            bottlesPerBox: row.bottlesPerBox || "1",
-          };
-        }
-        const p = catalogByCode.get(value);
-        if (!p) return { ...row, catalogCode: value, productName: "", useDefaultPacking: true };
-        return {
-          ...row,
-          catalogCode: value,
-          productName: p.name,
-          useDefaultPacking: true,
-          bottlesPerBox: String(p.bottlesPerCarton),
-        };
-      }),
-    );
+  function onCartonsChange(code: string, value: string) {
+    setGrid((prev) => {
+      const existing = prev[code] ?? {
+        cartons: "",
+        bottlesPerBox: "10",
+        useDefaultPacking: true,
+      };
+      return { ...prev, [code]: { ...existing, cartons: value } };
+    });
   }
 
-  function setUseDefaultPacking(rowId: string, useDefault: boolean) {
-    setItems((prev) =>
-      prev.map((row) => {
-        if (row.id !== rowId) return row;
-        if (row.catalogCode === CUSTOM_CODE || !row.catalogCode) {
-          return { ...row, useDefaultPacking: false };
-        }
-        const p = catalogByCode.get(row.catalogCode);
-        if (!p) return { ...row, useDefaultPacking: false };
-        return {
-          ...row,
+  function onBottlesPerBoxChange(code: string, value: string) {
+    setGrid((prev) => {
+      const existing = prev[code] ?? {
+        cartons: "",
+        bottlesPerBox: "10",
+        useDefaultPacking: false,
+      };
+      return { ...prev, [code]: { ...existing, bottlesPerBox: value } };
+    });
+  }
+
+  function onUseDefaultPackingChange(code: string, useDefault: boolean) {
+    setGrid((prev) => {
+      const p = catalogByCode.get(code);
+      const existing = prev[code] ?? {
+        cartons: "",
+        bottlesPerBox: p ? String(p.bottlesPerCarton) : "10",
+        useDefaultPacking: true,
+      };
+      return {
+        ...prev,
+        [code]: {
+          ...existing,
           useDefaultPacking: useDefault,
-          bottlesPerBox: useDefault ? String(p.bottlesPerCarton) : row.bottlesPerBox,
-        };
-      }),
-    );
+          bottlesPerBox: useDefault && p ? String(p.bottlesPerCarton) : existing.bottlesPerBox,
+        },
+      };
+    });
+  }
+
+  function onOtherChange(code: string, patch: Partial<OtherRow>) {
+    setOtherRows((prev) => prev.map((r) => (r.code === code ? { ...r, ...patch } : r)));
+  }
+
+  function onAddOther() {
+    setOtherRows((prev) => [...prev, makeOtherRow()]);
+  }
+
+  function onRemoveOther(code: string) {
+    setOtherRows((prev) => prev.filter((r) => r.code !== code));
+  }
+
+  function buildSubmitItems(): Array<{
+    productName: string;
+    boxes: number;
+    bottlesPerBox: number;
+  }> {
+    const out: Array<{ productName: string; boxes: number; bottlesPerBox: number }> = [];
+    for (const p of catalog) {
+      const row = grid[p.code];
+      if (!row) continue;
+      const cartons = Number(row.cartons);
+      const bpb = Number(row.bottlesPerBox);
+      if (!Number.isInteger(cartons) || cartons < 1) continue;
+      if (!Number.isInteger(bpb) || bpb < 1) continue;
+      out.push({ productName: p.name, boxes: cartons, bottlesPerBox: bpb });
+    }
+    for (const r of otherRows) {
+      const cartons = Number(r.cartons);
+      const bpb = Number(r.bottlesPerBox);
+      const pn = r.productName.trim();
+      if (!pn) continue;
+      if (!Number.isInteger(cartons) || cartons < 1) continue;
+      if (!Number.isInteger(bpb) || bpb < 1) continue;
+      out.push({ productName: pn, boxes: cartons, bottlesPerBox: bpb });
+    }
+    return out;
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -166,11 +259,7 @@ export default function NewOrderPage() {
           customerName: customerName.trim(),
           city: city.trim(),
           deadlineDate: deadlineDate.trim() || undefined,
-          items: items.map((it) => ({
-            productName: it.productName.trim(),
-            boxes: Number(it.boxes),
-            bottlesPerBox: Number(it.bottlesPerBox),
-          })),
+          items: buildSubmitItems(),
         }),
       });
 
@@ -179,7 +268,7 @@ export default function NewOrderPage() {
         return;
       }
 
-      const data = (await res.json().catch(() => null)) as any;
+      const data = (await res.json().catch(() => null)) as { id?: string; errors?: Record<string, string> } | null;
 
       if (!res.ok) {
         if (data?.errors && typeof data.errors === "object") {
@@ -195,29 +284,16 @@ export default function NewOrderPage() {
       setCustomerName("");
       setCity("");
       setDeadlineDate("");
-      setItems([emptyRow()]);
+      setGrid(() => {
+        const next: GridState = {};
+        for (const p of catalog) next[p.code] = defaultGridRow(p.bottlesPerCarton);
+        return next;
+      });
+      setOtherRows([]);
       setErrors({});
     } finally {
       setSubmitting(false);
     }
-  }
-
-  function addItem() {
-    setItems((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        catalogCode: "",
-        productName: "",
-        boxes: "",
-        bottlesPerBox: "10",
-        useDefaultPacking: true,
-      },
-    ]);
-  }
-
-  function removeItem(id: string) {
-    setItems((prev) => (prev.length <= 1 ? prev : prev.filter((x) => x.id !== id)));
   }
 
   if (successId) {
@@ -250,19 +326,13 @@ export default function NewOrderPage() {
     );
   }
 
-  const bpbLocked = (row: ItemRow): boolean =>
-    Boolean(
-      row.useDefaultPacking &&
-        row.catalogCode &&
-        row.catalogCode !== CUSTOM_CODE &&
-        catalogByCode.get(row.catalogCode),
-    );
-
   return (
     <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
       <h1 className="text-lg font-semibold text-zinc-900">New Order</h1>
       <p className="mt-1 text-sm text-zinc-600">
-        Pick a product to auto-fill <strong>bottles per carton</strong>. Use <strong>Custom bottles/carton</strong> for samples (e.g. 1 bottle). Each carton = one row on the loading sheet.
+        Every catalog product is listed below. Type the number of <strong>cartons</strong> next to
+        each product you want on this order — leave the rest blank. Use{" "}
+        <strong>Sample / custom</strong> if a product ships with non-standard bottles per carton.
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
@@ -292,7 +362,7 @@ export default function NewOrderPage() {
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") firstSelectRef.current?.focus();
+              if (e.key === "Enter") firstGridInputRef.current?.focus();
             }}
             className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
           />
@@ -329,145 +399,21 @@ export default function NewOrderPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-medium text-zinc-900">Products</div>
-              <div className="mt-0.5 text-xs text-zinc-600">
-                {catalogLoading ? "Loading catalog…" : `${catalog.length} packings in catalog.`}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={addItem}
-              className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
-            >
-              + Add product
-            </button>
-          </div>
-
-          {errors.items ? <div className="mt-3 text-sm text-red-700">{errors.items}</div> : null}
-
-          <div className="mt-4 space-y-4">
-            {items.map((it, idx) => (
-              <div key={it.id} className="rounded-lg border border-zinc-200 bg-white p-3 md:p-4">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-                  <div className="md:col-span-6">
-                    <label className="block text-sm font-medium text-zinc-800" htmlFor={`catalog-${it.id}`}>
-                      Product
-                    </label>
-                    <select
-                      id={`catalog-${it.id}`}
-                      ref={idx === 0 ? firstSelectRef : undefined}
-                      value={it.catalogCode}
-                      disabled={catalogLoading}
-                      onChange={(e) => onCatalogChange(it.id, e.target.value)}
-                      className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-400"
-                    >
-                      <option value="">{catalogLoading ? "Loading…" : "Choose product…"}</option>
-                      {catalog.map((p) => (
-                        <option key={p.code} value={p.code}>
-                          {p.name} ({p.bottlesPerCarton}/carton)
-                        </option>
-                      ))}
-                      <option value={CUSTOM_CODE}>Other (type name)…</option>
-                    </select>
-                    {errors[`items.${idx}.catalog`] ? (
-                      <div className="mt-1 text-sm text-red-700">{errors[`items.${idx}.catalog`]}</div>
-                    ) : null}
-
-                    {it.catalogCode === CUSTOM_CODE || (it.catalogCode && errors[`items.${idx}.productName`]) ? (
-                      <div className="mt-2">
-                        <label className="sr-only" htmlFor={`name-${it.id}`}>
-                          Product name
-                        </label>
-                        <input
-                          id={`name-${it.id}`}
-                          value={it.productName}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, productName: v } : x)));
-                          }}
-                          placeholder="Exact name for loading sheet"
-                          className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
-                        />
-                        {errors[`items.${idx}.productName`] ? (
-                          <div className="mt-1 text-sm text-red-700">{errors[`items.${idx}.productName`]}</div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-zinc-800" htmlFor={`boxes-${it.id}`}>
-                      Cartons
-                    </label>
-                    <input
-                      id={`boxes-${it.id}`}
-                      inputMode="numeric"
-                      value={it.boxes}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, boxes: v } : x)));
-                      }}
-                      className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
-                      placeholder="e.g. 10"
-                    />
-                    {errors[`items.${idx}.boxes`] ? (
-                      <div className="mt-1 text-sm text-red-700">{errors[`items.${idx}.boxes`]}</div>
-                    ) : null}
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-zinc-800" htmlFor={`bpb-${it.id}`}>
-                      Bottles / carton
-                    </label>
-                    <input
-                      id={`bpb-${it.id}`}
-                      inputMode="numeric"
-                      value={it.bottlesPerBox}
-                      readOnly={bpbLocked(it)}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        setItems((prev) => prev.map((x) => (x.id === it.id ? { ...x, bottlesPerBox: v } : x)));
-                      }}
-                      className={`mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400 ${
-                        bpbLocked(it) ? "cursor-not-allowed bg-zinc-100 text-zinc-600" : "bg-white"
-                      }`}
-                      placeholder="10"
-                    />
-                    {errors[`items.${idx}.bottlesPerBox`] ? (
-                      <div className="mt-1 text-sm text-red-700">{errors[`items.${idx}.bottlesPerBox`]}</div>
-                    ) : null}
-                  </div>
-
-                  <div className="md:col-span-2 md:flex md:flex-col md:justify-end">
-                    <button
-                      type="button"
-                      onClick={() => removeItem(it.id)}
-                      disabled={items.length <= 1}
-                      className="w-full rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200 disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-
-                {it.catalogCode && it.catalogCode !== CUSTOM_CODE ? (
-                  <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-zinc-700">
-                    <input
-                      type="checkbox"
-                      checked={!it.useDefaultPacking}
-                      onChange={(e) => setUseDefaultPacking(it.id, !e.target.checked)}
-                      className="rounded border-zinc-300"
-                    />
-                    <span>Custom bottles per carton (e.g. sample: set to 1)</span>
-                  </label>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        </div>
+        <NewOrderProductGrid
+          catalog={catalog}
+          catalogLoading={catalogLoading}
+          state={grid}
+          otherRows={otherRows}
+          errors={errors as GridErrors}
+          itemsError={errors.items}
+          firstInputRef={firstGridInputRef}
+          onCartonsChange={onCartonsChange}
+          onBottlesPerBoxChange={onBottlesPerBoxChange}
+          onUseDefaultPackingChange={onUseDefaultPackingChange}
+          onOtherChange={onOtherChange}
+          onAddOther={onAddOther}
+          onRemoveOther={onRemoveOther}
+        />
 
         <button
           type="submit"
