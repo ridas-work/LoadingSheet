@@ -372,3 +372,21 @@ Adding products one-by-one with dropdowns is slow and error-prone. Orders usuall
 Executable plans:
 - `.planning/phases/14-po-product-entry-table/01-PLAN.md`
 
+---
+
+## Phase 15 (Mixed sample box) — ✓ complete
+
+### Problem
+
+Sample orders ship **small bottle counts** for several products in **one physical box**. Today each product line becomes separate cartons on the loading sheet (e.g. 1 carton × 5 bottles + 1 carton × 2 bottles). Operations want **one box** containing both.
+
+### Solution
+
+- **Mixed sample box** mode on `/new-order`: enter **bottles per product** + **number of identical mixed boxes** (default 1).
+- Loading sheet: **one row per physical mixed box**; batch assignment per product inside the mix (reuse bundle-style `componentBatches`).
+- v1: whole order is either standard cartons **or** mixed sample (not both on one PO).
+
+Executable plans:
+- `.planning/phases/15-mixed-sample-box/01-PLAN.md`
+- `.planning/phases/15-mixed-sample-box/02-PLAN.md`
+

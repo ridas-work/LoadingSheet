@@ -76,3 +76,10 @@ PO team (**Nouman, Javeria, Aslam, Ibtisam**) see **all catalog products in one 
 
 Executable plans:
 - `.planning/phases/14-po-product-entry-table/01-PLAN.md` — full catalog grid + new-order integration
+
+## Phase 15: Mixed sample box (one carton, many products) ✓
+Sample orders often need **partial bottle counts** across several SKUs (e.g. 5 bottles of one product + 2 of another) shipped in **one physical box**, not as separate cartons. PO team toggles **Mixed sample box** on `/new-order`, enters **bottles per product** and **how many identical mixed boxes** to ship; loading sheet gets **one row per physical box** with **per-product batch picks** (like bundles).
+
+Executable plans:
+- `.planning/phases/15-mixed-sample-box/01-PLAN.md` — schema, build lines, batch validation
+- `.planning/phases/15-mixed-sample-box/02-PLAN.md` — new-order UI, loading sheet, admin summary

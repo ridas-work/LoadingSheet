@@ -1,13 +1,13 @@
 # Project State
 
-Phase: **14 complete** — PO full-catalog quantity grid
+Phase: **15 complete** — Mixed sample box
 Status: Verified ✓
 
 ## Context
-- `/new-order` now renders **every catalog product** in one grid; PO team types only carton counts. Empty rows are dropped on submit.
-- `NewOrderProductGrid.tsx` replaces the deleted `NewOrderProductTable.tsx`.
-- No API/schema changes; existing `/api/orders` POST and `Order` schema unchanged.
-- Sample / custom toggle handles non-standard bottles/carton per row; Other row covers products not in the catalog.
+- PO team can choose **Mixed sample box** on `/new-order`: bottles per product in one shared carton (or N identical mixed boxes).
+- Loading sheet: one row per physical mixed box; Rashid assigns a batch per product inside the mix.
+- Waleed's admin summary counts **bottles** (× box count) for mixed sample orders.
 
 ## Next
-- Pick the next phase from `.planning/ROADMAP.md` or open a new one with `/gsd-new-milestone` / `/gsd-plan-phase`.
+- Manual test on dev: create mixed order (e.g. 5 + 2 bottles, 1 box) and confirm loading sheet shows 1 row.
+- `/gsd-audit-milestone` or plan next phase.
