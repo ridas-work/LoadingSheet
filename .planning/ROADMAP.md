@@ -92,7 +92,7 @@ Executable plans:
 - `.planning/phases/16-packaging-inventory/02-PLAN.md` — inventory UI + nav
 - `.planning/phases/16-packaging-inventory/03-PLAN.md` — future auto-deduct hook (schema stub + Phase 17 roadmap)
 
-## Phase 17: Rashid daily filling & waste reconciliation — **planned**
+## Phase 17: Rashid daily filling & waste reconciliation ✓
 **Rashid** logs **per production batch, per day**: liters **filled today**, **ready to deliver**, and **physical remaining** in the batch. The app shows **Nimra’s system remaining** (`totalLiters − liters on loading sheets`) beside Rashid’s numbers and computes **variance / waste** so operations can reconcile spillage and unlogged usage.
 
 Executable plans:

@@ -411,7 +411,7 @@ Executable plans:
 
 ---
 
-## Phase 17 (Rashid daily filling & waste) — **planned**
+## Phase 17 (Rashid daily filling & waste) — **complete**
 
 ### Problem
 
