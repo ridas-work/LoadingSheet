@@ -1,66 +1,88 @@
-# Phase 14 Research — PO product entry table
+# Phase 14 Research — PO full-catalog quantity grid
 
-## User request
+## User request (revised)
 
-When **Nouman, Javeria, Aslam, or Ibtisam** create an order (PO number, customer, then products), they want a **table** so they can easily confirm they entered the **right products** and **right quantities** before saving.
+PO team (**Nouman, Javeria, Aslam, Ibtisam**) find **add-product + dropdown** flow difficult. They want:
 
-## Current UI (`/new-order`)
+1. **One fixed list** of all products (~15–17 catalog SKUs) visible at once.
+2. They only type **how many cartons** (and bottles/carton when needed) per product.
+3. A typical order uses **3–4 products** — most rows stay **empty / zero**.
+4. On save, **only products with carton count > 0** become order lines → loading sheet rows.
 
-- Header fields: PO, customer, city, deadline — OK.
-- Products: **stacked cards** (one card per line) with product dropdown, cartons, bottles/carton, remove.
-- Hard to scan when an order has **many SKUs** — each card repeats labels; no single grid view.
+Like a **spreadsheet checklist**: scan the full list, fill quantities where needed, submit.
 
-## Proposed UX (v1)
+## Why this is better than “add product” rows
 
-### Layout
+| Old flow | New flow |
+|----------|----------|
+| Pick product from dropdown per line | Product name already shown for every SKU |
+| Add/remove rows | All rows always visible |
+| Easy to forget a line or pick wrong SKU | Only type numbers in known rows |
+| Hard to compare totals | Footer: “N products · M cartons” |
+
+## Catalog (17 active SKUs)
+
+From `data/product-packings.json`: Brighten (2 + bundle), Fabrito (2), Power Wash (2 + bundle), Rhino (4), Titan, Degrease, Washout (3), bundles, etc.
+
+Each row in the grid = one catalog `ProductPacking` (including bundles as their own row).
+
+## Proposed UX
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ PO / Customer / City / Deadline (unchanged)                  │
-├─────────────────────────────────────────────────────────────┤
-│ Products                          [ + Add product ]        │
-│ ┌────┬──────────────────────┬─────────┬──────────┬───────┐ │
-│ │ #  │ Product              │ Cartons │ Btl/carton│       │ │
-│ ├────┼──────────────────────┼─────────┼──────────┼───────┤ │
-│ │ 1  │ [dropdown + custom]  │ [input] │ [input]  │ Remove│ │
-│ │ 2  │ …                    │ …       │ …        │       │ │
-│ └────┴──────────────────────┴─────────┴──────────┴───────┘ │
-│ Total cartons: 25          (only complete lines)           │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│ PO number · Customer · City · Deadline                        │
+├──────────────────────────────────────────────────────────────┤
+│ Enter cartons for each product (leave blank = not on order)   │
+│ ┌────────────────────────────┬─────────┬──────────┬─────────┐ │
+│ │ Product                    │ Cartons │ Btl/ctn  │         │ │
+│ ├────────────────────────────┼─────────┼──────────┼─────────┤ │
+│ │ Rhino 750ml                │ [  10 ] │ 10       │ (sample)│ │
+│ │ Power Wash                 │ [   0 ] │ 10       │         │ │
+│ │ … (all 17 products)        │         │          │         │ │
+│ ├────────────────────────────┴─────────┴──────────┴─────────┤ │
+│ │ Optional: Other product    │ [  ]    │ [  ]     │ name    │ │
+│ └────────────────────────────────────────────────────────────┘ │
+│ 3 products · 25 cartons on this order                          │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-### Behaviour (keep existing logic)
+### Row behaviour
 
-- Catalog pick → auto-fill product name + default bottles/carton.
-- **Other** → custom name field inline in Product column.
-- **Custom bottles/carton** checkbox under product cell (or compact in row).
-- Validation errors show **in-row** (red border / message under cell).
-- Incomplete rows: muted styling until product + cartons valid.
-- **+ Add product** appends a table row (same state model as today).
+- **Cartons**: empty or `0` = not on order; integer ≥ 1 = included.
+- **Bottles/carton**: default from catalog (read-only); **“Sample”** or checkbox toggles editable `1` for that row only.
+- Rows with cartons > 0: light highlight (e.g. green/zinc) so the 3–4 active lines stand out.
+- **Other** (optional v1): one extra row at bottom for custom product name + cartons (keeps today’s fallback).
 
-### Optional polish (in scope if quick)
+### Submit
 
-- **Total cartons** in table footer (sum of valid lines).
-- Horizontal scroll on small screens (`overflow-x-auto`).
-- Empty state: one blank row by default (current behaviour).
+Build `items[]` from rows where `cartons >= 1`:
+
+```json
+{ "productName": "Rhino 750ml", "boxes": 10, "bottlesPerBox": 10 }
+```
+
+Same POST `/api/orders` — no API change. `buildSheetLines` still creates one loading-sheet row per carton.
+
+### Validation
+
+- At least **one** line with cartons ≥ 1.
+- PO + customer required (unchanged).
+- Per-row: if cartons > 0, bottles/carton must be integer ≥ 1.
 
 ## Out of scope (v1)
 
-- Changing POST `/api/orders` payload or carton rules
-- Editing existing orders from this table
-- Duplicate-product warnings
-- Excel import
+- Changing admin summary columns (still maps by product name)
+- Editing existing orders with this grid
+- Hiding unused catalog products (user wants full list visible)
 
 ## Files
 
 | File | Change |
 |------|--------|
-| `components/NewOrderProductTable.tsx` | New — table UI + row editors |
-| `app/(app)/new-order/page.tsx` | Use component; slimmer page |
-| `README.md` | One line on table review for PO team |
+| `components/NewOrderProductGrid.tsx` | New — full catalog grid (replace partial `NewOrderProductTable.tsx`) |
+| `app/(app)/new-order/page.tsx` | Grid state keyed by catalog `code`; submit filters qty > 0 |
+| `README.md` | PO team: full product list, enter cartons only |
 
-## Verification
+## Supersedes
 
-- PO creator adds 3 products → sees 3 rows in one table with correct names and carton counts.
-- Submit still creates order with same `items[]` payload.
-- `npm run build` passes.
+Earlier Phase 14 idea (“add product” table with dynamic rows) — **replaced** by this full-catalog grid.

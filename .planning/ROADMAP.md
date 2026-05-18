@@ -71,8 +71,8 @@ Executable plans:
 - `.planning/phases/13-admin-oversight/01-PLAN.md` — admin route access + layout/API guards
 - `.planning/phases/13-admin-oversight/02-PLAN.md` — nav, orders creator column, read-only batch & dispatch UI
 
-## Phase 14: PO product entry table — **planned**
-When **Nouman, Javeria, Aslam, or Ibtisam** add products on **`/new-order`**, lines appear in a **single review table** (product, cartons, bottles/carton) so they can confirm the right SKUs and quantities before saving.
+## Phase 14: PO full-catalog quantity grid — **planned**
+PO team (**Nouman, Javeria, Aslam, Ibtisam**) see **all ~17 products in one list** on `/new-order` and only enter **carton counts** (typical order: 3–4 products). Rows left at zero are omitted; only filled products go to the loading sheet.
 
 Executable plans:
-- `.planning/phases/14-po-product-entry-table/01-PLAN.md` — table UI component + new-order integration
+- `.planning/phases/14-po-product-entry-table/01-PLAN.md` — full catalog grid + new-order integration

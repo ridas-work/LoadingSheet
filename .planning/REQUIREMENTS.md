@@ -358,17 +358,16 @@ Executable plans:
 
 ---
 
-## Phase 14 (PO product entry table) — **planned**
+## Phase 14 (PO full-catalog quantity grid) — **planned**
 
 ### Problem
 
-On `/new-order`, each product line is a separate card. With several SKUs, the PO team cannot quickly scan whether every product and carton count is correct.
+Adding products one-by-one with dropdowns is slow and error-prone. Orders usually include only **3–4** of **15–17** catalog SKUs.
 
 ### Solution
 
-- Refactor product entry into a **table**: one row per line, columns for product, cartons, bottles/carton, remove.
-- Show **total cartons** before submit.
-- No API changes — same `items[]` on create.
+- Show **full product list** on `/new-order`; PO team enters **cartons** (and sample bottles/carton if needed).
+- Save only lines with **cartons ≥ 1** → loading sheet gets those products only.
 
 Executable plans:
 - `.planning/phases/14-po-product-entry-table/01-PLAN.md`
