@@ -92,5 +92,13 @@ Executable plans:
 - `.planning/phases/16-packaging-inventory/02-PLAN.md` — inventory UI + nav
 - `.planning/phases/16-packaging-inventory/03-PLAN.md` — future auto-deduct hook (schema stub + Phase 17 roadmap)
 
-## Phase 17: Packaging auto-deduct — **planned** (after 16)
-When bottles are filled or orders dispatch, **automatically deduct** caps/stickers/bottles from packaging inventory using a BOM map (`ProductPacking` → packaging components). Warn on insufficient stock. Depends on Phase 16 inventory baseline.
+## Phase 17: Rashid daily filling & waste reconciliation — **planned**
+**Rashid** logs **per production batch, per day**: liters **filled today**, **ready to deliver**, and **physical remaining** in the batch. The app shows **Nimra’s system remaining** (`totalLiters − liters on loading sheets`) beside Rashid’s numbers and computes **variance / waste** so operations can reconcile spillage and unlogged usage.
+
+Executable plans:
+- `.planning/phases/17-rashid-daily-filling-waste/01-PLAN.md` — model, waste math, API
+- `.planning/phases/17-rashid-daily-filling-waste/02-PLAN.md` — `/dispatch/filling` inline grid + nav
+- `.planning/phases/17-rashid-daily-filling-waste/03-PLAN.md` — admin visibility + Phase 18 stub
+
+## Phase 18: Packaging auto-deduct — **planned** (after 17)
+When bottles are filled or orders dispatch, **automatically deduct** caps/stickers/bottles from packaging inventory using a BOM map (`ProductPacking` → packaging components). Warn on insufficient stock. Depends on Phase 16 inventory baseline and optional link from Phase 17 fill events.

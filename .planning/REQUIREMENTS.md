@@ -404,12 +404,31 @@ Factory needs to track **empty packaging** (bottles, caps, stickers) on the shel
 - Seeded **packaging item catalog** by category; Rashid updates **on-hand count** (physical count) with audit movements.
 - Admin read-only oversight.
 
-### Future (Phase 17)
-
-- Auto-deduct from inventory when production/dispatch consumes packaging; BOM link to product packings.
-
 Executable plans:
 - `.planning/phases/16-packaging-inventory/01-PLAN.md`
 - `.planning/phases/16-packaging-inventory/02-PLAN.md`
 - `.planning/phases/16-packaging-inventory/03-PLAN.md`
+
+---
+
+## Phase 17 (Rashid daily filling & waste) — **planned**
+
+### Problem
+
+Rashid fills bottles from Nimra’s batches and needs to record **daily fill**, **ready-to-deliver** stock, and **physical leftover** per batch. Operations want to **compare** those numbers to **Nimra’s remaining liters** (batch total minus loading-sheet allocation) to see **waste / variance**.
+
+### Solution (v1)
+
+- Route **`/dispatch/filling`** — spreadsheet: Nimra remaining (read-only) + Rashid’s three liter fields + variance column.
+- `BatchFillingDailyEntry` per batch per date; PATCH on row save.
+- Variance = system remaining − physical remaining (confirm with ops at UAT).
+
+### Future (Phase 18)
+
+- Auto-deduct packaging when filling/dispatching; BOM link to product packings.
+
+Executable plans:
+- `.planning/phases/17-rashid-daily-filling-waste/01-PLAN.md`
+- `.planning/phases/17-rashid-daily-filling-waste/02-PLAN.md`
+- `.planning/phases/17-rashid-daily-filling-waste/03-PLAN.md`
 
