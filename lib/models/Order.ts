@@ -30,11 +30,51 @@ const DispatchSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const MixedSampleContentSchema = new mongoose.Schema(
+  {
+    productName: { type: String, required: true, trim: true },
+    bottles: { type: Number, required: true, min: 1 },
+  },
+  { _id: false },
+);
+
+const MixedSampleSchema = new mongoose.Schema(
+  {
+    boxCount: { type: Number, required: true, min: 1 },
+    contents: {
+      type: [MixedSampleContentSchema],
+      required: true,
+      validate: {
+        validator(v: unknown) {
+          return Array.isArray(v) && v.length > 0;
+        },
+        message: "At least one product in the mixed sample box is required.",
+      },
+    },
+  },
+  { _id: false },
+);
+
 const SheetLineSchema = new mongoose.Schema(
   {
     boxNo: { type: Number, required: true, min: 1 },
     productName: { type: String, required: true, trim: true },
     bottlesPerBox: { type: Number, required: true, min: 1 },
+    lineKind: {
+      type: String,
+      enum: ["standard", "mixed_sample"],
+      required: false,
+      default: "standard",
+    },
+    mixedContents: {
+      type: [
+        {
+          productName: { type: String, required: true, trim: true },
+          bottles: { type: Number, required: true, min: 1 },
+        },
+      ],
+      default: [],
+    },
     batchNo: { type: String, required: false, default: "" },
     componentBatches: {
       type: [
@@ -57,15 +97,21 @@ const OrderSchema = new mongoose.Schema(
     customerName: { type: String, required: true, trim: true },
     city: { type: String, required: false, default: "", trim: true },
     deadlineDate: { type: Date, required: false, default: null },
+    orderKind: {
+      type: String,
+      enum: ["standard", "mixed_sample"],
+      required: false,
+      default: "standard",
+    },
+    mixedSample: {
+      type: MixedSampleSchema,
+      required: false,
+      default: null,
+    },
     items: {
       type: [OrderItemSchema],
       required: true,
-      validate: {
-        validator(v: unknown) {
-          return Array.isArray(v) && v.length > 0;
-        },
-        message: "At least one item is required.",
-      },
+      default: [],
     },
     sheetLines: {
       type: [SheetLineSchema],

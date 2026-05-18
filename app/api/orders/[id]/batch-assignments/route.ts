@@ -10,6 +10,7 @@ import {
   type PackingCatalogRow,
   validateSheetBatchAllocations,
 } from "@/lib/bundleCatalog";
+import { isMixedSampleLine } from "@/lib/mixedSampleBox";
 import { effectiveBatchDefsForOrder, normalizeBatchNo, poolToBatchDefs, productsMatch } from "@/lib/batchVolume";
 import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
@@ -108,8 +109,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const workingLines = (order.sheetLines ?? []).map((line) => {
     const incoming = assignmentMap.get(line.boxNo);
     const bundle = isBundleProduct(line.productName, catalog);
+    const mixed = isMixedSampleLine(line);
 
-    if (bundle) {
+    if (bundle || mixed) {
       const componentBatches =
         incoming?.componentBatches ??
         (line.componentBatches ?? []).map((c) => ({
@@ -120,6 +122,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         boxNo: line.boxNo,
         productName: line.productName,
         bottlesPerBox: line.bottlesPerBox,
+        lineKind: line.lineKind,
+        mixedContents: mixed
+          ? (line.mixedContents ?? []).map((c) => ({
+              productName: c.productName,
+              bottles: c.bottles,
+            }))
+          : [],
         batchNo: "",
         componentBatches,
       };
@@ -164,7 +173,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const working = workingLines.find((w) => w.boxNo === line.boxNo);
     if (!working) continue;
 
-    if (isBundleProduct(line.productName, catalog)) {
+    if (isBundleProduct(line.productName, catalog) || isMixedSampleLine(line)) {
       line.set("batchNo", "");
       line.set(
         "componentBatches",

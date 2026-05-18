@@ -5,6 +5,7 @@ import {
   roundLiters,
   type CatalogProduct,
 } from "@/lib/batchVolume";
+import { isMixedSampleLine, resolveMixedSampleParts } from "@/lib/mixedSampleBox";
 
 export type BundleComponentRef = {
   code: string;
@@ -25,10 +26,29 @@ export type SheetLineLike = {
   boxNo: number;
   productName: string;
   bottlesPerBox: number;
+  lineKind?: string | null;
+  mixedContents?: Array<{ productName: string; bottles: number }> | null;
   batchNo?: string | null;
   componentBatches?: ComponentBatch[] | null;
   weight?: number | null;
 };
+
+function lineUsesComponentBatches(
+  line: SheetLineLike,
+  catalog: PackingCatalogRow[],
+): boolean {
+  return isMixedSampleLine(line) || isBundleProduct(line.productName, catalog);
+}
+
+function resolveComponentParts(
+  line: SheetLineLike,
+  catalog: PackingCatalogRow[],
+): Array<{ productName: string; bottlesPerUnit: number; litersPerBottle: number }> {
+  if (isMixedSampleLine(line)) {
+    return resolveMixedSampleParts(line, catalog);
+  }
+  return resolveBundleParts(line.productName, catalog);
+}
 
 export type BatchLiterAllocation = {
   batchNo: string;
@@ -82,8 +102,8 @@ export function resolveBundleParts(
 }
 
 export function formatBatchDisplay(line: SheetLineLike, catalog: PackingCatalogRow[]): string {
-  if (isBundleProduct(line.productName, catalog)) {
-    const parts = resolveBundleParts(line.productName, catalog);
+  if (lineUsesComponentBatches(line, catalog)) {
+    const parts = resolveComponentParts(line, catalog);
     const labels = parts.map((part) => {
       const hit =
         line.componentBatches?.find((c) => c.productName.trim() === part.productName.trim()) ??
@@ -96,8 +116,8 @@ export function formatBatchDisplay(line: SheetLineLike, catalog: PackingCatalogR
 }
 
 export function lineBatchComplete(line: SheetLineLike, catalog: PackingCatalogRow[]): boolean {
-  if (isBundleProduct(line.productName, catalog)) {
-    const parts = resolveBundleParts(line.productName, catalog);
+  if (lineUsesComponentBatches(line, catalog)) {
+    const parts = resolveComponentParts(line, catalog);
     if (parts.length === 0) return false;
     return parts.every((part) => {
       const hit =
@@ -113,8 +133,8 @@ export function lineBatchAllocations(
   line: SheetLineLike,
   catalog: PackingCatalogRow[],
 ): BatchLiterAllocation[] {
-  if (isBundleProduct(line.productName, catalog)) {
-    const parts = resolveBundleParts(line.productName, catalog);
+  if (lineUsesComponentBatches(line, catalog)) {
+    const parts = resolveComponentParts(line, catalog);
     const allocations: BatchLiterAllocation[] = [];
 
     for (const part of parts) {
@@ -123,7 +143,9 @@ export function lineBatchAllocations(
         line.componentBatches?.find((c) => productsMatch(c.productName, part.productName, catalog));
       const batchNo = normalizeBatchNo(hit?.batchNo ?? "");
       if (!batchNo) continue;
-      const liters = roundLiters(line.bottlesPerBox * part.bottlesPerUnit * part.litersPerBottle);
+      const liters = isMixedSampleLine(line)
+        ? roundLiters(part.bottlesPerUnit * part.litersPerBottle)
+        : roundLiters(line.bottlesPerBox * part.bottlesPerUnit * part.litersPerBottle);
       allocations.push({ batchNo, liters, productName: part.productName });
     }
 
