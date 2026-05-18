@@ -20,7 +20,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-dvh bg-zinc-50">
       <header className="border-b border-zinc-200 bg-white">
-        <div className={`mx-auto flex items-center justify-between px-4 py-3 ${admin ? "max-w-[1600px]" : "max-w-4xl"}`}>
+        <div
+          className={`mx-auto flex items-center justify-between px-4 py-3 ${
+            admin || role === "dispatch_editor" ? "max-w-[1600px]" : "max-w-4xl"
+          }`}
+        >
           <div className="flex flex-wrap items-center gap-4">
             <Link href={homeHref} className="text-sm font-semibold text-zinc-900">
               Loading Sheet
@@ -42,6 +46,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 <Link href="/dispatch/inventory" className="text-sm text-zinc-600 hover:text-zinc-900">
                   Packaging inventory
                 </Link>
+                <Link href="/dispatch/filling" className="text-sm text-zinc-600 hover:text-zinc-900">
+                  Daily filling
+                </Link>
               </>
             ) : null}
             {role !== "batch_editor" && !admin ? (
@@ -57,6 +64,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 <Link href="/dispatch/inventory" className="text-sm text-zinc-600 hover:text-zinc-900">
                   Packaging inventory
                 </Link>
+                <Link href="/dispatch/filling" className="text-sm text-zinc-600 hover:text-zinc-900">
+                  Daily filling
+                </Link>
               </>
             ) : null}
             {role === "po_creator" ? (
@@ -71,7 +81,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
-      <main className={`mx-auto px-4 py-6 ${admin ? "max-w-[1600px]" : "max-w-4xl"}`}>{children}</main>
+      <main
+        className={`mx-auto px-4 py-6 ${
+          admin || role === "dispatch_editor" ? "max-w-[1600px]" : "max-w-4xl"
+        }`}
+      >
+        {children}
+      </main>
     </div>
   );
 }
