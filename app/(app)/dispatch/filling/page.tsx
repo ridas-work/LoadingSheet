@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import type { FillingRow } from "@/components/BatchFillingGrid";
 import { BatchFillingGrid } from "@/components/BatchFillingGrid";
+import { DatePickerForm } from "@/components/DatePickerForm";
 import { auth } from "@/lib/auth";
 import { todayIsoDate } from "@/lib/batchFillingWaste";
 import { roundLiters } from "@/lib/batchVolume";
@@ -84,22 +85,8 @@ export default async function BatchFillingPage({ searchParams }: PageProps) {
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-zinc-600">
-          <label htmlFor="date-picker" className="font-medium">Date:</label>
-          <form method="get">
-            <input
-              id="date-picker"
-              type="date"
-              name="date"
-              defaultValue={date}
-              max={todayIsoDate()}
-              onChange={(e) => {
-                if (e.target.form) {
-                  (e.target.form as HTMLFormElement).requestSubmit();
-                }
-              }}
-              className="rounded-lg border border-zinc-200 px-2 py-1 text-sm text-zinc-800"
-            />
-          </form>
+          <span className="font-medium">Date:</span>
+          <DatePickerForm value={date} max={todayIsoDate()} />
         </div>
       </div>
 
