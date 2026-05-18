@@ -15,14 +15,20 @@ import {
   type OtherRow,
 } from "@/components/NewOrderProductGrid";
 
-type FieldErrors = Partial<Record<"poNumber" | "customerName" | "items", string>> &
+type FieldErrors = Partial<
+  Record<"poNumber" | "customerName" | "items" | "mixedSample" | "mixedBoxCount", string>
+> &
   Record<string, string>;
+
+type OrderKind = "standard" | "mixed_sample";
 
 export default function NewOrderPage() {
   const [poNumber, setPoNumber] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [city, setCity] = useState("");
   const [deadlineDate, setDeadlineDate] = useState("");
+  const [orderKind, setOrderKind] = useState<OrderKind>("standard");
+  const [mixedBoxCount, setMixedBoxCount] = useState("1");
   const [grid, setGrid] = useState<GridState>({});
   const [otherRows, setOtherRows] = useState<OtherRow[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -86,15 +92,30 @@ export default function NewOrderPage() {
     return n;
   }, [catalog, grid, otherRows]);
 
-  const canSubmit = useMemo(
-    () => Boolean(poNumber.trim() && customerName.trim() && activeCount > 0),
-    [activeCount, customerName, poNumber],
-  );
+  const isMixed = orderKind === "mixed_sample";
+
+  const canSubmit = useMemo(() => {
+    if (!poNumber.trim() || !customerName.trim() || activeCount === 0) return false;
+    if (isMixed) {
+      const boxes = Number(mixedBoxCount);
+      return Number.isInteger(boxes) && boxes >= 1;
+    }
+    return true;
+  }, [activeCount, customerName, isMixed, mixedBoxCount, poNumber]);
 
   function validate(): FieldErrors {
     const next: FieldErrors = {};
     if (!poNumber.trim()) next.poNumber = "PO number is required.";
     if (!customerName.trim()) next.customerName = "Customer name is required.";
+
+    if (isMixed) {
+      const boxes = Number(mixedBoxCount);
+      if (!mixedBoxCount.trim()) {
+        next.mixedBoxCount = "Number of mixed boxes is required.";
+      } else if (!Number.isInteger(boxes) || boxes < 1) {
+        next.mixedBoxCount = "Must be an integer ≥ 1.";
+      }
+    }
 
     let validCount = 0;
     for (const p of catalog) {
@@ -108,20 +129,17 @@ export default function NewOrderPage() {
       if (!Number.isInteger(cartons) || cartons < 1) {
         next[`item.${p.code}.cartons`] = "Must be an integer ≥ 1.";
       }
-      if (!row.bottlesPerBox.trim()) {
-        next[`item.${p.code}.bottlesPerBox`] = "Required.";
-      } else if (!Number.isInteger(bpb) || bpb < 1) {
-        next[`item.${p.code}.bottlesPerBox`] = "Must be an integer ≥ 1.";
+      if (!isMixed) {
+        if (!row.bottlesPerBox.trim()) {
+          next[`item.${p.code}.bottlesPerBox`] = "Required.";
+        } else if (!Number.isInteger(bpb) || bpb < 1) {
+          next[`item.${p.code}.bottlesPerBox`] = "Must be an integer ≥ 1.";
+        }
       }
 
-      if (
-        Number.isInteger(cartons) &&
-        cartons >= 1 &&
-        Number.isInteger(bpb) &&
-        bpb >= 1
-      ) {
-        validCount += 1;
-      }
+      const qtyOk = Number.isInteger(cartons) && cartons >= 1;
+      const bpbOk = isMixed || (Number.isInteger(bpb) && bpb >= 1);
+      if (qtyOk && bpbOk) validCount += 1;
     }
 
     otherRows.forEach((r) => {
@@ -133,29 +151,27 @@ export default function NewOrderPage() {
       const bpb = Number(r.bottlesPerBox);
       if (!hasName) next[`item.${r.code}.productName`] = "Product name is required.";
       if (!cartonsRaw) {
-        next[`item.${r.code}.cartons`] = "Cartons is required.";
+        next[`item.${r.code}.cartons`] = isMixed ? "Bottles is required." : "Cartons is required.";
       } else if (!Number.isInteger(cartons) || cartons < 1) {
         next[`item.${r.code}.cartons`] = "Must be an integer ≥ 1.";
       }
-      if (!r.bottlesPerBox.trim()) {
-        next[`item.${r.code}.bottlesPerBox`] = "Required.";
-      } else if (!Number.isInteger(bpb) || bpb < 1) {
-        next[`item.${r.code}.bottlesPerBox`] = "Must be an integer ≥ 1.";
+      if (!isMixed) {
+        if (!r.bottlesPerBox.trim()) {
+          next[`item.${r.code}.bottlesPerBox`] = "Required.";
+        } else if (!Number.isInteger(bpb) || bpb < 1) {
+          next[`item.${r.code}.bottlesPerBox`] = "Must be an integer ≥ 1.";
+        }
       }
 
-      if (
-        hasName &&
-        Number.isInteger(cartons) &&
-        cartons >= 1 &&
-        Number.isInteger(bpb) &&
-        bpb >= 1
-      ) {
-        validCount += 1;
-      }
+      const qtyOk = hasName && Number.isInteger(cartons) && cartons >= 1;
+      const bpbOk = isMixed || (Number.isInteger(bpb) && bpb >= 1);
+      if (qtyOk && bpbOk) validCount += 1;
     });
 
     if (validCount === 0) {
-      next.items = "Enter cartons for at least one product.";
+      next.items = isMixed
+        ? "Enter bottles for at least one product in the mixed box."
+        : "Enter cartons for at least one product.";
     }
     return next;
   }
@@ -213,6 +229,25 @@ export default function NewOrderPage() {
     setOtherRows((prev) => prev.filter((r) => r.code !== code));
   }
 
+  function buildMixedContents(): Array<{ productName: string; bottles: number }> {
+    const out: Array<{ productName: string; bottles: number }> = [];
+    for (const p of catalog) {
+      const row = grid[p.code];
+      if (!row) continue;
+      const bottles = Number(row.cartons);
+      if (!Number.isInteger(bottles) || bottles < 1) continue;
+      out.push({ productName: p.name, bottles });
+    }
+    for (const r of otherRows) {
+      const bottles = Number(r.cartons);
+      const pn = r.productName.trim();
+      if (!pn) continue;
+      if (!Number.isInteger(bottles) || bottles < 1) continue;
+      out.push({ productName: pn, bottles });
+    }
+    return out;
+  }
+
   function buildSubmitItems(): Array<{
     productName: string;
     boxes: number;
@@ -254,13 +289,28 @@ export default function NewOrderPage() {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          poNumber: poNumber.trim(),
-          customerName: customerName.trim(),
-          city: city.trim(),
-          deadlineDate: deadlineDate.trim() || undefined,
-          items: buildSubmitItems(),
-        }),
+        body: JSON.stringify(
+          isMixed
+            ? {
+                poNumber: poNumber.trim(),
+                customerName: customerName.trim(),
+                city: city.trim(),
+                deadlineDate: deadlineDate.trim() || undefined,
+                orderKind: "mixed_sample",
+                mixedSample: {
+                  boxCount: Number(mixedBoxCount),
+                  contents: buildMixedContents(),
+                },
+              }
+            : {
+                poNumber: poNumber.trim(),
+                customerName: customerName.trim(),
+                city: city.trim(),
+                deadlineDate: deadlineDate.trim() || undefined,
+                orderKind: "standard",
+                items: buildSubmitItems(),
+              },
+        ),
       });
 
       if (res.status === 401) {
@@ -290,6 +340,8 @@ export default function NewOrderPage() {
         return next;
       });
       setOtherRows([]);
+      setOrderKind("standard");
+      setMixedBoxCount("1");
       setErrors({});
     } finally {
       setSubmitting(false);
@@ -330,12 +382,35 @@ export default function NewOrderPage() {
     <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
       <h1 className="text-lg font-semibold text-zinc-900">New Order</h1>
       <p className="mt-1 text-sm text-zinc-600">
-        Every catalog product is listed below. Type the number of <strong>cartons</strong> next to
-        each product you want on this order — leave the rest blank. Use{" "}
-        <strong>Sample / custom</strong> if a product ships with non-standard bottles per carton.
+        {isMixed
+          ? "Mixed sample box: enter how many bottles of each product go in one shared carton. All selected products ship together in the same physical box."
+          : "Every catalog product is listed below. Type the number of cartons next to each product you want on this order — leave the rest blank. Use Sample / custom if a product ships with non-standard bottles per carton."}
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+          <div className="text-sm font-medium text-zinc-900">Order type</div>
+          <div className="mt-2 flex flex-wrap gap-4">
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
+              <input
+                type="radio"
+                name="orderKind"
+                checked={orderKind === "standard"}
+                onChange={() => setOrderKind("standard")}
+              />
+              Standard (cartons per product)
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
+              <input
+                type="radio"
+                name="orderKind"
+                checked={orderKind === "mixed_sample"}
+                onChange={() => setOrderKind("mixed_sample")}
+              />
+              Mixed sample box (several products, one carton)
+            </label>
+          </div>
+        </div>
         <div>
           <label className="block text-sm font-medium text-zinc-800" htmlFor="poNumber">
             PO number
@@ -399,9 +474,31 @@ export default function NewOrderPage() {
           </div>
         </div>
 
+        {isMixed ? (
+          <div>
+            <label className="block text-sm font-medium text-zinc-800" htmlFor="mixedBoxCount">
+              Number of identical mixed boxes
+            </label>
+            <input
+              id="mixedBoxCount"
+              inputMode="numeric"
+              value={mixedBoxCount}
+              onChange={(e) => setMixedBoxCount(e.target.value)}
+              className="mt-1 w-32 rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              Usually 1. Use 2+ only if you ship multiple boxes with the same product mix inside each.
+            </p>
+            {errors.mixedBoxCount ? (
+              <p className="mt-1 text-sm text-red-700">{errors.mixedBoxCount}</p>
+            ) : null}
+          </div>
+        ) : null}
+
         <NewOrderProductGrid
           catalog={catalog}
           catalogLoading={catalogLoading}
+          mode={isMixed ? "bottles" : "cartons"}
           state={grid}
           otherRows={otherRows}
           errors={errors as GridErrors}

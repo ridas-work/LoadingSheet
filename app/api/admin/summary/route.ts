@@ -32,6 +32,8 @@ export async function GET(req: Request) {
         dispatchTripId: 1,
         dispatch: 1,
         items: 1,
+        orderKind: 1,
+        mixedSample: 1,
       })
       .lean(),
     ProductPacking.find({ active: true })
@@ -49,6 +51,8 @@ export async function GET(req: Request) {
       dispatchTripId: o.dispatchTripId,
       dispatch: o.dispatch,
       items: o.items,
+      orderKind: o.orderKind,
+      mixedSample: o.mixedSample,
     })),
     catalog.map((p) => ({
       code: p.code,

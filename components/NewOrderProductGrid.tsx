@@ -62,9 +62,12 @@ export function otherRowIsActive(row: OtherRow): boolean {
   return Boolean(row.productName.trim()) && Number.isInteger(n) && n >= 1;
 }
 
+export type GridEntryMode = "cartons" | "bottles";
+
 type Props = {
   catalog: CatalogProduct[];
   catalogLoading: boolean;
+  mode?: GridEntryMode;
   state: GridState;
   otherRows: OtherRow[];
   errors: GridErrors;
@@ -85,6 +88,7 @@ function cellError(errors: GridErrors, code: string, field: string): string | un
 export function NewOrderProductGrid({
   catalog,
   catalogLoading,
+  mode = "cartons",
   state,
   otherRows,
   errors,
@@ -97,22 +101,24 @@ export function NewOrderProductGrid({
   onAddOther,
   onRemoveOther,
 }: Props) {
+  const isBottles = mode === "bottles";
+
   const summary = useMemo(() => {
     let productCount = 0;
-    let totalCartons = 0;
+    let totalQty = 0;
     for (const p of catalog) {
       const row = state[p.code];
       if (!row) continue;
       if (!rowIsActive(row)) continue;
       productCount += 1;
-      totalCartons += Number(row.cartons);
+      totalQty += Number(row.cartons);
     }
     for (const r of otherRows) {
       if (!otherRowIsActive(r)) continue;
       productCount += 1;
-      totalCartons += Number(r.cartons);
+      totalQty += Number(r.cartons);
     }
-    return { productCount, totalCartons };
+    return { productCount, totalQty };
   }, [catalog, otherRows, state]);
 
   return (
@@ -123,7 +129,9 @@ export function NewOrderProductGrid({
           <div className="mt-0.5 text-xs text-zinc-600">
             {catalogLoading
               ? "Loading catalog…"
-              : "Enter cartons next to each product you want on this order. Leave the rest blank."}
+              : isBottles
+                ? "Enter bottles per product for one mixed sample box. Leave the rest blank."
+                : "Enter cartons next to each product you want on this order. Leave the rest blank."}
           </div>
         </div>
         <div className="text-right text-xs text-zinc-600">
@@ -132,7 +140,8 @@ export function NewOrderProductGrid({
             {summary.productCount === 1 ? "" : "s"}
           </div>
           <div>
-            <span className="font-semibold text-zinc-900">{summary.totalCartons}</span> cartons total
+            <span className="font-semibold text-zinc-900">{summary.totalQty}</span>{" "}
+            {isBottles ? "bottles in mix" : "cartons total"}
           </div>
         </div>
       </div>
@@ -144,9 +153,15 @@ export function NewOrderProductGrid({
           <thead>
             <tr className="border-b border-zinc-200 bg-zinc-50 text-left">
               <th className="min-w-[16rem] px-3 py-2 font-medium text-zinc-700">Product</th>
-              <th className="w-28 px-3 py-2 text-center font-medium text-zinc-700">Cartons</th>
-              <th className="w-32 px-3 py-2 text-center font-medium text-zinc-700">Bottles / carton</th>
-              <th className="w-32 px-3 py-2 font-medium text-zinc-700" />
+              <th className="w-28 px-3 py-2 text-center font-medium text-zinc-700">
+                {isBottles ? "Bottles" : "Cartons"}
+              </th>
+              {!isBottles ? (
+                <>
+                  <th className="w-32 px-3 py-2 text-center font-medium text-zinc-700">Bottles / carton</th>
+                  <th className="w-32 px-3 py-2 font-medium text-zinc-700" />
+                </>
+              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -166,9 +181,11 @@ export function NewOrderProductGrid({
                 >
                   <td className="px-3 py-2">
                     <div className="font-medium text-zinc-900">{p.name}</div>
-                    <div className="mt-0.5 text-[11px] text-zinc-500">
-                      Default {p.bottlesPerCarton} bottles / carton
-                    </div>
+                    {!isBottles ? (
+                      <div className="mt-0.5 text-[11px] text-zinc-500">
+                        Default {p.bottlesPerCarton} bottles / carton
+                      </div>
+                    ) : null}
                   </td>
                   <td className="px-3 py-2 text-center">
                     <input
@@ -189,29 +206,33 @@ export function NewOrderProductGrid({
                       <p className="mt-1 text-[11px] text-red-700">{cartonsErr}</p>
                     ) : null}
                   </td>
-                  <td className="px-3 py-2 text-center">
-                    <input
-                      inputMode="numeric"
-                      value={row.bottlesPerBox}
-                      readOnly={locked}
-                      onChange={(e) => onBottlesPerBoxChange(p.code, e.target.value)}
-                      className={`w-20 rounded-lg border px-2 py-1.5 text-center text-sm outline-none focus:border-zinc-400 ${
-                        bpbErr ? "border-red-400" : "border-zinc-200"
-                      } ${locked ? "cursor-not-allowed bg-zinc-100 text-zinc-600" : "bg-white"}`}
-                    />
-                    {bpbErr ? <p className="mt-1 text-[11px] text-red-700">{bpbErr}</p> : null}
-                  </td>
-                  <td className="px-3 py-2">
-                    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-600">
-                      <input
-                        type="checkbox"
-                        checked={!row.useDefaultPacking}
-                        onChange={(e) => onUseDefaultPackingChange(p.code, !e.target.checked)}
-                        className="rounded border-zinc-300"
-                      />
-                      <span>Sample / custom</span>
-                    </label>
-                  </td>
+                  {!isBottles ? (
+                    <>
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          inputMode="numeric"
+                          value={row.bottlesPerBox}
+                          readOnly={locked}
+                          onChange={(e) => onBottlesPerBoxChange(p.code, e.target.value)}
+                          className={`w-20 rounded-lg border px-2 py-1.5 text-center text-sm outline-none focus:border-zinc-400 ${
+                            bpbErr ? "border-red-400" : "border-zinc-200"
+                          } ${locked ? "cursor-not-allowed bg-zinc-100 text-zinc-600" : "bg-white"}`}
+                        />
+                        {bpbErr ? <p className="mt-1 text-[11px] text-red-700">{bpbErr}</p> : null}
+                      </td>
+                      <td className="px-3 py-2">
+                        <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-600">
+                          <input
+                            type="checkbox"
+                            checked={!row.useDefaultPacking}
+                            onChange={(e) => onUseDefaultPackingChange(p.code, !e.target.checked)}
+                            className="rounded border-zinc-300"
+                          />
+                          <span>Sample / custom</span>
+                        </label>
+                      </td>
+                    </>
+                  ) : null}
                 </tr>
               );
             })}
@@ -258,26 +279,40 @@ export function NewOrderProductGrid({
                       <p className="mt-1 text-[11px] text-red-700">{cartonsErr}</p>
                     ) : null}
                   </td>
-                  <td className="px-3 py-2 text-center">
-                    <input
-                      inputMode="numeric"
-                      value={r.bottlesPerBox}
-                      onChange={(e) => onOtherChange(r.code, { bottlesPerBox: e.target.value })}
-                      className={`w-20 rounded-lg border px-2 py-1.5 text-center text-sm outline-none focus:border-zinc-400 ${
-                        bpbErr ? "border-red-400" : "border-zinc-200"
-                      } bg-white`}
-                    />
-                    {bpbErr ? <p className="mt-1 text-[11px] text-red-700">{bpbErr}</p> : null}
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      onClick={() => onRemoveOther(r.code)}
-                      className="rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
-                    >
-                      Remove
-                    </button>
-                  </td>
+                  {!isBottles ? (
+                    <>
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          inputMode="numeric"
+                          value={r.bottlesPerBox}
+                          onChange={(e) => onOtherChange(r.code, { bottlesPerBox: e.target.value })}
+                          className={`w-20 rounded-lg border px-2 py-1.5 text-center text-sm outline-none focus:border-zinc-400 ${
+                            bpbErr ? "border-red-400" : "border-zinc-200"
+                          } bg-white`}
+                        />
+                        {bpbErr ? <p className="mt-1 text-[11px] text-red-700">{bpbErr}</p> : null}
+                      </td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => onRemoveOther(r.code)}
+                          className="rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </>
+                  ) : (
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => onRemoveOther(r.code)}
+                        className="rounded-lg bg-white px-2 py-1.5 text-xs font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  )}
                 </tr>
               );
             })}
@@ -294,12 +329,14 @@ export function NewOrderProductGrid({
                 </button>
               </td>
               <td className="px-3 py-2 text-center text-sm font-semibold text-zinc-900">
-                {summary.totalCartons > 0 ? summary.totalCartons : "—"}
+                {summary.totalQty > 0 ? summary.totalQty : "—"}
               </td>
-              <td colSpan={2} className="px-3 py-2 text-xs text-zinc-500">
+              <td colSpan={isBottles ? 1 : 2} className="px-3 py-2 text-xs text-zinc-500">
                 {summary.productCount > 0
                   ? `${summary.productCount} product${summary.productCount === 1 ? "" : "s"} on this order`
-                  : "Enter cartons next to any product to include it"}
+                  : isBottles
+                    ? "Enter bottles for each product in the mixed box"
+                    : "Enter cartons next to any product to include it"}
               </td>
             </tr>
           </tfoot>

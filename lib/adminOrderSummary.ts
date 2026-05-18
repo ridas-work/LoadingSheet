@@ -36,6 +36,11 @@ type OrderInput = {
   deadlineDate?: Date | string | null;
   dispatchTripId?: unknown;
   dispatch?: { vehicleNo?: string | null } | null;
+  orderKind?: string | null;
+  mixedSample?: {
+    boxCount?: number;
+    contents?: Array<{ productName?: string; bottles?: number }>;
+  } | null;
   items?: Array<{ productName?: string; boxes?: number }>;
 };
 
@@ -93,12 +98,26 @@ export function buildAdminOrderSummary(
   const rows: SummaryRow[] = filtered.map((order, idx) => {
     const cells: Record<string, number> = Object.fromEntries(columns.map((c) => [c.key, 0]));
 
-    for (const item of order.items ?? []) {
-      const boxes = typeof item.boxes === "number" ? item.boxes : 0;
-      if (boxes < 1) continue;
-      const code = resolveCatalogCode(item.productName ?? "", catalog);
-      if (!code || !(code in cells)) continue;
-      cells[code] += boxes;
+    if (order.orderKind === "mixed_sample" && order.mixedSample?.contents?.length) {
+      const boxCount =
+        typeof order.mixedSample.boxCount === "number" && order.mixedSample.boxCount >= 1
+          ? order.mixedSample.boxCount
+          : 1;
+      for (const item of order.mixedSample.contents) {
+        const bottles = typeof item.bottles === "number" ? item.bottles : 0;
+        if (bottles < 1) continue;
+        const code = resolveCatalogCode(item.productName ?? "", catalog);
+        if (!code || !(code in cells)) continue;
+        cells[code] += bottles * boxCount;
+      }
+    } else {
+      for (const item of order.items ?? []) {
+        const boxes = typeof item.boxes === "number" ? item.boxes : 0;
+        if (boxes < 1) continue;
+        const code = resolveCatalogCode(item.productName ?? "", catalog);
+        if (!code || !(code in cells)) continue;
+        cells[code] += boxes;
+      }
     }
 
     const rowTotal = Object.values(cells).reduce((sum, n) => sum + n, 0);

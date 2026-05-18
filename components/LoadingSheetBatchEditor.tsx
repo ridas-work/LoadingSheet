@@ -22,16 +22,28 @@ import {
   type ComponentBatch,
   type PackingCatalogRow,
 } from "@/lib/bundleCatalog";
+import { isMixedSampleLine, resolveMixedSampleParts } from "@/lib/mixedSampleBox";
 import { type DispatchFields } from "@/lib/roles";
 
 export type LoadingSheetLine = {
   boxNo: number;
   productName: string;
   bottlesPerBox: number;
+  lineKind?: string;
+  mixedContents?: Array<{ productName: string; bottles: number }>;
   batchNo: string;
   componentBatches?: ComponentBatch[];
   weight: number | null;
 };
+
+function lineHasComponentBatches(line: LoadingSheetLine, catalog: PackingCatalogRow[]): boolean {
+  return isMixedSampleLine(line) || isBundleProduct(line.productName, catalog);
+}
+
+function resolveLineParts(line: LoadingSheetLine, catalog: PackingCatalogRow[]) {
+  if (isMixedSampleLine(line)) return resolveMixedSampleParts(line, catalog);
+  return resolveBundleParts(line.productName, catalog);
+}
 
 type Props = {
   orderId: string;
@@ -183,12 +195,14 @@ export function LoadingSheetBatchEditor({
   const workingLines = useMemo(
     () =>
       sheetLines.map((line) => {
-        if (isBundleProduct(line.productName, catalog)) {
-          const parts = resolveBundleParts(line.productName, catalog);
+        if (lineHasComponentBatches(line, catalog)) {
+          const parts = resolveLineParts(line, catalog);
           return {
             boxNo: line.boxNo,
             productName: line.productName,
             bottlesPerBox: line.bottlesPerBox,
+            lineKind: line.lineKind,
+            mixedContents: line.mixedContents,
             batchNo: "",
             componentBatches: parts.map((part) => ({
               productName: part.productName,
@@ -200,6 +214,7 @@ export function LoadingSheetBatchEditor({
           boxNo: line.boxNo,
           productName: line.productName,
           bottlesPerBox: line.bottlesPerBox,
+          lineKind: line.lineKind,
           batchNo: batches[line.boxNo] ?? "",
           componentBatches: [],
         };
@@ -243,8 +258,8 @@ export function LoadingSheetBatchEditor({
     }
 
     const assignments = sheetLines.map((line) => {
-      if (isBundleProduct(line.productName, catalog)) {
-        const parts = resolveBundleParts(line.productName, catalog);
+      if (lineHasComponentBatches(line, catalog)) {
+        const parts = resolveLineParts(line, catalog);
         return {
           boxNo: line.boxNo,
           componentBatches: parts.map((part) => ({
@@ -440,9 +455,9 @@ export function LoadingSheetBatchEditor({
             </thead>
             <tbody>
               {sheetLines.map((row) => {
-                const bundle = isBundleProduct(row.productName, catalog);
-                const parts = bundle ? resolveBundleParts(row.productName, catalog) : [];
-                const batchValue = bundle
+                const multiBatch = lineHasComponentBatches(row, catalog);
+                const parts = multiBatch ? resolveLineParts(row, catalog) : [];
+                const batchValue = multiBatch
                   ? formatBatchDisplay(
                       {
                         ...row,
@@ -461,12 +476,23 @@ export function LoadingSheetBatchEditor({
                 return (
                   <tr key={row.boxNo}>
                     <td className="border border-black px-1 py-1 text-center">{row.boxNo}</td>
-                    <td className="border border-black px-1 py-1">{row.productName}</td>
+                    <td className="border border-black px-1 py-1">
+                      <div>{row.productName}</div>
+                      {isMixedSampleLine(row) && row.mixedContents?.length ? (
+                        <ul className="mt-1 list-none text-[10px] text-zinc-700 print:text-[9px]">
+                          {row.mixedContents.map((c) => (
+                            <li key={c.productName}>
+                              {c.productName} × {c.bottles}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </td>
                     <td className="border border-black px-1 py-1 text-center">{row.bottlesPerBox}</td>
                     <td className="border border-black px-1 py-1 text-center">
                       {showBatchInputs ? (
                         <div className="space-y-1">
-                          {bundle ? (
+                          {multiBatch ? (
                             parts.map((part) => {
                               const options = batchesForRow(part.productName);
                               const value = componentBatches[row.boxNo]?.[part.productName] ?? "";

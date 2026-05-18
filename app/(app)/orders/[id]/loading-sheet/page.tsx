@@ -46,18 +46,26 @@ function normalizeSheetLines(order: {
     if (rebuilt.length > 0) sheetLines = buildSheetLines(rebuilt);
   }
 
-  return sheetLines.map((row) => ({
-    boxNo: row.boxNo,
-    productName: row.productName,
-    bottlesPerBox: row.bottlesPerBox,
-    batchNo: row.batchNo ?? "",
-    componentBatches: (row as { componentBatches?: Array<{ productName: string; batchNo?: string }> })
-      .componentBatches?.map((c) => ({
+  return sheetLines.map((row) => {
+    const extended = row as SheetLine & {
+      lineKind?: string;
+      mixedContents?: Array<{ productName: string; bottles: number }>;
+      componentBatches?: Array<{ productName: string; batchNo?: string }>;
+    };
+    return {
+      boxNo: row.boxNo,
+      productName: row.productName,
+      bottlesPerBox: row.bottlesPerBox,
+      lineKind: extended.lineKind,
+      mixedContents: extended.mixedContents,
+      batchNo: row.batchNo ?? "",
+      componentBatches: extended.componentBatches?.map((c) => ({
         productName: c.productName,
         batchNo: c.batchNo ?? "",
       })),
-    weight: row.weight ?? null,
-  }));
+      weight: row.weight ?? null,
+    };
+  });
 }
 
 export default async function LoadingSheetPage(props: PageProps) {
