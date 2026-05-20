@@ -446,8 +446,26 @@ When a product has an issue or a customer wants changes, only **management (Wale
 
 - Auto-deduct packaging when filling/dispatching; BOM link to product packings.
 
+---
+
+## Phase 19 (Packaging auto-deduct) — **planned**
+
+See `.planning/ROADMAP.md` — implementation plans TBD when executed.
+
+---
+
+## Phase 20 (Nimra add catalog product) — **planned**
+
+### Problem
+
+New factory SKUs are not in `ProductPacking` until someone edits JSON and runs seed.
+
+### Solution (v1)
+
+- Nimra POST new packing + **Add product** UI on production batches.
+
 Executable plans:
-- `.planning/phases/18-admin-order-edit/01-PLAN.md`
-- `.planning/phases/18-admin-order-edit/02-PLAN.md`
-- `.planning/phases/18-admin-order-edit/03-PLAN.md`
+- `.planning/phases/20-nimra-add-product/01-PLAN.md`
+- `.planning/phases/20-nimra-add-product/02-PLAN.md`
+- `.planning/phases/20-nimra-add-product/03-PLAN.md`
 

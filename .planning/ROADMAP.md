@@ -44,7 +44,7 @@ Executable plans:
 - `.planning/phases/09-multi-po-vehicle-dispatch/02-PLAN.md` — Rashid trip UI + orders integration
 
 ## Phase 10: Production batch QC fields ✓
-Nimra's batch registry gains **structured QC/logistics fields** (pH, solids, appearance, provider, drum, quantity, product, date) stored for **future feedback audit**. **Product batch families** — e.g. one **Power Wash** batch covers both Power Wash and Power Wash (pouch) packings on POs.
+Nimra's batch registry gains **structured QC/logistics fields** (pH, solids, appearance, provider, HCL, quantity, product, date) stored for **future feedback audit**. **Viscosity** is optional for **Rhino, Brighten, Power Wash, and Hand Sanitizer** batch families. **Product batch families** — e.g. one **Power Wash** batch covers both Power Wash and Power Wash (pouch) packings on POs.
 
 Executable plans:
 - `.planning/phases/10-production-batch-qc-fields/01-PLAN.md` — schema, API, product families
@@ -110,3 +110,11 @@ Executable plans:
 
 ## Phase 19: Packaging auto-deduct — **planned** (after 18)
 When bottles are filled or orders dispatch, **automatically deduct** caps/stickers/bottles from packaging inventory using a BOM map (`ProductPacking` → packaging components). Warn on insufficient stock. Depends on Phase 16 inventory baseline and optional link from Phase 17 fill events.
+
+## Phase 20: Nimra add catalog product — **planned**
+**Nimra** can register **new sellable packings** (product name, code, batch family, bottles per carton, liters per bottle) from the production portal when the factory prepares a SKU not yet in the master list — so new-order and batch registry stay in sync without a developer-only seed step.
+
+Executable plans:
+- `.planning/phases/20-nimra-add-product/01-PLAN.md` — `POST /api/product-packings` (batch_editor only), validation, unique code
+- `.planning/phases/20-nimra-add-product/02-PLAN.md` — **Add product** UI on `/production/batches` (or batch new page), success feedback
+- `.planning/phases/20-nimra-add-product/03-PLAN.md` — README + optional admin read-only list note
