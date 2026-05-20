@@ -111,7 +111,7 @@ Executable plans:
 ## Phase 19: Packaging auto-deduct — **planned** (after 18)
 When bottles are filled or orders dispatch, **automatically deduct** caps/stickers/bottles from packaging inventory using a BOM map (`ProductPacking` → packaging components). Warn on insufficient stock. Depends on Phase 16 inventory baseline and optional link from Phase 17 fill events.
 
-## Phase 20: Nimra add catalog product — **planned**
+## Phase 20: Nimra add catalog product ✓
 **Nimra** can register **new sellable packings** (product name, code, batch family, bottles per carton, liters per bottle) from the production portal when the factory prepares a SKU not yet in the master list — so new-order and batch registry stay in sync without a developer-only seed step.
 
 Executable plans:

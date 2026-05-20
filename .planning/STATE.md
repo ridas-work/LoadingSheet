@@ -1,7 +1,7 @@
 # Project State
 
 Phase: **19 planned** — Packaging auto-deduct  
-Phase: **20 planned** — Nimra add catalog product  
+Phase: **20 complete** ✓ — Nimra add catalog product (`POST /api/product-packings`, **Add product** on `/production/batches`, README)  
 Status: Phase 18 complete ✓
 
 ## Recent product / QC updates
@@ -9,5 +9,4 @@ Status: Phase 18 complete ✓
 - **Hand Sanitizer** added to `data/product-packings.json` — run `npm run seed:products` to load into DB.
 
 ## Next
-- `/gsd-execute-phase 20` — Nimra Add product UI + API
-- `/gsd-plan-phase 19` — if packaging auto-deduct needs more design first
+- `/gsd-plan-phase 19` — packaging auto-deduct when ready

@@ -454,7 +454,7 @@ See `.planning/ROADMAP.md` — implementation plans TBD when executed.
 
 ---
 
-## Phase 20 (Nimra add catalog product) — **planned**
+## Phase 20 (Nimra add catalog product) — **complete**
 
 ### Problem
 
