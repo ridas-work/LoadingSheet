@@ -19,9 +19,15 @@ type Props = {
   orders: OrderRow[];
   isDispatchEditor: boolean;
   showEnteredBy?: boolean;
+  canEditOrders?: boolean;
 };
 
-export function OrdersListWithTrips({ orders, isDispatchEditor, showEnteredBy = false }: Props) {
+export function OrdersListWithTrips({
+  orders,
+  isDispatchEditor,
+  showEnteredBy = false,
+  canEditOrders = false,
+}: Props) {
   const [selected, setSelected] = useState<string[]>([]);
 
   const toggle = (id: string) => {
@@ -87,6 +93,14 @@ export function OrdersListWithTrips({ orders, isDispatchEditor, showEnteredBy = 
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  {canEditOrders ? (
+                    <Link
+                      href={`/orders/${o.id}/edit`}
+                      className="rounded-lg bg-amber-700 px-3 py-2 text-sm font-medium text-white"
+                    >
+                      Edit order
+                    </Link>
+                  ) : null}
                   <Link
                     href={`/orders/${o.id}/loading-sheet`}
                     className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white"

@@ -2,7 +2,7 @@ import { OrdersListWithTrips } from "@/components/OrdersListWithTrips";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
-import { isAdmin, roleFromSession } from "@/lib/roles";
+import { canEditOrders, isAdmin, roleFromSession } from "@/lib/roles";
 
 export default async function OrdersPage() {
   await connectToDatabase();
@@ -11,6 +11,7 @@ export default async function OrdersPage() {
   const role = roleFromSession(session?.user as { role?: string });
   const isDispatchEditor = role === "dispatch_editor";
   const showEnteredBy = isAdmin(role);
+  const editOrders = canEditOrders(role);
 
   const orders = await Order.find({})
     .sort({ createdAt: -1 })
@@ -53,7 +54,12 @@ export default async function OrdersPage() {
           No orders yet.
         </p>
       ) : (
-        <OrdersListWithTrips orders={rows} isDispatchEditor={isDispatchEditor} showEnteredBy={showEnteredBy} />
+        <OrdersListWithTrips
+          orders={rows}
+          isDispatchEditor={isDispatchEditor}
+          showEnteredBy={showEnteredBy}
+          canEditOrders={editOrders}
+        />
       )}
     </div>
   );
