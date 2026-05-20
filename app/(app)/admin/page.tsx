@@ -15,7 +15,7 @@ export default function AdminPage() {
             href="/orders"
             className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
           >
-            Orders — who entered each PO
+            Orders — view &amp; edit POs
           </Link>
           <Link
             href="/production/batches"
