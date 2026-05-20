@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AddProductModal } from "@/components/AddProductModal";
 import { ProductionBatchRowActions } from "@/components/ProductionBatchRowActions";
 import { auth } from "@/lib/auth";
 import { formatLiters } from "@/lib/batchVolume";
@@ -47,12 +48,15 @@ export default async function ProductionBatchesPage() {
           </p>
         </div>
         {isBatchEditor ? (
-          <Link
-            href="/production/batches/new"
-            className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
-          >
-            Add batch
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <AddProductModal />
+            <Link
+              href="/production/batches/new"
+              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
+            >
+              Add batch
+            </Link>
+          </div>
         ) : null}
       </div>
 
