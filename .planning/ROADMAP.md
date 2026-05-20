@@ -118,3 +118,11 @@ Executable plans:
 - `.planning/phases/20-nimra-add-product/01-PLAN.md` — `POST /api/product-packings` (batch_editor only), validation, unique code
 - `.planning/phases/20-nimra-add-product/02-PLAN.md` — **Add product** UI on `/production/batches` (or batch new page), success feedback
 - `.planning/phases/20-nimra-add-product/03-PLAN.md` — README + optional admin read-only list note
+
+## Phase 21: Gate guard (Zaman) — delivery confirmation ✓
+**Zaman** (`gate_guard`) at the gate marks each order **Out for delivery** when the vehicle leaves, **Delivered** when the customer has received the goods, or **Pending redelivery** when goods return on the vehicle for a later run. Seeded login **`zaman` / `Zaman-Guard-01`**. State lives on **Order** with audited transitions; list shows trip-linked / dispatch-ready orders.
+
+Executable plans:
+- `.planning/phases/21-gate-guard-zaman/01-PLAN.md` — `Order` gate fields, `gate_guard` role + seed, `GET /api/gate/orders`, `PATCH /api/orders/[id]/gate-delivery`
+- `.planning/phases/21-gate-guard-zaman/02-PLAN.md` — `/gate/orders` UI, nav, cross-role redirects
+- `.planning/phases/21-gate-guard-zaman/03-PLAN.md` — README + STATE note for Zaman workflow

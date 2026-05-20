@@ -469,3 +469,29 @@ Executable plans:
 - `.planning/phases/20-nimra-add-product/02-PLAN.md`
 - `.planning/phases/20-nimra-add-product/03-PLAN.md`
 
+---
+
+## Phase 21 (Gate guard — Zaman) — **complete**
+
+### Who
+
+| Display name | Username | Role | Initial password |
+|--------------|----------|------|------------------|
+| Zaman | `zaman` | `gate_guard` | `Zaman-Guard-01` |
+
+### Problem
+
+Dispatch assigns vehicles and trips, but there is **no system record** of when goods **left the gate**, when they were **delivered**, or when they **came back** for a later attempt.
+
+### Solution (v1)
+
+- **`gate_guard`** role: home **`/gate/orders`**; only this role (v1) edits gate status.
+- **`Order`** fields: `gateDeliveryStatus` — `none` | `out_for_delivery` | `delivered` | `pending_redelivery`; timestamps + audit (`gateUpdatedAt`, `gateUpdatedByName`, …).
+- **APIs:** `GET /api/gate/orders` (eligible orders), `PATCH /api/orders/[id]/gate-delivery` with **validated transitions** (see `21-RESEARCH.md`).
+- **UI:** simple list + actions; label **Pending redelivery** (not “pending order”) to avoid confusion with admin pending POs.
+
+Executable plans:
+- `.planning/phases/21-gate-guard-zaman/01-PLAN.md`
+- `.planning/phases/21-gate-guard-zaman/02-PLAN.md`
+- `.planning/phases/21-gate-guard-zaman/03-PLAN.md`
+
