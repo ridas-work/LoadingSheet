@@ -3,7 +3,8 @@
 Phase: **19 planned** — Packaging auto-deduct  
 Phase: **20 complete** ✓ — Nimra add catalog product (`POST /api/product-packings`, **Add product** on `/production/batches`, README)  
 Phase: **21 complete** ✓ — Gate guard Zaman (`gate_guard`, `/gate/orders`, delivery status API)  
-Status: Phase 21 complete ✓
+Phase: **22 complete** ✓ — Hybrid PO (standard + custom multi-product cartons) — `.planning/phases/22-hybrid-order-custom-boxes/`  
+Status: Phase 22 complete ✓
 
 ## Recent product / QC updates
 - **Viscosity** optional field on production batches for **Rhino, Brighten, Power Wash, and Hand Sanitizer** batch families (not only Rhino).

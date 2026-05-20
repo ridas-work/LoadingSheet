@@ -495,3 +495,21 @@ Executable plans:
 - `.planning/phases/21-gate-guard-zaman/02-PLAN.md`
 - `.planning/phases/21-gate-guard-zaman/03-PLAN.md`
 
+---
+
+## Phase 22 (Hybrid PO — standard + custom cartons) — **complete** ✓
+
+### Problem
+
+Orders like **AMIR STORE** need **many standard carton lines** (Rhino 250/500/750, Degrease, …) **and** a few **custom physical cartons** where several SKUs are packed **in one box** (e.g. Power Wash Pouch + Brighten + Fabrito). The app today forces **either** full **standard** **or** full **mixed sample** (`orderKind`), not both on one PO.
+
+### Solution (v1)
+
+- **Single PO flow:** standard `items[]` plus optional **`customCartons[]`**; merged **`sheetLines`** = standard rows + `mixed_sample`-style rows per custom definition, global **`boxNo`**.
+- **UI:** **Add custom carton** (Create box) builder + existing standard grid; optional legacy path for old “mixed only” orders.
+
+Executable plans:
+- `.planning/phases/22-hybrid-order-custom-boxes/01-PLAN.md`
+- `.planning/phases/22-hybrid-order-custom-boxes/02-PLAN.md`
+- `.planning/phases/22-hybrid-order-custom-boxes/03-PLAN.md`
+

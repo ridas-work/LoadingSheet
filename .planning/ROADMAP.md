@@ -126,3 +126,11 @@ Executable plans:
 - `.planning/phases/21-gate-guard-zaman/01-PLAN.md` — `Order` gate fields, `gate_guard` role + seed, `GET /api/gate/orders`, `PATCH /api/orders/[id]/gate-delivery`
 - `.planning/phases/21-gate-guard-zaman/02-PLAN.md` — `/gate/orders` UI, nav, cross-role redirects
 - `.planning/phases/21-gate-guard-zaman/03-PLAN.md` — README + STATE note for Zaman workflow
+
+## Phase 22: Hybrid PO — standard cartons + custom multi-product boxes ✓
+**One order** can combine **normal carton lines** (each SKU × N cartons, Rule B) with **one or more custom cartons** where the PO team defines **several catalog products and bottle counts inside the same physical box** (e.g. Power Wash Pouch + Brighten + Fabrito in one carton), without forcing the whole PO to be “mixed sample only”. Unifies today’s split between **`orderKind: standard`** and **`mixed_sample`** into a single flexible flow (e.g. **Add custom carton** / **Create box** builder + standard grid).
+
+Executable plans:
+- `.planning/phases/22-hybrid-order-custom-boxes/01-PLAN.md` — order payload + `sheetLines` builder (merge standard + custom lines, `boxNo`, `lineKind`), API validation, migration notes
+- `.planning/phases/22-hybrid-order-custom-boxes/02-PLAN.md` — `/new-order` UI: standard table + custom carton section (repeatable), preview row count
+- `.planning/phases/22-hybrid-order-custom-boxes/03-PLAN.md` — admin order edit, loading-sheet labels, README, regression checklist (batch assign, weight, dispatch)
