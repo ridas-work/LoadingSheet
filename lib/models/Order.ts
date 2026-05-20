@@ -145,6 +145,18 @@ const OrderSchema = new mongoose.Schema(
     },
     adminEditedAt: { type: Date, required: false, default: null },
     adminEditedByName: { type: String, required: false, default: "", trim: true },
+    gateDeliveryStatus: {
+      type: String,
+      enum: ["none", "out_for_delivery", "delivered", "pending_redelivery"],
+      required: false,
+      default: "none",
+    },
+    gateOutAt: { type: Date, required: false, default: null },
+    gateDeliveredAt: { type: Date, required: false, default: null },
+    gatePendingAt: { type: Date, required: false, default: null },
+    gateUpdatedAt: { type: Date, required: false, default: null },
+    gateUpdatedByUserId: { type: String, required: false, default: null },
+    gateUpdatedByName: { type: String, required: false, default: "", trim: true },
   },
   { timestamps: { createdAt: true, updatedAt: true } },
 );

@@ -1,6 +1,17 @@
-export type AppRole = "po_creator" | "batch_editor" | "dispatch_editor" | "admin";
+export type AppRole =
+  | "po_creator"
+  | "batch_editor"
+  | "dispatch_editor"
+  | "gate_guard"
+  | "admin";
 
-const ALLOWED_ROLES: AppRole[] = ["po_creator", "batch_editor", "dispatch_editor", "admin"];
+const ALLOWED_ROLES: AppRole[] = [
+  "po_creator",
+  "batch_editor",
+  "dispatch_editor",
+  "gate_guard",
+  "admin",
+];
 
 export function isAppRole(role: unknown): role is AppRole {
   return typeof role === "string" && ALLOWED_ROLES.includes(role as AppRole);
@@ -10,6 +21,7 @@ export function homePathForRole(role: AppRole): string {
   if (role === "admin") return "/admin";
   if (role === "batch_editor") return "/production/batches";
   if (role === "dispatch_editor") return "/dispatch/trips";
+  if (role === "gate_guard") return "/gate/orders";
   return "/new-order";
 }
 
@@ -42,6 +54,15 @@ export function canEditDispatch(role: AppRole | null): boolean {
 /** Boss (Waleed) — correct PO lines / customer details after creation. */
 export function canEditOrders(role: AppRole | null): boolean {
   return role === "admin";
+}
+
+export function canViewGateOrders(role: AppRole | null): boolean {
+  return role === "gate_guard" || role === "admin";
+}
+
+/** Zaman — gate out / delivered / pending redelivery. */
+export function canEditGateDelivery(role: AppRole | null): boolean {
+  return role === "gate_guard";
 }
 
 export type DispatchFields = {
