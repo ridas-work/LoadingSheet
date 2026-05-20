@@ -9,5 +9,8 @@ export default async function OrdersLayout({ children }: { children: React.React
   if (role === "batch_editor") {
     redirect("/production/batches");
   }
+  if (role === "gate_guard") {
+    redirect("/gate/orders");
+  }
   return children;
 }

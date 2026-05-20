@@ -6,6 +6,9 @@ import { adminCanViewOperations, homePathForRole, roleFromSession } from "@/lib/
 export default async function DispatchLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
+  if (role === "gate_guard") {
+    redirect("/gate/orders");
+  }
   if (role !== "dispatch_editor" && !adminCanViewOperations(role)) {
     redirect(role ? homePathForRole(role) : "/login");
   }
