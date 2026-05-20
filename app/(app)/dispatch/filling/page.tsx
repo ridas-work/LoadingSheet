@@ -80,8 +80,9 @@ export default async function BatchFillingPage({ searchParams }: PageProps) {
               : "Record how much you filled today, what is ready to deliver, and how much liquid remains in each batch."}
           </p>
           <p className="mt-1 text-xs text-zinc-500">
-            <strong>Variance</strong> = Nimra&apos;s system remaining − your physical count.
-            Positive (red) = possible waste or unlogged use. Negative (amber) = Rashid measured more than system.
+            <strong>Waste (L)</strong> = Nimra remaining − Filled today − Ready to deliver − Physical
+            remaining. Example: 50 − 10 − 5 − 10 = <strong>25 L</strong> unaccounted. Zero = balanced.
+            Red = missing liquid; amber = you recorded more than Nimra&apos;s pool.
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-zinc-600">

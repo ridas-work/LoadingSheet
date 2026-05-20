@@ -1,15 +1,34 @@
 import { roundLiters } from "@/lib/batchVolume";
 
 /**
- * Variance (waste indicator):
- *   positive → system thinks more liquid remains than Rashid measured (spillage / unlogged use)
- *   negative → Rashid measured more than system expects (unassigned fill or sheet not updated)
+ * Waste / variance (liters unaccounted for):
+ *
+ *   Nimra remaining − Filled today − Ready to deliver − Physical remaining
+ *
+ *   0  → books match Rashid’s counts
+ *   +  → liquid missing (waste, spill, or count error)
+ *   −  → Rashid recorded more than Nimra’s pool (PO sheets may need updating)
  */
+export function computeWasteLiters(
+  systemRemainingLiters: number,
+  filledLitersToday: number,
+  readyToDeliverLiters: number,
+  physicalRemainingLiters: number,
+): number {
+  return roundLiters(
+    systemRemainingLiters -
+      filledLitersToday -
+      readyToDeliverLiters -
+      physicalRemainingLiters,
+  );
+}
+
+/** @deprecated Use computeWasteLiters — kept for any legacy two-arg callers */
 export function computeVariance(
   systemRemainingLiters: number,
   physicalRemainingLiters: number,
 ): number {
-  return roundLiters(systemRemainingLiters - physicalRemainingLiters);
+  return computeWasteLiters(systemRemainingLiters, 0, 0, physicalRemainingLiters);
 }
 
 export function parseNonNegativeLiters(

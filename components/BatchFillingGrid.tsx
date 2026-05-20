@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { computeVariance } from "@/lib/batchFillingWaste";
+import { computeWasteLiters } from "@/lib/batchFillingWaste";
 import { roundLiters } from "@/lib/batchVolume";
 
 export type EntryData = {
@@ -163,7 +163,8 @@ export function BatchFillingGrid({ date, initialRows, readOnly }: Props) {
       {!readOnly ? (
         <p className="border-b border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
           Enter today&apos;s filling data. Each row saves automatically when you leave it.
-          Variance = Nimra&apos;s system remaining − your physical count.
+          Waste (L) = Nimra remaining − Filled today − Ready to deliver − Physical remaining. Zero
+          means everything balances.
         </p>
       ) : null}
       <div className="overflow-x-auto">
@@ -190,14 +191,18 @@ export function BatchFillingGrid({ date, initialRows, readOnly }: Props) {
               if (!state) return null;
               const sysRemaining = liveSystem[row.batchNo] ?? row.systemRemainingLiters;
 
+              const filledNum = Number(state.filledLitersToday);
+              const readyNum = Number(state.readyToDeliverLiters);
               const physicalNum =
                 state.physicalRemainingLiters === ""
                   ? 0
                   : Number(state.physicalRemainingLiters);
-              const physicalValid = Number.isFinite(physicalNum) && physicalNum >= 0;
+              const numsValid = [filledNum, readyNum, physicalNum].every(
+                (n) => Number.isFinite(n) && n >= 0,
+              );
               const liveVariance =
-                state.physicalRemainingLiters !== "" && physicalValid
-                  ? computeVariance(sysRemaining, physicalNum)
+                state.physicalRemainingLiters !== "" && numsValid
+                  ? computeWasteLiters(sysRemaining, filledNum, readyNum, physicalNum)
                   : null;
 
               const rowStatus = saveStatus[row.batchNo] ?? "idle";

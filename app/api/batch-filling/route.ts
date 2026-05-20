@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import { computeVariance, parseNonNegativeLiters, todayIsoDate } from "@/lib/batchFillingWaste";
+import { computeWasteLiters, parseNonNegativeLiters, todayIsoDate } from "@/lib/batchFillingWaste";
 import { roundLiters } from "@/lib/batchVolume";
 import { connectToDatabase } from "@/lib/db";
 import { BatchFillingDailyEntry } from "@/lib/models/BatchFillingDailyEntry";
@@ -112,7 +112,7 @@ export async function PATCH(req: Request) {
   const { usedMap } = await loadBatchUsageContext();
   const usage = usageForBatchNo(batchNo, batch.totalLiters, usedMap);
   const systemRemaining = roundLiters(usage.remainingLiters);
-  const wasteLiters = computeVariance(systemRemaining, physical);
+  const wasteLiters = computeWasteLiters(systemRemaining, filled, ready, physical);
 
   const result = await BatchFillingDailyEntry.findOneAndUpdate(
     { batchNo, entryDate },
