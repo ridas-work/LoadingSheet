@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  CustomCartonBuilder,
+  buildCustomCartonsPayload,
+  emptyCartonDraft,
+  type CustomCartonDraft,
+} from "@/components/CustomCartonBuilder";
+import {
   NewOrderProductGrid,
   defaultGridRow,
   makeOtherRow,
@@ -31,6 +37,7 @@ export default function NewOrderPage() {
   const [mixedBoxCount, setMixedBoxCount] = useState("1");
   const [grid, setGrid] = useState<GridState>({});
   const [otherRows, setOtherRows] = useState<OtherRow[]>([]);
+  const [customCartons, setCustomCartons] = useState<CustomCartonDraft[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [successId, setSuccessId] = useState<string | null>(null);
@@ -94,14 +101,16 @@ export default function NewOrderPage() {
 
   const isMixed = orderKind === "mixed_sample";
 
+  const customCartonPayload = useMemo(() => buildCustomCartonsPayload(customCartons), [customCartons]);
+
   const canSubmit = useMemo(() => {
-    if (!poNumber.trim() || !customerName.trim() || activeCount === 0) return false;
+    if (!poNumber.trim() || !customerName.trim()) return false;
     if (isMixed) {
       const boxes = Number(mixedBoxCount);
-      return Number.isInteger(boxes) && boxes >= 1;
+      return activeCount > 0 && Number.isInteger(boxes) && boxes >= 1;
     }
-    return true;
-  }, [activeCount, customerName, isMixed, mixedBoxCount, poNumber]);
+    return activeCount > 0 || customCartonPayload.length > 0;
+  }, [activeCount, customCartonPayload.length, customerName, isMixed, mixedBoxCount, poNumber]);
 
   function validate(): FieldErrors {
     const next: FieldErrors = {};
@@ -169,10 +178,34 @@ export default function NewOrderPage() {
     });
 
     if (validCount === 0) {
-      next.items = isMixed
-        ? "Enter bottles for at least one product in the mixed box."
-        : "Enter cartons for at least one product.";
+      if (isMixed) {
+        next.items = "Enter bottles for at least one product in the mixed box.";
+      } else if (buildCustomCartonsPayload(customCartons).length === 0) {
+        next.items = "Enter cartons for at least one product, or add a custom carton.";
+      }
     }
+
+    if (!isMixed && customCartons.length > 0) {
+      customCartons.forEach((c, ci) => {
+        const bc = Number(c.boxCount);
+        if (!c.boxCount.trim() || !Number.isInteger(bc) || bc < 1) {
+          next[`customCartons.${ci}.boxCount`] = "Must be an integer ≥ 1.";
+        }
+        let any = false;
+        c.rows.forEach((r, ri) => {
+          const pn = r.productName.trim();
+          const b = Number(r.bottles);
+          if (!pn && !r.bottles.trim()) return;
+          if (!pn) next[`customCartons.${ci}.rows.${ri}.productName`] = "Product name is required.";
+          if (!r.bottles.trim() || !Number.isInteger(b) || b < 1) {
+            next[`customCartons.${ci}.rows.${ri}.bottles`] = "Bottles must be an integer ≥ 1.";
+          }
+          if (pn && Number.isInteger(b) && b >= 1) any = true;
+        });
+        if (!any) next[`customCartons.${ci}.contents`] = "Add at least one product line with bottles.";
+      });
+    }
+
     return next;
   }
 
@@ -309,6 +342,7 @@ export default function NewOrderPage() {
                 deadlineDate: deadlineDate.trim() || undefined,
                 orderKind: "standard",
                 items: buildSubmitItems(),
+                customCartons: buildCustomCartonsPayload(customCartons),
               },
         ),
       });
@@ -340,6 +374,7 @@ export default function NewOrderPage() {
         return next;
       });
       setOtherRows([]);
+      setCustomCartons([]);
       setOrderKind("standard");
       setMixedBoxCount("1");
       setErrors({});
@@ -384,7 +419,7 @@ export default function NewOrderPage() {
       <p className="mt-1 text-sm text-zinc-600">
         {isMixed
           ? "Mixed sample box: enter how many bottles of each product go in one shared carton. All selected products ship together in the same physical box."
-          : "Every catalog product is listed below. Type the number of cartons next to each product you want on this order — leave the rest blank. Use Sample / custom if a product ships with non-standard bottles per carton."}
+          : "Every catalog product is listed below. Type cartons for normal lines, or leave rows blank and use Add custom carton to pack several SKUs in one box (you can combine both on the same PO). Use Sample / custom for non-default bottles per carton on standard lines."}
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
@@ -405,7 +440,10 @@ export default function NewOrderPage() {
                 type="radio"
                 name="orderKind"
                 checked={orderKind === "mixed_sample"}
-                onChange={() => setOrderKind("mixed_sample")}
+                onChange={() => {
+                  setOrderKind("mixed_sample");
+                  setCustomCartons([]);
+                }}
               />
               Mixed sample box (several products, one carton)
             </label>
@@ -473,6 +511,24 @@ export default function NewOrderPage() {
             />
           </div>
         </div>
+
+        {!isMixed && customCartons.length === 0 ? (
+          <button
+            type="button"
+            onClick={() => setCustomCartons([emptyCartonDraft()])}
+            className="rounded-lg border border-dashed border-zinc-400 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+          >
+            + Add custom carton
+          </button>
+        ) : null}
+
+        {!isMixed && customCartons.length > 0 ? (
+          <CustomCartonBuilder
+            cartons={customCartons}
+            onChange={setCustomCartons}
+            disabled={submitting}
+          />
+        ) : null}
 
         {isMixed ? (
           <div>

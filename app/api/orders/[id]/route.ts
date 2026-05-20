@@ -67,6 +67,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     orderKind: payload.orderKind,
     items: payload.items,
     mixedSample: payload.mixedSample,
+    customCartons: payload.customCartons,
     sheetLines,
   });
   existing.adminEditedAt = new Date();

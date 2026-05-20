@@ -5,6 +5,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
+  CustomCartonBuilder,
+  buildCustomCartonsPayload,
+  draftsFromSavedCartons,
+  emptyCartonDraft,
+  type CustomCartonDraft,
+} from "@/components/CustomCartonBuilder";
+import {
   NewOrderProductGrid,
   defaultGridRow,
   makeOtherRow,
@@ -33,6 +40,11 @@ export type AdminOrderInitial = {
   mixedBoxCount: number;
   standardItems: Array<{ productName: string; boxes: number; bottlesPerBox: number }>;
   mixedContents: Array<{ productName: string; bottles: number }>;
+  customCartons: Array<{
+    boxCount: number;
+    contents: Array<{ productName: string; bottles: number }>;
+    label?: string;
+  }>;
   hasBatchAssignments: boolean;
   onDispatchTrip: boolean;
   createdByName: string;
@@ -93,6 +105,7 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
   const [mixedBoxCount, setMixedBoxCount] = useState(String(initial.mixedBoxCount || 1));
   const [grid, setGrid] = useState<GridState>({});
   const [otherRows, setOtherRows] = useState<OtherRow[]>([]);
+  const [customCartons, setCustomCartons] = useState<CustomCartonDraft[]>([]);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
@@ -116,6 +129,11 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
           const { grid: g, otherRows: o } = hydrateGrid(list, initial);
           setGrid(g);
           setOtherRows(o);
+          if (initial.customCartons?.length) {
+            setCustomCartons(draftsFromSavedCartons(initial.customCartons));
+          } else {
+            setCustomCartons([]);
+          }
           setHydrated(true);
         }
       } catch {
@@ -188,10 +206,34 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
       if (qtyOk && bpbOk) validCount += 1;
     });
     if (validCount === 0) {
-      next.items = isMixed
-        ? "Enter bottles for at least one product in the mixed box."
-        : "Enter cartons for at least one product.";
+      if (isMixed) {
+        next.items = "Enter bottles for at least one product in the mixed box.";
+      } else if (buildCustomCartonsPayload(customCartons).length === 0) {
+        next.items = "Enter cartons for at least one product, or add a custom carton.";
+      }
     }
+
+    if (!isMixed && customCartons.length > 0) {
+      customCartons.forEach((c, ci) => {
+        const bc = Number(c.boxCount);
+        if (!c.boxCount.trim() || !Number.isInteger(bc) || bc < 1) {
+          next[`customCartons.${ci}.boxCount`] = "Must be an integer ≥ 1.";
+        }
+        let any = false;
+        c.rows.forEach((r, ri) => {
+          const pn = r.productName.trim();
+          const b = Number(r.bottles);
+          if (!pn && !r.bottles.trim()) return;
+          if (!pn) next[`customCartons.${ci}.rows.${ri}.productName`] = "Product name is required.";
+          if (!r.bottles.trim() || !Number.isInteger(b) || b < 1) {
+            next[`customCartons.${ci}.rows.${ri}.bottles`] = "Bottles must be an integer ≥ 1.";
+          }
+          if (pn && Number.isInteger(b) && b >= 1) any = true;
+        });
+        if (!any) next[`customCartons.${ci}.contents`] = "Add at least one product line with bottles.";
+      });
+    }
+
     return next;
   }
 
@@ -267,6 +309,7 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
                 deadlineDate: deadlineDate.trim() || undefined,
                 orderKind: "standard",
                 items: buildSubmitItems(),
+                customCartons: buildCustomCartonsPayload(customCartons),
               },
         ),
       });
@@ -297,6 +340,11 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
       setSubmitting(false);
     }
   }
+
+  const customPayloadLen = useMemo(
+    () => buildCustomCartonsPayload(customCartons).length,
+    [customCartons],
+  );
 
   const gridHandlers = {
     onCartonsChange: (code: string, value: string) =>
@@ -362,7 +410,10 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
               <input
                 type="radio"
                 checked={orderKind === "mixed_sample"}
-                onChange={() => setOrderKind("mixed_sample")}
+                onChange={() => {
+                  setOrderKind("mixed_sample");
+                  setCustomCartons([]);
+                }}
               />
               Mixed sample box
             </label>
@@ -457,10 +508,24 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
           <p className="text-sm text-zinc-500">Loading product catalog…</p>
         )}
 
+        {!isMixed && customCartons.length === 0 ? (
+          <button
+            type="button"
+            onClick={() => setCustomCartons([emptyCartonDraft()])}
+            className="rounded-lg border border-dashed border-zinc-400 bg-zinc-50 px-3 py-2 text-sm font-medium text-zinc-800 hover:bg-zinc-100"
+          >
+            + Add custom carton
+          </button>
+        ) : null}
+
+        {!isMixed && customCartons.length > 0 ? (
+          <CustomCartonBuilder cartons={customCartons} onChange={setCustomCartons} disabled={submitting} />
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
           <button
             type="submit"
-            disabled={submitting || catalogLoading || activeCount === 0}
+            disabled={submitting || catalogLoading || (activeCount === 0 && customPayloadLen === 0)}
             className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             {submitting ? "Saving…" : "Save changes"}

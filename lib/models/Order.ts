@@ -55,6 +55,24 @@ const MixedSampleSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const CustomCartonSchema = new mongoose.Schema(
+  {
+    boxCount: { type: Number, required: true, min: 1 },
+    contents: {
+      type: [MixedSampleContentSchema],
+      required: true,
+      validate: {
+        validator(v: unknown) {
+          return Array.isArray(v) && v.length > 0;
+        },
+        message: "At least one product line is required in a custom carton.",
+      },
+    },
+    label: { type: String, required: false, default: "", trim: true },
+  },
+  { _id: false },
+);
+
 const SheetLineSchema = new mongoose.Schema(
   {
     boxNo: { type: Number, required: true, min: 1 },
@@ -99,7 +117,7 @@ const OrderSchema = new mongoose.Schema(
     deadlineDate: { type: Date, required: false, default: null },
     orderKind: {
       type: String,
-      enum: ["standard", "mixed_sample"],
+      enum: ["standard", "mixed_sample", "hybrid"],
       required: false,
       default: "standard",
     },
@@ -107,6 +125,11 @@ const OrderSchema = new mongoose.Schema(
       type: MixedSampleSchema,
       required: false,
       default: null,
+    },
+    customCartons: {
+      type: [CustomCartonSchema],
+      required: false,
+      default: [],
     },
     items: {
       type: [OrderItemSchema],

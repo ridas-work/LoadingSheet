@@ -42,6 +42,10 @@ type OrderInput = {
     contents?: Array<{ productName?: string; bottles?: number }>;
   } | null;
   items?: Array<{ productName?: string; boxes?: number }>;
+  customCartons?: Array<{
+    boxCount?: number;
+    contents?: Array<{ productName?: string; bottles?: number }>;
+  }>;
 };
 
 function resolveCatalogCode(productName: string, catalog: CatalogRow[]): string | null {
@@ -117,6 +121,17 @@ export function buildAdminOrderSummary(
         const code = resolveCatalogCode(item.productName ?? "", catalog);
         if (!code || !(code in cells)) continue;
         cells[code] += boxes;
+      }
+      for (const carton of order.customCartons ?? []) {
+        const boxCount =
+          typeof carton.boxCount === "number" && carton.boxCount >= 1 ? carton.boxCount : 1;
+        for (const item of carton.contents ?? []) {
+          const bottles = typeof item.bottles === "number" ? item.bottles : 0;
+          if (bottles < 1) continue;
+          const code = resolveCatalogCode(item.productName ?? "", catalog);
+          if (!code || !(code in cells)) continue;
+          cells[code] += bottles * boxCount;
+        }
       }
     }
 

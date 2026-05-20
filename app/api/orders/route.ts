@@ -75,6 +75,7 @@ export async function POST(req: Request) {
     deadlineDate: payload.deadlineDate,
     orderKind: payload.orderKind,
     mixedSample: payload.mixedSample,
+    customCartons: payload.customCartons,
     items: payload.items,
     sheetLines: payload.sheetLines,
     createdByUserId: userId,

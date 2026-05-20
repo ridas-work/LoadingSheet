@@ -34,6 +34,7 @@ export async function GET(req: Request) {
         items: 1,
         orderKind: 1,
         mixedSample: 1,
+        customCartons: 1,
       })
       .lean(),
     ProductPacking.find({ active: true })

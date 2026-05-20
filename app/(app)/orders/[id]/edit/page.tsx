@@ -39,6 +39,15 @@ export default async function EditOrderPage({ params }: PageProps) {
       ? new Date(order.deadlineDate).toISOString().slice(0, 10)
       : "";
 
+  const customCartonsRaw = (order as { customCartons?: unknown }).customCartons;
+  const customCartons = Array.isArray(customCartonsRaw)
+    ? (customCartonsRaw as Array<{
+        boxCount: number;
+        contents: Array<{ productName: string; bottles: number }>;
+        label?: string;
+      }>)
+    : [];
+
   const initial: AdminOrderInitial = {
     orderId: order._id.toString(),
     poNumber: order.poNumber,
@@ -53,6 +62,7 @@ export default async function EditOrderPage({ params }: PageProps) {
       bottlesPerBox: i.bottlesPerBox,
     })),
     mixedContents: order.mixedSample?.contents ?? [],
+    customCartons,
     hasBatchAssignments,
     onDispatchTrip: Boolean(order.dispatchTripId),
     createdByName: order.createdByName ?? "",
