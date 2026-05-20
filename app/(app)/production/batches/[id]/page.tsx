@@ -12,6 +12,7 @@ import {
   usageForBatchNo,
   type ProductionBatchStatus,
 } from "@/lib/productionBatchStatus";
+import { isViscosityApplicableBatchFamily } from "@/lib/viscosityBatchFamily";
 import { roleFromSession } from "@/lib/roles";
 
 type PageProps = {
@@ -90,7 +91,10 @@ export default async function ProductionBatchDetailPage(props: PageProps) {
           <DetailRow label="Solids" value={batch.solids ?? ""} />
           <DetailRow label="Appearance" value={batch.appearance ?? ""} />
           <DetailRow label="Provider" value={batch.provider ?? ""} />
-          <DetailRow label="Drum" value={batch.drum ?? ""} />
+          <DetailRow label="HCL" value={batch.hcl ?? ""} />
+          {isViscosityApplicableBatchFamily(batch.productName) || batch.viscosity?.trim() ? (
+            <DetailRow label="Viscosity" value={batch.viscosity ?? ""} />
+          ) : null}
           <DetailRow label="Quantity" value={batch.quantity ?? ""} />
           <DetailRow label="Total liters (dispatch pool)" value={`${formatLiters(batch.totalLiters)} L`} />
           <DetailRow label="Registered by" value={batch.createdByName ?? ""} />

@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { isViscosityApplicableBatchFamily } from "@/lib/viscosityBatchFamily";
+
 type BatchFamily = { name: string; batchFamily: string };
 
 type Props = {
@@ -15,7 +17,8 @@ type Props = {
   initialSolids?: string;
   initialAppearance?: string;
   initialProvider?: string;
-  initialDrum?: string;
+  initialHcl?: string;
+  initialViscosity?: string;
   initialQuantity?: string;
 };
 
@@ -61,7 +64,8 @@ export function ProductionBatchForm({
   initialSolids = "",
   initialAppearance = "",
   initialProvider = "",
-  initialDrum = "",
+  initialHcl = "",
+  initialViscosity = "",
   initialQuantity = "",
 }: Props) {
   const router = useRouter();
@@ -79,8 +83,11 @@ export function ProductionBatchForm({
   const [solids, setSolids] = useState(initialSolids);
   const [appearance, setAppearance] = useState(initialAppearance);
   const [provider, setProvider] = useState(initialProvider);
-  const [drum, setDrum] = useState(initialDrum);
+  const [hcl, setHcl] = useState(initialHcl);
+  const [viscosity, setViscosity] = useState(initialViscosity);
   const [quantity, setQuantity] = useState(initialQuantity);
+
+  const showViscosity = isViscosityApplicableBatchFamily(productName);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -110,9 +117,9 @@ export function ProductionBatchForm({
       solids.trim().length > 0 &&
       appearance.trim().length > 0 &&
       provider.trim().length > 0 &&
-      drum.trim().length > 0 &&
+      hcl.trim().length > 0 &&
       quantity.trim().length > 0,
-    [appearance, batchNo, drum, ph, productName, provider, quantity, solids, totalLiters],
+    [appearance, batchNo, hcl, ph, productName, provider, quantity, solids, totalLiters],
   );
 
   async function onSubmit(e: React.FormEvent) {
@@ -129,7 +136,8 @@ export function ProductionBatchForm({
       solids: solids.trim(),
       appearance: appearance.trim(),
       provider: provider.trim(),
-      drum: drum.trim(),
+      hcl: hcl.trim(),
+      viscosity: showViscosity ? viscosity.trim() : "",
       quantity: quantity.trim(),
     };
 
@@ -204,7 +212,21 @@ export function ProductionBatchForm({
       <Field id="solids" label="Solids" value={solids} onChange={setSolids} placeholder="e.g. 29-30% (sinking 17)" />
       <Field id="appearance" label="Appearance" value={appearance} onChange={setAppearance} placeholder="e.g. Clear liquid" />
       <Field id="provider" label="Provider" value={provider} onChange={setProvider} placeholder="e.g. Ramzan" />
-      <Field id="drum" label="Drum" value={drum} onChange={setDrum} placeholder="e.g. 6 * 150" />
+      <Field id="hcl" label="HCL" value={hcl} onChange={setHcl} placeholder="e.g. 12%" />
+      {showViscosity ? (
+        <div>
+          <Field
+            id="viscosity"
+            label="Viscosity (optional)"
+            value={viscosity}
+            onChange={setViscosity}
+            placeholder="e.g. 2500 cps"
+          />
+          <p className="mt-1 text-xs text-zinc-500">
+            For Rhino, Brighten, Power Wash, and Hand Sanitizer batches. Leave blank if not measured.
+          </p>
+        </div>
+      ) : null}
       <Field id="quantity" label="Quantity" value={quantity} onChange={setQuantity} placeholder="e.g. 450L or 750kg" />
       <p className="text-xs text-zinc-500">
         Quantity is stored exactly as entered for future reference. Total liters below is used for dispatch remaining-volume checks.
