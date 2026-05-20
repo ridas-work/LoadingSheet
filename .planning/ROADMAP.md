@@ -100,7 +100,7 @@ Executable plans:
 - `.planning/phases/17-rashid-daily-filling-waste/02-PLAN.md` — `/dispatch/filling` inline grid + nav
 - `.planning/phases/17-rashid-daily-filling-waste/03-PLAN.md` — admin visibility + Phase 18 stub
 
-## Phase 18: Admin order edit (boss only) — **planned**
+## Phase 18: Admin order edit (boss only) ✓
 **Waleed Intisar (admin)** can **edit existing POs** — customer, deadline, product lines, carton counts, mixed-sample contents — when material issues or customer changes require corrections. PO creators still **create only**; Nimra/Rashid keep their own scoped edits. Rebuilds loading-sheet rows; preserves batch assignments where rows still match.
 
 Executable plans:

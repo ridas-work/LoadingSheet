@@ -430,7 +430,7 @@ Executable plans:
 
 ---
 
-## Phase 18 (Admin order edit — boss only) — **planned**
+## Phase 18 (Admin order edit — boss only) — **complete**
 
 ### Problem
 

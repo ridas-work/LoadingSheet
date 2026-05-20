@@ -1,17 +1,11 @@
 # Project State
 
-Phase: **18 planned** — Admin order edit (boss only)
-Status: Plans ready — execute when approved
+Phase: **19 planned** — Packaging auto-deduct
+Status: Phase 18 complete ✓
 
 ## Context
-- **Phase 17 ✓** — Rashid daily filling + waste at `/dispatch/filling`
-- **Phase 18 (new)** — Only **Waleed (admin)** can edit orders after creation (customer/product/qty corrections)
-- **Phase 19** — Packaging auto-deduct (deferred)
-
-## Decisions (Phase 18 planning)
-- `canEditOrders` → admin only; PO creators cannot edit after submit
-- PATCH rebuilds `sheetLines`; preserve `batchNo` / `componentBatches` when row identity matches
-- Reuse new-order grid patterns on `/orders/[id]/edit`
+- **Phase 18 ✓** — Waleed (admin) can **Edit order** from `/orders`; PO team cannot edit after create
+- **Phase 19** — Auto-deduct packaging from inventory when filling/dispatching
 
 ## Next
-- `/gsd-execute-phase 18`
+- `/gsd-plan-phase 19` or `/gsd-execute-phase 19` when BOM mapping is ready
