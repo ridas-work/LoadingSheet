@@ -423,12 +423,31 @@ Rashid fills bottles from Nimra’s batches and needs to record **daily fill**, 
 - `BatchFillingDailyEntry` per batch per date; PATCH on row save.
 - Variance = system remaining − physical remaining (confirm with ops at UAT).
 
-### Future (Phase 18)
-
-- Auto-deduct packaging when filling/dispatching; BOM link to product packings.
-
 Executable plans:
 - `.planning/phases/17-rashid-daily-filling-waste/01-PLAN.md`
 - `.planning/phases/17-rashid-daily-filling-waste/02-PLAN.md`
 - `.planning/phases/17-rashid-daily-filling-waste/03-PLAN.md`
+
+---
+
+## Phase 18 (Admin order edit — boss only) — **planned**
+
+### Problem
+
+When a product has an issue or a customer wants changes, only **management (Waleed)** should correct the PO. PO team should not edit orders after creation.
+
+### Solution (v1)
+
+- **`admin` only:** `PATCH /api/orders/[id]` and `/orders/[id]/edit`
+- Edit header + product quantities (standard + mixed sample); rebuild loading sheet
+- Preserve batch assignments on matching rows where possible
+
+### Future (Phase 19)
+
+- Auto-deduct packaging when filling/dispatching; BOM link to product packings.
+
+Executable plans:
+- `.planning/phases/18-admin-order-edit/01-PLAN.md`
+- `.planning/phases/18-admin-order-edit/02-PLAN.md`
+- `.planning/phases/18-admin-order-edit/03-PLAN.md`
 

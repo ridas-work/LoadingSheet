@@ -100,5 +100,13 @@ Executable plans:
 - `.planning/phases/17-rashid-daily-filling-waste/02-PLAN.md` — `/dispatch/filling` inline grid + nav
 - `.planning/phases/17-rashid-daily-filling-waste/03-PLAN.md` — admin visibility + Phase 18 stub
 
-## Phase 18: Packaging auto-deduct — **planned** (after 17)
+## Phase 18: Admin order edit (boss only) — **planned**
+**Waleed Intisar (admin)** can **edit existing POs** — customer, deadline, product lines, carton counts, mixed-sample contents — when material issues or customer changes require corrections. PO creators still **create only**; Nimra/Rashid keep their own scoped edits. Rebuilds loading-sheet rows; preserves batch assignments where rows still match.
+
+Executable plans:
+- `.planning/phases/18-admin-order-edit/01-PLAN.md` — `canEditOrders`, PATCH API, preserve batches
+- `.planning/phases/18-admin-order-edit/02-PLAN.md` — `/orders/[id]/edit` UI + list link
+- `.planning/phases/18-admin-order-edit/03-PLAN.md` — docs + Phase 19 stub
+
+## Phase 19: Packaging auto-deduct — **planned** (after 18)
 When bottles are filled or orders dispatch, **automatically deduct** caps/stickers/bottles from packaging inventory using a BOM map (`ProductPacking` → packaging components). Warn on insufficient stock. Depends on Phase 16 inventory baseline and optional link from Phase 17 fill events.

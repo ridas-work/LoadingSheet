@@ -1,13 +1,17 @@
 # Project State
 
-Phase: **18 planned** — Packaging auto-deduct
-Status: Phase 17 complete ✓
+Phase: **18 planned** — Admin order edit (boss only)
+Status: Plans ready — execute when approved
 
 ## Context
-- **Phase 16 ✓** — `/dispatch/inventory` packaging spreadsheet (Purchased / Rejected / UIP / Balance)
-- **Phase 17 ✓** — `/dispatch/filling` Rashid daily filling log with waste/variance vs Nimra
-- **Phase 18** — Auto-deduct packaging (bottles, caps, stickers) when filling/dispatching using BOM map
+- **Phase 17 ✓** — Rashid daily filling + waste at `/dispatch/filling`
+- **Phase 18 (new)** — Only **Waleed (admin)** can edit orders after creation (customer/product/qty corrections)
+- **Phase 19** — Packaging auto-deduct (deferred)
+
+## Decisions (Phase 18 planning)
+- `canEditOrders` → admin only; PO creators cannot edit after submit
+- PATCH rebuilds `sheetLines`; preserve `batchNo` / `componentBatches` when row identity matches
+- Reuse new-order grid patterns on `/orders/[id]/edit`
 
 ## Next
-- `/gsd-plan-phase 18` — plan packaging auto-deduct
-- or `/gsd-discuss-phase 18` to clarify BOM mapping first
+- `/gsd-execute-phase 18`
