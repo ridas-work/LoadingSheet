@@ -143,6 +143,8 @@ const OrderSchema = new mongoose.Schema(
       default: null,
       index: true,
     },
+    adminEditedAt: { type: Date, required: false, default: null },
+    adminEditedByName: { type: String, required: false, default: "", trim: true },
   },
   { timestamps: { createdAt: true, updatedAt: true } },
 );

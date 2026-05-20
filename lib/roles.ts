@@ -39,6 +39,11 @@ export function canEditDispatch(role: AppRole | null): boolean {
   return role === "dispatch_editor";
 }
 
+/** Boss (Waleed) — correct PO lines / customer details after creation. */
+export function canEditOrders(role: AppRole | null): boolean {
+  return role === "admin";
+}
+
 export type DispatchFields = {
   vehicleNo: string;
   driverName: string;
