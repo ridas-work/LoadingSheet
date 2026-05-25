@@ -134,3 +134,10 @@ Executable plans:
 - `.planning/phases/22-hybrid-order-custom-boxes/01-PLAN.md` — order payload + `sheetLines` builder (merge standard + custom lines, `boxNo`, `lineKind`), API validation, migration notes
 - `.planning/phases/22-hybrid-order-custom-boxes/02-PLAN.md` — `/new-order` UI: standard table + custom carton section (repeatable), preview row count
 - `.planning/phases/22-hybrid-order-custom-boxes/03-PLAN.md` — admin order edit, loading-sheet labels, README, regression checklist (batch assign, weight, dispatch)
+
+## Phase 23: Rashid daily filling — bottle counts + ready stock ✓
+Rashid’s daily filling screen should match factory work: he records **how many bottles were filled today** and **how many bottles are fully ready to deliver** (capped, labeled/stickered, packed/finished), instead of entering those operational counts as liters. The system still keeps **liter snapshots** internally by resolving the filled packing’s `litersPerBottle`, so variance against Nimra’s batch liters remains possible. Batches that can fill multiple pack sizes need a **packing selector** per line to avoid wrong liter conversion.
+
+Executable plans:
+- `.planning/phases/23-rashid-bottle-filling-readiness/01-PLAN.md` — data/API conversion from bottle entries to liter snapshots; support one or more packing lines per batch/day
+- `.planning/phases/23-rashid-bottle-filling-readiness/02-PLAN.md` — `/dispatch/filling` UI wording and admin read-only display for bottle-based daily filling

@@ -513,3 +513,22 @@ Executable plans:
 - `.planning/phases/22-hybrid-order-custom-boxes/02-PLAN.md`
 - `.planning/phases/22-hybrid-order-custom-boxes/03-PLAN.md`
 
+---
+
+## Phase 23 (Rashid daily filling — bottle counts + ready stock) — **complete** ✓
+
+### Problem
+
+The `/dispatch/filling` page currently asks Rashid for **filled today** and **ready to deliver** in liters. That is not how the floor counts finished work: Rashid counts **bottles** filled at the end of the day, and **bottles fully ready to deliver** after caps, labels/stickers, packing, and other finishing steps are complete.
+
+### Solution (v1)
+
+- Rashid enters **bottle counts** for daily filling and ready stock.
+- Each filled/ready line stores the **packing/product** used for conversion (because one Nimra batch family can sometimes fill multiple bottle sizes).
+- The system computes and stores **liter snapshots** from `bottles × litersPerBottle` so existing variance/waste against Nimra’s batch liters remains available.
+- **Physical remaining** can stay a liquid-batch reconciliation field in liters unless operations later decides to count it as finished bottle equivalent.
+
+Executable plans:
+- `.planning/phases/23-rashid-bottle-filling-readiness/01-PLAN.md`
+- `.planning/phases/23-rashid-bottle-filling-readiness/02-PLAN.md`
+
