@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
-import { adminCanViewOperations, homePathForRole, roleFromSession } from "@/lib/roles";
+import { adminCanViewOperations, canViewPackagingInventory, homePathForRole, roleFromSession } from "@/lib/roles";
 
 export default async function DispatchLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -9,7 +9,7 @@ export default async function DispatchLayout({ children }: { children: React.Rea
   if (role === "gate_guard") {
     redirect("/gate/orders");
   }
-  if (role !== "dispatch_editor" && !adminCanViewOperations(role)) {
+  if (role !== "dispatch_editor" && !adminCanViewOperations(role) && !canViewPackagingInventory(role)) {
     redirect(role ? homePathForRole(role) : "/login");
   }
   return children;

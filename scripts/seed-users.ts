@@ -30,6 +30,7 @@ function getSeedUsers(): SeedUser[] {
     { name: "Ibtisam", username: "ibtisam", password: "Ibtisam-Order-04", role: "po_creator" },
     { name: "Nimra", username: "nimra", password: "Nimra-Batch-01", role: "batch_editor" },
     { name: "Rashid", username: "rashid", password: "Rashid-Dispatch-01", role: "dispatch_editor" },
+    { name: "Haider", username: "haider", password: "Haider-Packaging-01", role: "packaging_editor" },
     { name: "Zaman", username: "zaman", password: "Zaman-Guard-01", role: "gate_guard" },
     { name: "Waleed Intisar", username: "waleed", password: "Waleed-Admin-01", role: "admin" },
   ];

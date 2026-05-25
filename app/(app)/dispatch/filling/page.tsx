@@ -12,7 +12,7 @@ import { connectToDatabase } from "@/lib/db";
 import { BatchFillingDailyEntry } from "@/lib/models/BatchFillingDailyEntry";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
-import { canEditDispatch, isAdmin, roleFromSession } from "@/lib/roles";
+import { canEditDispatch, homePathForRole, isAdmin, roleFromSession } from "@/lib/roles";
 import { loadBatchUsageContext, usageForBatchNo } from "@/lib/productionBatchStatus";
 
 type PageProps = {
@@ -24,7 +24,7 @@ export default async function BatchFillingPage({ searchParams }: PageProps) {
   const role = roleFromSession(session?.user as { role?: string });
 
   if (!canEditDispatch(role) && !isAdmin(role)) {
-    redirect("/login");
+    redirect(role ? homePathForRole(role) : "/login");
   }
 
   const readOnly = isAdmin(role);

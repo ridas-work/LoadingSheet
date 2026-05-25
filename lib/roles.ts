@@ -2,6 +2,7 @@ export type AppRole =
   | "po_creator"
   | "batch_editor"
   | "dispatch_editor"
+  | "packaging_editor"
   | "gate_guard"
   | "admin";
 
@@ -9,6 +10,7 @@ const ALLOWED_ROLES: AppRole[] = [
   "po_creator",
   "batch_editor",
   "dispatch_editor",
+  "packaging_editor",
   "gate_guard",
   "admin",
 ];
@@ -21,6 +23,7 @@ export function homePathForRole(role: AppRole): string {
   if (role === "admin") return "/admin";
   if (role === "batch_editor") return "/production/batches";
   if (role === "dispatch_editor") return "/dispatch/trips";
+  if (role === "packaging_editor") return "/dispatch/inventory";
   if (role === "gate_guard") return "/gate/orders";
   return "/new-order";
 }
@@ -49,6 +52,14 @@ export function canEditProductionBatches(role: AppRole | null): boolean {
 
 export function canEditDispatch(role: AppRole | null): boolean {
   return role === "dispatch_editor";
+}
+
+export function canViewPackagingInventory(role: AppRole | null): boolean {
+  return role === "packaging_editor" || role === "admin";
+}
+
+export function canEditPackagingInventory(role: AppRole | null): boolean {
+  return role === "packaging_editor";
 }
 
 /** Boss (Waleed) — correct PO lines / customer details after creation. */

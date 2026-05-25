@@ -1,16 +1,20 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
-import { canEditDispatch, roleFromSession } from "@/lib/roles";
+import { canEditDispatch, homePathForRole, roleFromSession } from "@/lib/roles";
 
 export default async function DispatchTripsPage() {
   await connectToDatabase();
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
+  if (role && role !== "dispatch_editor" && role !== "admin") {
+    redirect(homePathForRole(role));
+  }
   const canEdit = canEditDispatch(role);
 
   const trips = await DispatchTrip.find({}).sort({ updatedAt: -1 }).lean();

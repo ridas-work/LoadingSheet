@@ -22,7 +22,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <header className="border-b border-zinc-200 bg-white">
         <div
           className={`mx-auto flex items-center justify-between px-4 py-3 ${
-            admin || role === "dispatch_editor" ? "max-w-[1600px]" : role === "gate_guard" ? "max-w-5xl" : "max-w-4xl"
+            admin || role === "dispatch_editor" || role === "packaging_editor"
+              ? "max-w-[1600px]"
+              : role === "gate_guard"
+                ? "max-w-5xl"
+                : "max-w-4xl"
           }`}
         >
           <div className="flex flex-wrap items-center gap-4">
@@ -56,7 +60,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Gate orders
               </Link>
             ) : null}
-            {role !== "batch_editor" && role !== "gate_guard" && !admin ? (
+            {role !== "batch_editor" && role !== "gate_guard" && role !== "packaging_editor" && !admin ? (
               <Link href="/orders" className="text-sm text-zinc-600 hover:text-zinc-900">
                 Orders
               </Link>
@@ -74,6 +78,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 </Link>
               </>
             ) : null}
+            {role === "packaging_editor" ? (
+              <Link href="/dispatch/inventory" className="text-sm text-zinc-600 hover:text-zinc-900">
+                Packaging inventory
+              </Link>
+            ) : null}
             {role === "po_creator" ? (
               <Link href="/new-order" className="text-sm text-zinc-600 hover:text-zinc-900">
                 New order
@@ -88,7 +97,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       </header>
       <main
         className={`mx-auto px-4 py-6 ${
-          admin || role === "dispatch_editor" ? "max-w-[1600px]" : role === "gate_guard" ? "max-w-5xl" : "max-w-4xl"
+          admin || role === "dispatch_editor" || role === "packaging_editor"
+            ? "max-w-[1600px]"
+            : role === "gate_guard"
+              ? "max-w-5xl"
+              : "max-w-4xl"
         }`}
       >
         {children}

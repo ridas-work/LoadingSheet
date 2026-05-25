@@ -9,7 +9,7 @@ import { connectToDatabase } from "@/lib/db";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
 import { batchProgress } from "@/lib/orderBatchStatus";
-import { canEditDispatch, EMPTY_DISPATCH, roleFromSession, type DispatchFields } from "@/lib/roles";
+import { canEditDispatch, EMPTY_DISPATCH, homePathForRole, roleFromSession, type DispatchFields } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -47,6 +47,9 @@ export default async function DispatchTripDetailPage(props: PageProps) {
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
+  if (role && role !== "dispatch_editor" && role !== "admin") {
+    redirect(homePathForRole(role));
+  }
   const canEdit = canEditDispatch(role);
 
   await connectToDatabase();
