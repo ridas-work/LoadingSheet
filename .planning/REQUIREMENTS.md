@@ -448,9 +448,29 @@ When a product has an issue or a customer wants changes, only **management (Wale
 
 ---
 
-## Phase 19 (Packaging auto-deduct) — **planned**
+## Phase 19 (Packaging auto-deduct) — **complete** ✓
 
-See `.planning/ROADMAP.md` — implementation plans TBD when executed.
+### Updated problem
+
+Packaging inventory was originally Rashid’s responsibility, but operations now wants a separate person: **Haider**. Haider should maintain packaging stock while Rashid remains focused on dispatch and filling.
+
+Operations also wants packaging stock to reduce automatically when an order is **delivered**. The system already knows how many bottles are in a carton through `ProductPacking.bottlesPerCarton` (for example **Rhino 250ml = 20 bottles per carton**), so carton/box deduction should be calculated from shipped quantities and product packing metadata.
+
+### Solution (v1)
+
+- Add **Haider** as a packaging inventory user with a dedicated role (`packaging_editor`).
+- Haider can edit packaging inventory; admin can view; Rashid no longer edits packaging inventory unless explicitly kept as fallback.
+- Add product-to-packaging mapping/BOM using existing `PackagingItem.linkedProductCode` plus category conventions for bottles, caps, stickers/labels, cartons/boxes, pouches, partitions, etc.
+- On Zaman’s **Delivered** transition, deduct packaging for the delivered order:
+  - bottles/caps/stickers/labels by shipped bottle count;
+  - cartons/boxes by carton/physical-box count using `ProductPacking.bottlesPerCarton` and actual `sheetLines`;
+  - mixed/custom cartons use their `mixedContents` bottle counts and one physical box per `sheetLine`.
+- Deduction is audited and idempotent: one delivered order must not deduct twice.
+
+Executable plans:
+- `.planning/phases/19-haider-packaging-auto-deduct/01-PLAN.md`
+- `.planning/phases/19-haider-packaging-auto-deduct/02-PLAN.md`
+- `.planning/phases/19-haider-packaging-auto-deduct/03-PLAN.md`
 
 ---
 

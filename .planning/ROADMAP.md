@@ -108,8 +108,13 @@ Executable plans:
 - `.planning/phases/18-admin-order-edit/02-PLAN.md` — `/orders/[id]/edit` UI + list link
 - `.planning/phases/18-admin-order-edit/03-PLAN.md` — docs + Phase 19 stub
 
-## Phase 19: Packaging auto-deduct — **planned** (after 18)
-When bottles are filled or orders dispatch, **automatically deduct** caps/stickers/bottles from packaging inventory using a BOM map (`ProductPacking` → packaging components). Warn on insufficient stock. Depends on Phase 16 inventory baseline and optional link from Phase 17 fill events.
+## Phase 19: Haider packaging inventory + delivery auto-deduct ✓
+Move **packaging inventory** ownership from Rashid to **Haider** (`packaging_editor`): Haider maintains bottles, caps, stickers/labels, cartons/boxes, pouches, and related materials. When Zaman marks an order **Delivered**, the app automatically deducts packaging from inventory using the order’s actual loading-sheet rows and product packing metadata: **bottles/stickers/caps by bottle count**, and **cartons/boxes by `ProductPacking.bottlesPerCarton`** (e.g. Rhino 250ml has **20 bottles per carton**, so carton usage follows shipped bottle count / 20). Deductions must be audited, idempotent, and visible to admin.
+
+Executable plans:
+- `.planning/phases/19-haider-packaging-auto-deduct/01-PLAN.md` — Haider role/user and packaging inventory access ownership
+- `.planning/phases/19-haider-packaging-auto-deduct/02-PLAN.md` — packaging BOM resolver from order lines, product packings, and packaging item links
+- `.planning/phases/19-haider-packaging-auto-deduct/03-PLAN.md` — gate-delivered auto-deduct, audit/idempotency, docs
 
 ## Phase 20: Nimra add catalog product ✓
 **Nimra** can register **new sellable packings** (product name, code, batch family, bottles per carton, liters per bottle) from the production portal when the factory prepares a SKU not yet in the master list — so new-order and batch registry stay in sync without a developer-only seed step.
