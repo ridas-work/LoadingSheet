@@ -42,6 +42,49 @@ export function parseNonNegativeLiters(
   return roundLiters(n);
 }
 
+export function parseNonNegativeBottleCount(
+  value: unknown,
+  field: string,
+): number | { error: string } {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(n) || n < 0) {
+    return { error: `${field} must be a whole number ≥ 0` };
+  }
+  return n;
+}
+
+export type BottlePackingLine = {
+  litersPerBottle: number;
+  filledBottlesToday: number;
+  readyToDeliverBottles: number;
+};
+
+export function fillingLineSnapshots(line: BottlePackingLine): {
+  filledLitersTodaySnapshot: number;
+  readyToDeliverLitersSnapshot: number;
+} {
+  return {
+    filledLitersTodaySnapshot: roundLiters(line.filledBottlesToday * line.litersPerBottle),
+    readyToDeliverLitersSnapshot: roundLiters(line.readyToDeliverBottles * line.litersPerBottle),
+  };
+}
+
+export function totalPackingLineSnapshots(lines: BottlePackingLine[]): {
+  filledLitersToday: number;
+  readyToDeliverLiters: number;
+} {
+  return lines.reduce(
+    (totals, line) => {
+      const snapshots = fillingLineSnapshots(line);
+      return {
+        filledLitersToday: roundLiters(totals.filledLitersToday + snapshots.filledLitersTodaySnapshot),
+        readyToDeliverLiters: roundLiters(totals.readyToDeliverLiters + snapshots.readyToDeliverLitersSnapshot),
+      };
+    },
+    { filledLitersToday: 0, readyToDeliverLiters: 0 },
+  );
+}
+
 /** Today's date as "YYYY-MM-DD" (UTC). */
 export function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10);

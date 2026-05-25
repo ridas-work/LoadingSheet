@@ -8,7 +8,7 @@ export default function AdminPage() {
       <div className="rounded-xl border border-zinc-200 bg-white p-4 print:hidden">
         <h2 className="text-sm font-semibold text-zinc-900">Oversight</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Read-only access to orders, Nimra&apos;s production batches, dispatch trips, packaging inventory, and daily filling records.
+          Read-only access to orders, Nimra&apos;s production batches, dispatch trips, packaging inventory, and daily bottle filling records.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link
@@ -39,7 +39,7 @@ export default function AdminPage() {
             href="/dispatch/filling"
             className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
           >
-            Daily filling &amp; waste
+            Daily bottle filling &amp; waste
           </Link>
         </div>
       </div>

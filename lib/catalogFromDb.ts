@@ -44,3 +44,38 @@ export function catalogProductsOnly(catalog: PackingCatalogRow[]): CatalogProduc
     batchFamily: p.batchFamily,
   }));
 }
+
+export type FillingPackingOption = {
+  code: string;
+  name: string;
+  litersPerBottle: number;
+  batchFamily: string;
+};
+
+function normalizedCatalogKeys(packing: PackingCatalogRow): string[] {
+  return [
+    packing.name,
+    packing.batchFamily ?? "",
+    ...(packing.aliases ?? []),
+  ]
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function packingOptionsForBatchProduct(
+  batchProductName: string,
+  catalog: PackingCatalogRow[],
+): FillingPackingOption[] {
+  const key = batchProductName.trim().toLowerCase();
+  if (!key) return [];
+
+  return catalog
+    .filter((packing) => normalizedCatalogKeys(packing).includes(key))
+    .map((packing) => ({
+      code: packing.code,
+      name: packing.name,
+      litersPerBottle: packing.litersPerBottle,
+      batchFamily: packing.batchFamily?.trim() || packing.name,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}

@@ -1,9 +1,26 @@
 import mongoose, { type InferSchemaType } from "mongoose";
 
+const BatchFillingPackingLineSchema = new mongoose.Schema(
+  {
+    productCode: { type: String, required: true, trim: true, lowercase: true },
+    productName: { type: String, required: true, trim: true },
+    /** Snapshot from ProductPacking at save time; bottle counts are operator-entered. */
+    litersPerBottle: { type: Number, required: true, min: 0.001 },
+    filledBottlesToday: { type: Number, required: true, default: 0, min: 0 },
+    readyToDeliverBottles: { type: Number, required: true, default: 0, min: 0 },
+    /** Derived snapshots so historical rows do not change if catalog values change. */
+    filledLitersTodaySnapshot: { type: Number, required: true, default: 0, min: 0 },
+    readyToDeliverLitersSnapshot: { type: Number, required: true, default: 0, min: 0 },
+  },
+  { _id: false },
+);
+
 const BatchFillingDailyEntrySchema = new mongoose.Schema(
   {
     batchNo: { type: String, required: true, trim: true },
     entryDate: { type: String, required: true, trim: true }, // ISO date "YYYY-MM-DD"
+    packingLines: { type: [BatchFillingPackingLineSchema], required: false, default: [] },
+    /** Derived from packingLines; old records may contain manually-entered liter values. */
     filledLitersToday: { type: Number, required: true, default: 0, min: 0 },
     readyToDeliverLiters: { type: Number, required: true, default: 0, min: 0 },
     physicalRemainingLiters: { type: Number, required: true, default: 0, min: 0 },

@@ -1,11 +1,25 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import { computeWasteLiters, parseNonNegativeLiters, todayIsoDate } from "@/lib/batchFillingWaste";
+import {
+  computeWasteLiters,
+  fillingLineSnapshots,
+  parseNonNegativeBottleCount,
+  parseNonNegativeLiters,
+  todayIsoDate,
+  totalPackingLineSnapshots,
+  type BottlePackingLine,
+} from "@/lib/batchFillingWaste";
 import { roundLiters } from "@/lib/batchVolume";
+import {
+  packingCatalogFromDocs,
+  packingOptionsForBatchProduct,
+  type FillingPackingOption,
+} from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
 import { BatchFillingDailyEntry } from "@/lib/models/BatchFillingDailyEntry";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
+import { ProductPacking } from "@/lib/models/ProductPacking";
 import { canEditDispatch, isAdmin, roleFromSession } from "@/lib/roles";
 import {
   loadBatchUsageContext,
@@ -14,6 +28,57 @@ import {
 
 function canView(role: ReturnType<typeof roleFromSession>): boolean {
   return role === "dispatch_editor" || isAdmin(role);
+}
+
+type StoredPackingLine = BottlePackingLine & {
+  productCode: string;
+  productName: string;
+  filledLitersTodaySnapshot?: number;
+  readyToDeliverLitersSnapshot?: number;
+};
+
+type StoredEntry = {
+  batchNo: string;
+  entryDate: string;
+  packingLines?: StoredPackingLine[];
+  filledLitersToday: number;
+  readyToDeliverLiters: number;
+  physicalRemainingLiters: number;
+  systemRemainingLiters: number;
+  wasteLiters: number;
+  note?: string | null;
+  recordedByName?: string | null;
+  updatedAt?: Date;
+};
+
+function serializePackingLine(line: StoredPackingLine) {
+  const snapshots = fillingLineSnapshots(line);
+  return {
+    productCode: line.productCode,
+    productName: line.productName,
+    litersPerBottle: line.litersPerBottle,
+    filledBottlesToday: line.filledBottlesToday,
+    readyToDeliverBottles: line.readyToDeliverBottles,
+    filledLitersTodaySnapshot: line.filledLitersTodaySnapshot ?? snapshots.filledLitersTodaySnapshot,
+    readyToDeliverLitersSnapshot:
+      line.readyToDeliverLitersSnapshot ?? snapshots.readyToDeliverLitersSnapshot,
+  };
+}
+
+function serializeEntry(entry: StoredEntry) {
+  const packingLines = (entry.packingLines ?? []).map(serializePackingLine);
+  return {
+    filledLitersToday: entry.filledLitersToday,
+    readyToDeliverLiters: entry.readyToDeliverLiters,
+    packingLines,
+    legacyLitersOnly: packingLines.length === 0 && (entry.filledLitersToday > 0 || entry.readyToDeliverLiters > 0),
+    physicalRemainingLiters: entry.physicalRemainingLiters,
+    systemRemainingLiters: entry.systemRemainingLiters,
+    wasteLiters: entry.wasteLiters,
+    note: entry.note ?? "",
+    recordedByName: entry.recordedByName ?? "",
+    updatedAt: entry.updatedAt?.toISOString() ?? null,
+  };
 }
 
 export async function GET(req: Request) {
@@ -27,11 +92,15 @@ export async function GET(req: Request) {
 
   await connectToDatabase();
 
-  const [batches, { usedMap }, entries] = await Promise.all([
+  const [batches, { usedMap }, entries, catalogDocs] = await Promise.all([
     ProductionBatch.find({}).sort({ preparedAt: -1 }).lean(),
     loadBatchUsageContext(),
     BatchFillingDailyEntry.find({ entryDate: date }).lean(),
+    ProductPacking.find({ active: true })
+      .select({ code: 1, name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1, bundleComponents: 1 })
+      .lean(),
   ]);
+  const catalog = packingCatalogFromDocs(catalogDocs);
 
   const entryByBatch = new Map(entries.map((e) => [e.batchNo.toLowerCase(), e]));
 
@@ -49,18 +118,8 @@ export async function GET(req: Request) {
         usedLiters: usage.usedLiters,
         systemRemainingLiters: usage.remainingLiters,
         status: usage.status,
-        entry: entry
-          ? {
-              filledLitersToday: entry.filledLitersToday,
-              readyToDeliverLiters: entry.readyToDeliverLiters,
-              physicalRemainingLiters: entry.physicalRemainingLiters,
-              systemRemainingLiters: entry.systemRemainingLiters,
-              wasteLiters: entry.wasteLiters,
-              note: entry.note ?? "",
-              recordedByName: entry.recordedByName ?? "",
-              updatedAt: entry.updatedAt?.toISOString() ?? null,
-            }
-          : null,
+        packingOptions: packingOptionsForBatchProduct(b.productName, catalog),
+        entry: entry ? serializeEntry(entry as StoredEntry) : null,
       };
     })
     .filter(Boolean);
@@ -80,8 +139,7 @@ export async function PATCH(req: Request) {
   const body = (await req.json().catch(() => null)) as {
     batchNo?: unknown;
     entryDate?: unknown;
-    filledLitersToday?: unknown;
-    readyToDeliverLiters?: unknown;
+    packingLines?: unknown;
     physicalRemainingLiters?: unknown;
     note?: unknown;
   } | null;
@@ -93,12 +151,6 @@ export async function PATCH(req: Request) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(entryDate))
     return NextResponse.json({ error: "entryDate must be YYYY-MM-DD" }, { status: 400 });
 
-  const filled = parseNonNegativeLiters(body.filledLitersToday, "Filled today");
-  if (typeof filled === "object") return NextResponse.json({ error: filled.error }, { status: 400 });
-
-  const ready = parseNonNegativeLiters(body.readyToDeliverLiters, "Ready to deliver");
-  if (typeof ready === "object") return NextResponse.json({ error: ready.error }, { status: 400 });
-
   const physical = parseNonNegativeLiters(body.physicalRemainingLiters, "Physical remaining");
   if (typeof physical === "object") return NextResponse.json({ error: physical.error }, { status: 400 });
 
@@ -106,20 +158,80 @@ export async function PATCH(req: Request) {
 
   await connectToDatabase();
 
-  const batch = await ProductionBatch.findOne({ batchNo }).lean();
+  const [batch, catalogDocs] = await Promise.all([
+    ProductionBatch.findOne({ batchNo }).lean(),
+    ProductPacking.find({ active: true })
+      .select({ code: 1, name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1, bundleComponents: 1 })
+      .lean(),
+  ]);
   if (!batch) return NextResponse.json({ error: `Batch "${batchNo}" not found` }, { status: 404 });
+  const catalog = packingCatalogFromDocs(catalogDocs);
+  const options = packingOptionsForBatchProduct(batch.productName, catalog);
+  const optionByCode = new Map(options.map((option) => [option.code.trim().toLowerCase(), option]));
 
   const { usedMap } = await loadBatchUsageContext();
   const usage = usageForBatchNo(batchNo, batch.totalLiters, usedMap);
   const systemRemaining = roundLiters(usage.remainingLiters);
-  const wasteLiters = computeWasteLiters(systemRemaining, filled, ready, physical);
+  const rawLines = Array.isArray(body.packingLines) ? body.packingLines : [];
+  const packingLines: StoredPackingLine[] = [];
+
+  for (let i = 0; i < rawLines.length; i += 1) {
+    const raw = rawLines[i] as Record<string, unknown>;
+    const filledBottlesToday = parseNonNegativeBottleCount(
+      raw?.filledBottlesToday ?? 0,
+      `Filled bottles row ${i + 1}`,
+    );
+    if (typeof filledBottlesToday === "object") {
+      return NextResponse.json({ error: filledBottlesToday.error }, { status: 400 });
+    }
+
+    const readyToDeliverBottles = parseNonNegativeBottleCount(
+      raw?.readyToDeliverBottles ?? 0,
+      `Ready bottles row ${i + 1}`,
+    );
+    if (typeof readyToDeliverBottles === "object") {
+      return NextResponse.json({ error: readyToDeliverBottles.error }, { status: 400 });
+    }
+
+    const productCode = typeof raw?.productCode === "string" ? raw.productCode.trim().toLowerCase() : "";
+    const hasBottles = filledBottlesToday > 0 || readyToDeliverBottles > 0;
+    if (!productCode && !hasBottles) continue;
+    if (!productCode) {
+      return NextResponse.json({ error: `Select a product/packing for row ${i + 1}` }, { status: 400 });
+    }
+
+    const option: FillingPackingOption | undefined = optionByCode.get(productCode);
+    if (!option) {
+      return NextResponse.json(
+        { error: `Product/packing is not valid for batch "${batch.productName}" on row ${i + 1}` },
+        { status: 400 },
+      );
+    }
+    if (!hasBottles) continue;
+
+    const baseLine = {
+      productCode: option.code,
+      productName: option.name,
+      litersPerBottle: option.litersPerBottle,
+      filledBottlesToday,
+      readyToDeliverBottles,
+    };
+    packingLines.push({
+      ...baseLine,
+      ...fillingLineSnapshots(baseLine),
+    });
+  }
+
+  const { filledLitersToday, readyToDeliverLiters } = totalPackingLineSnapshots(packingLines);
+  const wasteLiters = computeWasteLiters(systemRemaining, filledLitersToday, readyToDeliverLiters, physical);
 
   const result = await BatchFillingDailyEntry.findOneAndUpdate(
     { batchNo, entryDate },
     {
       $set: {
-        filledLitersToday: filled,
-        readyToDeliverLiters: ready,
+        packingLines,
+        filledLitersToday,
+        readyToDeliverLiters,
         physicalRemainingLiters: physical,
         systemRemainingLiters: systemRemaining,
         wasteLiters,
@@ -135,12 +247,7 @@ export async function PATCH(req: Request) {
     entry: {
       batchNo: result.batchNo,
       entryDate: result.entryDate,
-      filledLitersToday: result.filledLitersToday,
-      readyToDeliverLiters: result.readyToDeliverLiters,
-      physicalRemainingLiters: result.physicalRemainingLiters,
-      systemRemainingLiters: result.systemRemainingLiters,
-      wasteLiters: result.wasteLiters,
-      note: result.note ?? "",
+      ...serializeEntry(result as StoredEntry),
     },
   });
 }

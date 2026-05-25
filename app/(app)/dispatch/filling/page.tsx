@@ -7,9 +7,11 @@ import { DatePickerForm } from "@/components/DatePickerForm";
 import { auth } from "@/lib/auth";
 import { todayIsoDate } from "@/lib/batchFillingWaste";
 import { roundLiters } from "@/lib/batchVolume";
+import { packingCatalogFromDocs, packingOptionsForBatchProduct } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
 import { BatchFillingDailyEntry } from "@/lib/models/BatchFillingDailyEntry";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
+import { ProductPacking } from "@/lib/models/ProductPacking";
 import { canEditDispatch, isAdmin, roleFromSession } from "@/lib/roles";
 import { loadBatchUsageContext, usageForBatchNo } from "@/lib/productionBatchStatus";
 
@@ -31,11 +33,15 @@ export default async function BatchFillingPage({ searchParams }: PageProps) {
 
   await connectToDatabase();
 
-  const [batches, { usedMap }, entries] = await Promise.all([
+  const [batches, { usedMap }, entries, catalogDocs] = await Promise.all([
     ProductionBatch.find({}).sort({ preparedAt: -1 }).lean(),
     loadBatchUsageContext(),
     BatchFillingDailyEntry.find({ entryDate: date }).lean(),
+    ProductPacking.find({ active: true })
+      .select({ code: 1, name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1, bundleComponents: 1 })
+      .lean(),
   ]);
+  const catalog = packingCatalogFromDocs(catalogDocs);
 
   const entryByBatch = new Map(entries.map((e) => [e.batchNo.toLowerCase(), e]));
 
@@ -51,10 +57,23 @@ export default async function BatchFillingPage({ searchParams }: PageProps) {
         usedLiters: roundLiters(usage.usedLiters),
         systemRemainingLiters: roundLiters(usage.remainingLiters),
         status: usage.status,
+        packingOptions: packingOptionsForBatchProduct(b.productName, catalog),
         entry: entry
           ? {
               filledLitersToday: entry.filledLitersToday,
               readyToDeliverLiters: entry.readyToDeliverLiters,
+              packingLines: (entry.packingLines ?? []).map((line) => ({
+                productCode: line.productCode,
+                productName: line.productName,
+                litersPerBottle: line.litersPerBottle,
+                filledBottlesToday: line.filledBottlesToday,
+                readyToDeliverBottles: line.readyToDeliverBottles,
+                filledLitersTodaySnapshot: line.filledLitersTodaySnapshot,
+                readyToDeliverLitersSnapshot: line.readyToDeliverLitersSnapshot,
+              })),
+              legacyLitersOnly:
+                (entry.packingLines ?? []).length === 0 &&
+                (entry.filledLitersToday > 0 || entry.readyToDeliverLiters > 0),
               physicalRemainingLiters: entry.physicalRemainingLiters,
               systemRemainingLiters: entry.systemRemainingLiters,
               wasteLiters: entry.wasteLiters,
@@ -76,13 +95,14 @@ export default async function BatchFillingPage({ searchParams }: PageProps) {
           <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Daily filling log</h1>
           <p className="mt-1 text-sm text-zinc-600">
             {readOnly
-              ? "View filling records and waste for each batch (read-only)."
-              : "Record how much you filled today, what is ready to deliver, and how much liquid remains in each batch."}
+              ? "View bottle filling records, ready stock, and liter variance for each batch (read-only)."
+              : "Record bottles filled today, bottles fully ready to deliver, and liquid remaining in each batch."}
           </p>
           <p className="mt-1 text-xs text-zinc-500">
-            <strong>Waste (L)</strong> = Nimra remaining − Filled today − Ready to deliver − Physical
-            remaining. Example: 50 − 10 − 5 − 10 = <strong>25 L</strong> unaccounted. Zero = balanced.
-            Red = missing liquid; amber = you recorded more than Nimra&apos;s pool.
+            <strong>Ready to deliver</strong> means capped, labeled/stickered, packed/finished, and ready for
+            dispatch. <strong>Waste (L)</strong> still compares Nimra remaining against the derived liters from
+            bottle counts plus physical liquid remaining. Red = missing liquid; amber = recorded more than
+            Nimra&apos;s pool.
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-zinc-600">
