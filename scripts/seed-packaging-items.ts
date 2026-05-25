@@ -12,11 +12,23 @@ type SeedRow = {
   code: string;
   name: string;
   category: string;
+  sortOrder?: number;
   unit?: string;
   linkedProductCode?: string;
+  linkedBatchFamily?: string;
+  deductAs?: string;
 };
 
-const VALID_CATEGORIES = new Set(["bottle", "cap", "sticker", "label", "other"]);
+const VALID_CATEGORIES = new Set([
+  "bottle",
+  "cap",
+  "sticker",
+  "label",
+  "box",
+  "pouch",
+  "partition",
+  "other",
+]);
 
 function loadSeedRows(): SeedRow[] {
   const raw = process.env.SEED_PACKAGING_JSON;
@@ -39,15 +51,19 @@ function loadSeedRows(): SeedRow[] {
 async function main() {
   await connectToDatabase();
   const rows = loadSeedRows();
+  const codes: string[] = [];
   let n = 0;
 
-  for (const r of rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]!;
     const code = r.code.trim().toLowerCase();
     const name = r.name.trim();
     const category = r.category.trim().toLowerCase();
+    const sortOrder = typeof r.sortOrder === "number" ? r.sortOrder : i + 1;
     if (!code || !name || !VALID_CATEGORIES.has(category)) {
       throw new Error(`Invalid row: ${JSON.stringify(r)}`);
     }
+    codes.push(code);
 
     await PackagingItem.updateOne(
       { code },
@@ -55,18 +71,31 @@ async function main() {
         $set: {
           name,
           category,
+          sortOrder,
           unit: r.unit?.trim() || "pcs",
           linkedProductCode: r.linkedProductCode?.trim().toLowerCase() ?? "",
+          linkedBatchFamily: r.linkedBatchFamily?.trim().toLowerCase() ?? "",
+          deductAs: r.deductAs?.trim().toLowerCase() || category,
           active: true,
         },
-        $setOnInsert: { onHand: 0 },
+        $setOnInsert: {
+          purchasedQty: 0,
+          rejectedDamage: 0,
+          uip: 0,
+          onHand: 0,
+        },
       },
       { upsert: true },
     );
     n += 1;
   }
 
-  console.log(`Seeded ${n} packaging items.`);
+  const deactivated = await PackagingItem.updateMany(
+    { code: { $nin: codes } },
+    { $set: { active: false } },
+  );
+
+  console.log(`Seeded ${n} packaging items. Deactivated ${deactivated.modifiedCount} old catalog rows.`);
   process.exit(0);
 }
 

@@ -4,6 +4,7 @@ import type { PackingCatalogRow } from "@/lib/bundleCatalog";
 type CatalogDoc = {
   code: string;
   name: string;
+  bottlesPerCarton?: number | null;
   litersPerBottle?: number | null;
   aliases?: string[];
   batchFamily?: string | null;
@@ -17,6 +18,7 @@ export function packingCatalogFromDocs(docs: CatalogDoc[]): PackingCatalogRow[] 
     const row: PackingCatalogRow = {
       code: p.code,
       name: p.name,
+      bottlesPerCarton: typeof p.bottlesPerCarton === "number" && p.bottlesPerCarton > 0 ? p.bottlesPerCarton : 1,
       litersPerBottle: inferLitersPerBottleFromName(p.name, p.litersPerBottle),
       aliases: p.aliases ?? [],
       batchFamily: p.batchFamily?.trim() || p.name,

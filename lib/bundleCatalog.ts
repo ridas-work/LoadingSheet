@@ -14,6 +14,7 @@ export type BundleComponentRef = {
 
 export type PackingCatalogRow = CatalogProduct & {
   code: string;
+  bottlesPerCarton: number;
   bundleComponents?: BundleComponentRef[];
 };
 
