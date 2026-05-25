@@ -180,6 +180,20 @@ const OrderSchema = new mongoose.Schema(
     gateUpdatedAt: { type: Date, required: false, default: null },
     gateUpdatedByUserId: { type: String, required: false, default: null },
     gateUpdatedByName: { type: String, required: false, default: "", trim: true },
+    packagingDeductedAt: { type: Date, required: false, default: null },
+    packagingDeductedByUserId: { type: String, required: false, default: null },
+    packagingDeductedByName: { type: String, required: false, default: "", trim: true },
+    packagingDeductionSummary: {
+      type: [
+        {
+          itemCode: { type: String, required: true, trim: true, lowercase: true },
+          itemName: { type: String, required: true, trim: true },
+          quantity: { type: Number, required: true, min: 0 },
+        },
+      ],
+      required: false,
+      default: [],
+    },
   },
   { timestamps: { createdAt: true, updatedAt: true } },
 );

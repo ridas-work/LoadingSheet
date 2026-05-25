@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 
 import { auth } from "@/lib/auth";
+import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
 import {
   assertGateTransition,
@@ -11,6 +12,14 @@ import {
   parseGateDeliveryPatchBody,
 } from "@/lib/gateDelivery";
 import { Order } from "@/lib/models/Order";
+import { PackagingItem } from "@/lib/models/PackagingItem";
+import { PackagingStockMovement } from "@/lib/models/PackagingStockMovement";
+import { ProductPacking } from "@/lib/models/ProductPacking";
+import {
+  assertPackagingDeductionPreview,
+  buildPackagingDeductionPreview,
+  type DeductionSheetLine,
+} from "@/lib/packagingDeduction";
 import { canEditGateDelivery, roleFromSession } from "@/lib/roles";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -53,6 +62,49 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const $set = gateDeliveryUpdateFields(parsed.status, { userId, userName });
+  if (parsed.status === "delivered" && !existing.packagingDeductedAt) {
+    const [catalogDocs, packagingItems] = await Promise.all([
+      ProductPacking.find({ active: true })
+        .select({ code: 1, name: 1, bottlesPerCarton: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1, bundleComponents: 1 })
+        .lean(),
+      PackagingItem.find({ active: true }).lean(),
+    ]);
+    const preview = buildPackagingDeductionPreview({
+      sheetLines: (existing.sheetLines ?? []) as DeductionSheetLine[],
+      catalog: packingCatalogFromDocs(catalogDocs),
+      packagingItems,
+    });
+    const previewError = assertPackagingDeductionPreview(preview);
+    if (previewError) {
+      return NextResponse.json({ error: previewError }, { status: 400 });
+    }
+
+    for (const line of preview.lines) {
+      await PackagingItem.updateOne(
+        { code: line.itemCode },
+        { $inc: { uip: line.quantity, onHand: -line.quantity } },
+      );
+      await PackagingStockMovement.create({
+        itemCode: line.itemCode,
+        quantityDelta: -line.quantity,
+        quantityAfter: line.quantityAfter,
+        reason: "used",
+        note: `Auto-deducted on delivery for PO ${existing.poNumber}: ${line.reasonDetail}`,
+        recordedByUserId: userId,
+        recordedByName: userName,
+      });
+    }
+
+    $set.packagingDeductedAt = new Date();
+    $set.packagingDeductedByUserId = userId;
+    $set.packagingDeductedByName = userName;
+    $set.packagingDeductionSummary = preview.lines.map((line) => ({
+      itemCode: line.itemCode,
+      itemName: line.itemName,
+      quantity: line.quantity,
+    }));
+  }
+
   const doc = await Order.findByIdAndUpdate(id, { $set }, { new: true }).lean();
   if (!doc) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
