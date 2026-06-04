@@ -54,6 +54,7 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
+  const [rowSuccess, setRowSuccess] = useState<Record<string, string>>({});
 
   const load = useCallback(async (f: FilterKey) => {
     setLoading(true);
@@ -87,16 +88,42 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
       delete next[orderId];
       return next;
     });
+    setRowSuccess((prev) => {
+      const next = { ...prev };
+      delete next[orderId];
+      return next;
+    });
     try {
       const res = await fetch(`/api/orders/${orderId}/gate-delivery`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        packagingStockUpdated?: boolean;
+        packagingDeductionSummary?: Array<{ itemName?: string; quantity?: number }>;
+      };
       if (!res.ok) {
         setRowError((prev) => ({ ...prev, [orderId]: data.error || `Save failed (${res.status})` }));
         return;
+      }
+      if (status === "delivered" && data.packagingStockUpdated) {
+        const n = data.packagingDeductionSummary?.length ?? 0;
+        setRowSuccess((prev) => ({
+          ...prev,
+          [orderId]:
+            n > 0
+              ? `Packaging stock updated (${n} line${n === 1 ? "" : "s"}).`
+              : "Delivered — packaging stock updated.",
+        }));
+        setTimeout(() => {
+          setRowSuccess((p) => {
+            const next = { ...p };
+            delete next[orderId];
+            return next;
+          });
+        }, 5000);
       }
       await load(filter);
       router.refresh();
@@ -129,8 +156,8 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
         <p className="text-sm text-zinc-600">Loading orders…</p>
       ) : orders.length === 0 ? (
         <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
-          No orders match this filter. Orders appear here after Rashid assigns them to a trip or enters
-          vehicle details on dispatch.
+          No orders match this filter. Orders appear here only when Rashid has put them on a **dispatch trip**
+          and filled **vehicle number, driver, and DC number** so the shipment is ready to leave the gate.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
@@ -183,6 +210,9 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
                         </div>
                         {rowError[o.id] ? (
                           <p className="mt-1 text-xs text-red-600">{rowError[o.id]}</p>
+                        ) : null}
+                        {rowSuccess[o.id] ? (
+                          <p className="mt-1 text-xs text-emerald-700">{rowSuccess[o.id]}</p>
                         ) : null}
                       </td>
                     ) : null}

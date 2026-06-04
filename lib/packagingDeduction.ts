@@ -218,7 +218,10 @@ export function buildPackagingDeductionPreview(args: {
   const lines = [...quantities.values()].sort((a, b) => a.itemName.localeCompare(b.itemName));
   const insufficientStock = lines
     .filter((line) => line.quantityAfter < 0)
-    .map((line) => `Insufficient ${line.itemName}: need ${line.quantity}, have ${line.quantity + line.quantityAfter}`);
+    .map((line) => {
+      const balance = line.quantity + line.quantityAfter;
+      return `Insufficient ${line.itemName}: need ${line.quantity}, balance ${balance} (Purchased − Rejected − UIP)`;
+    });
 
   return {
     lines,

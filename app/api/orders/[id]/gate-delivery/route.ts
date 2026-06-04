@@ -12,8 +12,8 @@ import {
   parseGateDeliveryPatchBody,
 } from "@/lib/gateDelivery";
 import { Order } from "@/lib/models/Order";
+import { applyPackagingUipIncrements } from "@/lib/packagingStockApply";
 import { PackagingItem } from "@/lib/models/PackagingItem";
-import { PackagingStockMovement } from "@/lib/models/PackagingStockMovement";
 import { ProductPacking } from "@/lib/models/ProductPacking";
 import {
   assertPackagingDeductionPreview,
@@ -79,20 +79,21 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       return NextResponse.json({ error: previewError }, { status: 400 });
     }
 
-    for (const line of preview.lines) {
-      await PackagingItem.updateOne(
-        { code: line.itemCode },
-        { $inc: { uip: line.quantity, onHand: -line.quantity } },
-      );
-      await PackagingStockMovement.create({
+    const applyError = await applyPackagingUipIncrements(
+      preview.lines.map((line) => ({
         itemCode: line.itemCode,
-        quantityDelta: -line.quantity,
-        quantityAfter: line.quantityAfter,
-        reason: "used",
-        note: `Auto-deducted on delivery for PO ${existing.poNumber}: ${line.reasonDetail}`,
+        quantity: line.quantity,
+        detail: line.reasonDetail,
+      })),
+      {
+        reason: "delivered",
+        note: `PO ${existing.poNumber} delivered`,
         recordedByUserId: userId,
         recordedByName: userName,
-      });
+      },
+    );
+    if (applyError) {
+      return NextResponse.json({ error: applyError }, { status: 400 });
     }
 
     $set.packagingDeductedAt = new Date();
@@ -111,6 +112,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const status = normalizeGateStatus(doc.gateDeliveryStatus);
+  const deductionSummary = (doc.packagingDeductionSummary ?? []) as Array<{
+    itemCode?: string;
+    itemName?: string;
+    quantity?: number;
+  }>;
+
   return NextResponse.json({
     order: {
       id: doc._id.toString(),
@@ -122,5 +129,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       gateUpdatedAt: doc.gateUpdatedAt ?? null,
       gateUpdatedByName: doc.gateUpdatedByName ?? "",
     },
+    packagingStockUpdated: parsed.status === "delivered" && Boolean(doc.packagingDeductedAt),
+    packagingDeductionSummary: deductionSummary,
   });
 }
