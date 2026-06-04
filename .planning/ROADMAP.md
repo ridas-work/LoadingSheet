@@ -116,6 +116,14 @@ Executable plans:
 - `.planning/phases/19-haider-packaging-auto-deduct/02-PLAN.md` — packaging BOM resolver from order lines, product packings, and packaging item links
 - `.planning/phases/19-haider-packaging-auto-deduct/03-PLAN.md` — gate-delivered auto-deduct, audit/idempotency, docs
 
+## Phase 24: Field visit tickets — Nouman & Javeria sample-to-order — **complete**
+**Nouman** and **Javeria** visit customers, **request samples**, and track each visit as a **ticket**. They record sample delivery, customer feedback (liked / not), and **conclude** the visit. The ticket stays open until a **PO is placed** from that customer: **confirmed order → positive points and link to PO**; **no order / lost deal → negative points** and ticket closed. Other PO creators (Aslam, Ibtisam) are not in this workflow in v1.
+
+Executable plans:
+- `.planning/phases/24-field-visit-sample-tickets/01-PLAN.md` — `FieldVisitTicket` model, APIs, order `visitTicketId` linkage and auto-close on order
+- `.planning/phases/24-field-visit-sample-tickets/02-PLAN.md` — `/field-visits` UI for Nouman/Javeria, new-order prefill/link
+- `.planning/phases/24-field-visit-sample-tickets/03-PLAN.md` — admin read-only visit list + rep points, README
+
 ## Phase 20: Nimra add catalog product ✓
 **Nimra** can register **new sellable packings** (product name, code, batch family, bottles per carton, liters per bottle) from the production portal when the factory prepares a SKU not yet in the master list — so new-order and batch registry stay in sync without a developer-only seed step.
 

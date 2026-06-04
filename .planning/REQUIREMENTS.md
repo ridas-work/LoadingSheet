@@ -552,3 +552,24 @@ Executable plans:
 - `.planning/phases/23-rashid-bottle-filling-readiness/01-PLAN.md`
 - `.planning/phases/23-rashid-bottle-filling-readiness/02-PLAN.md`
 
+---
+
+## Phase 24 (Field visit tickets — Nouman & Javeria) — **complete**
+
+### Problem
+
+Nouman and Javeria visit shops to win business. Today there is no structured way to track a visit from **sample request** through **customer feedback** to **order outcome** and rep performance.
+
+### Solution (v1)
+
+- **Visit ticket** per customer/place visit, owned by the visiting rep.
+- Flow: **Request sample** → **Deliver sample** (record received date, customer details, like/dislike comments) → **Conclude visit** → wait for order.
+- **Close ticket:** linked **confirmed PO** → **positive points** and PO alert; **no order / lost** → **negative points**.
+- **New order** can link to a concluded visit; successful PO creation closes ticket as won.
+- **Admin** sees all visits and monthly points per rep.
+
+Executable plans:
+- `.planning/phases/24-field-visit-sample-tickets/01-PLAN.md`
+- `.planning/phases/24-field-visit-sample-tickets/02-PLAN.md`
+- `.planning/phases/24-field-visit-sample-tickets/03-PLAN.md`
+
