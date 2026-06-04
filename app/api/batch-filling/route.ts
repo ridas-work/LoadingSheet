@@ -17,9 +17,13 @@ import {
   type FillingPackingOption,
 } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
+import { computeFillingUipIncrements } from "@/lib/packagingFillingDeduction";
+import { applyPackagingUipIncrements } from "@/lib/packagingStockApply";
 import { BatchFillingDailyEntry } from "@/lib/models/BatchFillingDailyEntry";
+import { PackagingItem } from "@/lib/models/PackagingItem";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
+import type { DeductionPackagingItem, DeductionPacking } from "@/lib/packagingDeduction";
 import { canEditDispatch, isAdmin, roleFromSession } from "@/lib/roles";
 import {
   loadBatchUsageContext,
@@ -158,11 +162,21 @@ export async function PATCH(req: Request) {
 
   await connectToDatabase();
 
-  const [batch, catalogDocs] = await Promise.all([
+  const [batch, catalogDocs, previousEntry, packagingItems] = await Promise.all([
     ProductionBatch.findOne({ batchNo }).lean(),
     ProductPacking.find({ active: true })
-      .select({ code: 1, name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1, bundleComponents: 1 })
+      .select({
+        code: 1,
+        name: 1,
+        bottlesPerCarton: 1,
+        litersPerBottle: 1,
+        aliases: 1,
+        batchFamily: 1,
+        bundleComponents: 1,
+      })
       .lean(),
+    BatchFillingDailyEntry.findOne({ batchNo, entryDate }).lean(),
+    PackagingItem.find({ active: true }).lean(),
   ]);
   if (!batch) return NextResponse.json({ error: `Batch "${batchNo}" not found` }, { status: 404 });
   const catalog = packingCatalogFromDocs(catalogDocs);
@@ -225,6 +239,68 @@ export async function PATCH(req: Request) {
   const { filledLitersToday, readyToDeliverLiters } = totalPackingLineSnapshots(packingLines);
   const wasteLiters = computeWasteLiters(systemRemaining, filledLitersToday, readyToDeliverLiters, physical);
 
+  const catalogDeduction: DeductionPacking[] = catalog.map((p) => ({
+    code: p.code,
+    name: p.name,
+    bottlesPerCarton: p.bottlesPerCarton,
+    aliases: p.aliases,
+    batchFamily: p.batchFamily,
+    bundleComponents: p.bundleComponents,
+  }));
+  const previousLines = (previousEntry?.packagingUipApplied ?? []).length
+    ? (previousEntry?.packagingUipApplied ?? []).map((a) => ({
+        productCode: a.productCode,
+        filledBottlesToday: a.filledBottlesApplied,
+      }))
+    : (previousEntry?.packingLines ?? []).map((l) => ({
+        productCode: l.productCode,
+        filledBottlesToday: l.filledBottlesToday ?? 0,
+      }));
+
+  const newLines = packingLines.map((l) => ({
+    productCode: l.productCode,
+    filledBottlesToday: l.filledBottlesToday,
+  }));
+
+  const uipPreview = computeFillingUipIncrements({
+    previousLines,
+    newLines,
+    catalog: catalogDeduction,
+    packagingItems: packagingItems as DeductionPackagingItem[],
+  });
+
+  if (uipPreview.missingMappings.length > 0) {
+    return NextResponse.json(
+      { error: `Packaging mapping missing: ${uipPreview.missingMappings.join("; ")}` },
+      { status: 400 },
+    );
+  }
+  if (uipPreview.insufficientStock.length > 0) {
+    return NextResponse.json({ error: uipPreview.insufficientStock.join("; ") }, { status: 400 });
+  }
+
+  const applyError = await applyPackagingUipIncrements(
+    uipPreview.increments.map((i) => ({
+      itemCode: i.itemCode,
+      quantity: i.quantity,
+      detail: i.detail,
+    })),
+    {
+      reason: "filling",
+      note: `Batch ${batchNo} filling ${entryDate}`,
+      recordedByUserId: userId,
+      recordedByName: session.user.name ?? "",
+    },
+  );
+  if (applyError) {
+    return NextResponse.json({ error: applyError }, { status: 400 });
+  }
+
+  const packagingUipApplied = newLines.map((l) => ({
+    productCode: l.productCode,
+    filledBottlesApplied: l.filledBottlesToday,
+  }));
+
   const result = await BatchFillingDailyEntry.findOneAndUpdate(
     { batchNo, entryDate },
     {
@@ -236,6 +312,7 @@ export async function PATCH(req: Request) {
         systemRemainingLiters: systemRemaining,
         wasteLiters,
         note,
+        packagingUipApplied,
         recordedByUserId: userId,
         recordedByName: session.user.name ?? "",
       },
