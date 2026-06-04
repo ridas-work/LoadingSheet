@@ -61,9 +61,11 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (!canEditPackagingInventory(roleFromSession(session.user as { role?: string }))) {
+  const role = roleFromSession(session.user as { role?: string });
+  if (!canEditPackagingInventory(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const haiderOnlyLedger = role === "packaging_editor";
 
   const userId = (session.user as { id?: string }).id;
   if (!userId) {
@@ -95,7 +97,16 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const beforePurchased = item.purchasedQty ?? 0;
+  const beforeRejected = item.rejectedDamage ?? 0;
   const before = packagingBalance(item);
+
+  if (haiderOnlyLedger && body.uip !== undefined) {
+    return NextResponse.json(
+      { error: "UIP is updated automatically from filling and delivered orders." },
+      { status: 400 },
+    );
+  }
 
   if (body.onHand !== undefined && body.purchasedQty === undefined) {
     const legacy = parseNonNegativeInt(body.onHand, "onHand");
@@ -116,7 +127,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       if (typeof v === "object") return NextResponse.json({ error: v.error }, { status: 400 });
       item.rejectedDamage = v;
     }
-    if (body.uip !== undefined) {
+    if (!haiderOnlyLedger && body.uip !== undefined) {
       const v = parseNonNegativeInt(body.uip, "UIP");
       if (typeof v === "object") return NextResponse.json({ error: v.error }, { status: 400 });
       item.uip = v;
@@ -132,12 +143,19 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   item.onHand = after;
   await item.save();
 
+  const purchasedChanged = (item.purchasedQty ?? 0) !== beforePurchased;
+  const rejectedChanged = (item.rejectedDamage ?? 0) !== beforeRejected;
+  let reason: "purchase_adjust" | "rejected" | "count" = "count";
+  if (purchasedChanged && !rejectedChanged) reason = "purchase_adjust";
+  else if (rejectedChanged && !purchasedChanged) reason = "rejected";
+  else if (purchasedChanged || rejectedChanged) reason = "purchase_adjust";
+
   await PackagingStockMovement.create({
     itemCode,
     quantityDelta: after - before,
     quantityAfter: after,
-    reason: "count",
-    note,
+    reason,
+    note: note || (purchasedChanged ? "Purchased qty updated" : "Rejected/damage updated"),
     recordedByUserId: userId,
     recordedByName: session.user.name ?? "",
   });

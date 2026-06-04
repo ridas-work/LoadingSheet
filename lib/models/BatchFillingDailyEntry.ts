@@ -1,5 +1,13 @@
 import mongoose, { type InferSchemaType } from "mongoose";
 
+const PackagingUipAppliedSchema = new mongoose.Schema(
+  {
+    productCode: { type: String, required: true, trim: true, lowercase: true },
+    filledBottlesApplied: { type: Number, required: true, default: 0, min: 0 },
+  },
+  { _id: false },
+);
+
 const BatchFillingPackingLineSchema = new mongoose.Schema(
   {
     productCode: { type: String, required: true, trim: true, lowercase: true },
@@ -20,6 +28,8 @@ const BatchFillingDailyEntrySchema = new mongoose.Schema(
     batchNo: { type: String, required: true, trim: true },
     entryDate: { type: String, required: true, trim: true }, // ISO date "YYYY-MM-DD"
     packingLines: { type: [BatchFillingPackingLineSchema], required: false, default: [] },
+    /** Filled-bottle counts already applied to packaging UIP for this entry (idempotent re-save). */
+    packagingUipApplied: { type: [PackagingUipAppliedSchema], required: false, default: [] },
     /** Derived from packingLines; old records may contain manually-entered liter values. */
     filledLitersToday: { type: Number, required: true, default: 0, min: 0 },
     readyToDeliverLiters: { type: Number, required: true, default: 0, min: 0 },

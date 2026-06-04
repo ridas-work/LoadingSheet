@@ -1,6 +1,17 @@
 import mongoose, { type InferSchemaType } from "mongoose";
 
-const REASONS = ["count", "received", "used", "adjustment", "other"] as const;
+/** `used` kept for legacy rows; new delivery deducts use `delivered`. */
+const REASONS = [
+  "count",
+  "purchase_adjust",
+  "rejected",
+  "filling",
+  "delivered",
+  "received",
+  "used",
+  "adjustment",
+  "other",
+] as const;
 
 const PackagingStockMovementSchema = new mongoose.Schema(
   {

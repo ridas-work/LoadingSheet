@@ -30,12 +30,21 @@ export default async function PackagingInventoryPage() {
         <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Packaging inventory</h1>
         <p className="mt-1 text-sm text-zinc-600">
           {canEdit
-            ? "Haider maintains packaging stock here. Type quantities in the table below; each row saves when you leave it."
+            ? "Haider records purchased stock and rejected/damaged units. Balance is calculated automatically."
             : "View packaging stock (read-only)."}
         </p>
-        <p className="mt-2 text-xs text-amber-800">
-          Delivered orders automatically deduct mapped bottles, caps, stickers, labels, and cartons.
+        <p className="mt-2 text-xs text-zinc-700">
+          <strong>Balance = Purchased − Rejected/Damage − UIP</strong> (Used in Production). Rashid&apos;s daily filling
+          adds empty bottles/caps to UIP. When Zaman marks an order delivered, stickers and cartons (and order bottles
+          per the loading sheet) add to UIP too.
         </p>
+        {canEdit ? (
+          <p className="mt-1 text-xs text-zinc-500">
+            <Link href="/dispatch/inventory/movements" className="underline hover:text-zinc-800">
+              Recent stock movements
+            </Link>
+          </p>
+        ) : null}
       </div>
 
       <PackagingInventoryGrid
