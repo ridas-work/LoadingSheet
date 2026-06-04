@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
-import { homePathForRole, isAdmin, roleFromSession } from "@/lib/roles";
+import { canAccessFieldVisits, homePathForRole, isAdmin, roleFromSession } from "@/lib/roles";
 
 import { LogoutButton } from "./logout-button";
 
@@ -14,8 +14,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const role = roleFromSession(session.user as { role?: string });
+  const username = (session.user as { username?: string })?.username;
   const homeHref = role ? homePathForRole(role) : "/new-order";
   const admin = isAdmin(role);
+  const fieldVisits = canAccessFieldVisits(role, username);
 
   return (
     <div className="min-h-dvh bg-zinc-50">
@@ -53,6 +55,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 <Link href="/dispatch/filling" className="text-sm text-zinc-600 hover:text-zinc-900">
                   Daily filling
                 </Link>
+                <Link href="/admin/field-visits" className="text-sm text-zinc-600 hover:text-zinc-900">
+                  Field visits
+                </Link>
               </>
             ) : null}
             {role === "gate_guard" ? (
@@ -86,6 +91,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {role === "po_creator" ? (
               <Link href="/new-order" className="text-sm text-zinc-600 hover:text-zinc-900">
                 New order
+              </Link>
+            ) : null}
+            {fieldVisits && !admin ? (
+              <Link href="/field-visits" className="text-sm text-zinc-600 hover:text-zinc-900">
+                Field visits
               </Link>
             ) : null}
           </div>

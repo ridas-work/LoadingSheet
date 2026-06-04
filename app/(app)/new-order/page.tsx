@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+
+import type { SerializedTicket } from "@/lib/fieldVisitTickets";
 
 import {
   CustomCartonBuilder,
   buildCustomCartonsPayload,
   emptyCartonDraft,
+  resolvedCustomRowProductName,
   type CustomCartonDraft,
 } from "@/components/CustomCartonBuilder";
 import {
@@ -29,9 +33,12 @@ type FieldErrors = Partial<
 type OrderKind = "standard" | "mixed_sample";
 
 export default function NewOrderPage() {
+  const searchParams = useSearchParams();
   const [poNumber, setPoNumber] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [city, setCity] = useState("");
+  const [visitTicketId, setVisitTicketId] = useState("");
+  const [visitTickets, setVisitTickets] = useState<SerializedTicket[]>([]);
   const [deadlineDate, setDeadlineDate] = useState("");
   const [orderKind, setOrderKind] = useState<OrderKind>("standard");
   const [mixedBoxCount, setMixedBoxCount] = useState("1");
@@ -45,6 +52,34 @@ export default function NewOrderPage() {
   const [catalogLoading, setCatalogLoading] = useState(true);
   const customerRef = useRef<HTMLInputElement | null>(null);
   const firstGridInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    const qVisit = searchParams.get("visitTicketId") ?? "";
+    const qCustomer = searchParams.get("customerName") ?? "";
+    const qCity = searchParams.get("city") ?? "";
+    if (qVisit) setVisitTicketId(qVisit);
+    if (qCustomer) setCustomerName(decodeURIComponent(qCustomer));
+    if (qCity) setCity(decodeURIComponent(qCity));
+  }, [searchParams]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/field-visits", { credentials: "same-origin" });
+        if (res.ok) {
+          const data = (await res.json()) as { tickets?: SerializedTicket[] };
+          const awaiting = (data.tickets ?? []).filter((t) => t.status === "visit_concluded");
+          if (!cancelled) setVisitTickets(awaiting);
+        }
+      } catch {
+        if (!cancelled) setVisitTickets([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -101,7 +136,10 @@ export default function NewOrderPage() {
 
   const isMixed = orderKind === "mixed_sample";
 
-  const customCartonPayload = useMemo(() => buildCustomCartonsPayload(customCartons), [customCartons]);
+  const customCartonPayload = useMemo(
+    () => buildCustomCartonsPayload(customCartons, catalog),
+    [catalog, customCartons],
+  );
 
   const canSubmit = useMemo(() => {
     if (!poNumber.trim() || !customerName.trim()) return false;
@@ -180,7 +218,7 @@ export default function NewOrderPage() {
     if (validCount === 0) {
       if (isMixed) {
         next.items = "Enter bottles for at least one product in the mixed box.";
-      } else if (buildCustomCartonsPayload(customCartons).length === 0) {
+      } else if (buildCustomCartonsPayload(customCartons, catalog).length === 0) {
         next.items = "Enter cartons for at least one product, or add a custom carton.";
       }
     }
@@ -193,7 +231,7 @@ export default function NewOrderPage() {
         }
         let any = false;
         c.rows.forEach((r, ri) => {
-          const pn = r.productName.trim();
+          const pn = resolvedCustomRowProductName(r, catalog);
           const b = Number(r.bottles);
           if (!pn && !r.bottles.trim()) return;
           if (!pn) next[`customCartons.${ci}.rows.${ri}.productName`] = "Product name is required.";
@@ -322,13 +360,9 @@ export default function NewOrderPage() {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(
-          isMixed
+        body: JSON.stringify({
+          ...(isMixed
             ? {
-                poNumber: poNumber.trim(),
-                customerName: customerName.trim(),
-                city: city.trim(),
-                deadlineDate: deadlineDate.trim() || undefined,
                 orderKind: "mixed_sample",
                 mixedSample: {
                   boxCount: Number(mixedBoxCount),
@@ -336,15 +370,16 @@ export default function NewOrderPage() {
                 },
               }
             : {
-                poNumber: poNumber.trim(),
-                customerName: customerName.trim(),
-                city: city.trim(),
-                deadlineDate: deadlineDate.trim() || undefined,
                 orderKind: "standard",
                 items: buildSubmitItems(),
-                customCartons: buildCustomCartonsPayload(customCartons),
-              },
-        ),
+                customCartons: buildCustomCartonsPayload(customCartons, catalog),
+              }),
+          poNumber: poNumber.trim(),
+          customerName: customerName.trim(),
+          city: city.trim(),
+          deadlineDate: deadlineDate.trim() || undefined,
+          ...(visitTicketId.trim() ? { visitTicketId: visitTicketId.trim() } : {}),
+        }),
       });
 
       if (res.status === 401) {
@@ -352,7 +387,12 @@ export default function NewOrderPage() {
         return;
       }
 
-      const data = (await res.json().catch(() => null)) as { id?: string; errors?: Record<string, string> } | null;
+      const data = (await res.json().catch(() => null)) as {
+        id?: string;
+        errors?: Record<string, string>;
+        visitTicketClosed?: boolean;
+        pointsAwarded?: number;
+      } | null;
 
       if (!res.ok) {
         if (data?.errors && typeof data.errors === "object") {
@@ -364,6 +404,7 @@ export default function NewOrderPage() {
       }
 
       setSuccessId(String(data?.id ?? ""));
+      setVisitTicketId("");
       setPoNumber("");
       setCustomerName("");
       setCity("");
@@ -423,6 +464,41 @@ export default function NewOrderPage() {
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+        {visitTickets.length > 0 ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <label className="block text-sm font-medium text-emerald-950" htmlFor="visitTicket">
+              Link to field visit (optional)
+            </label>
+            <p className="mt-0.5 text-xs text-emerald-800">
+              Concluded visits only — saving the PO closes the ticket with +10 points.
+            </p>
+            <select
+              id="visitTicket"
+              value={visitTicketId}
+              onChange={(e) => {
+                const id = e.target.value;
+                setVisitTicketId(id);
+                const t = visitTickets.find((v) => v.id === id);
+                if (t) {
+                  setCustomerName(t.customerName);
+                  setCity(t.city);
+                }
+              }}
+              className="mt-2 w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
+            >
+              <option value="">— No visit link —</option>
+              {visitTickets.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.placeName} — {t.customerName}
+                  {t.city ? ` (${t.city})` : ""}
+                </option>
+              ))}
+            </select>
+            {errors.visitTicketId ? (
+              <p className="mt-1 text-sm text-red-700">{errors.visitTicketId}</p>
+            ) : null}
+          </div>
+        ) : null}
         <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
           <div className="text-sm font-medium text-zinc-900">Order type</div>
           <div className="mt-2 flex flex-wrap gap-4">
@@ -527,6 +603,7 @@ export default function NewOrderPage() {
             cartons={customCartons}
             onChange={setCustomCartons}
             disabled={submitting}
+            catalogProducts={catalog}
           />
         ) : null}
 
