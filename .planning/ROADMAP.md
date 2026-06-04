@@ -124,6 +124,14 @@ Executable plans:
 - `.planning/phases/24-field-visit-sample-tickets/02-PLAN.md` — `/field-visits` UI for Nouman/Javeria, new-order prefill/link
 - `.planning/phases/24-field-visit-sample-tickets/03-PLAN.md` — admin read-only visit list + rep points, README
 
+## Phase 25: Packaging quantity balance — purchased, UIP, delivered — **complete**
+**Haider** records **purchased** packaging and **rejected/damaged** on his inventory portal; **balance** = purchased − rejected − **UIP** (Used In Production). **Rashid** daily filling automatically moves **filled bottles** (and caps) into UIP. When **Zaman** marks an order **Delivered**, **bottles, stickers, and cartons** from that PO’s loading sheet increase UIP so remaining stock is the true balance.
+
+Executable plans:
+- `.planning/phases/25-packaging-quantity-balance/01-PLAN.md` — Haider ledger: purchased + rejected only; UIP/balance read-only
+- `.planning/phases/25-packaging-quantity-balance/02-PLAN.md` — Rashid filling → auto UIP (delta, idempotent)
+- `.planning/phases/25-packaging-quantity-balance/03-PLAN.md` — Zaman delivered deduct, movements audit, README
+
 ## Phase 20: Nimra add catalog product ✓
 **Nimra** can register **new sellable packings** (product name, code, batch family, bottles per carton, liters per bottle) from the production portal when the factory prepares a SKU not yet in the master list — so new-order and batch registry stay in sync without a developer-only seed step.
 

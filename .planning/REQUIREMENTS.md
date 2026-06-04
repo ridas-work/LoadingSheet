@@ -573,3 +573,28 @@ Executable plans:
 - `.planning/phases/24-field-visit-sample-tickets/02-PLAN.md`
 - `.planning/phases/24-field-visit-sample-tickets/03-PLAN.md`
 
+---
+
+## Phase 25 (Packaging quantity balance) — **complete**
+
+### Problem
+
+Haider maintains packaging SKUs, but stock is not tied to factory usage: Rashid fills bottles and Zaman ships orders without a single **check-and-balance** ledger.
+
+### Solution (v1)
+
+**Ledger:** `Balance = Purchased − Rejected/Damage − UIP`
+
+| Role | Action |
+|------|--------|
+| **Haider** | Enter **purchased** qty and **rejected/damaged**; view UIP and balance (read-only) |
+| **Rashid** | Saving **filled bottles today** → auto-increment **UIP** on mapped bottle/cap SKUs (delta per save) |
+| **Zaman** | **Delivered** on a PO → auto-increment **UIP** for order packaging (bottles, stickers, cartons per sheet); idempotent |
+
+Audit via `PackagingStockMovement` (`filling`, `delivered`, `purchase_adjust`, `rejected`).
+
+Executable plans:
+- `.planning/phases/25-packaging-quantity-balance/01-PLAN.md`
+- `.planning/phases/25-packaging-quantity-balance/02-PLAN.md`
+- `.planning/phases/25-packaging-quantity-balance/03-PLAN.md`
+
