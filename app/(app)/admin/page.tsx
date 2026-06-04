@@ -41,6 +41,12 @@ export default function AdminPage() {
           >
             Daily bottle filling &amp; waste
           </Link>
+          <Link
+            href="/admin/field-visits"
+            className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
+          >
+            Field visits (Nouman &amp; Javeria)
+          </Link>
         </div>
       </div>
       <AdminSummaryDashboard />
