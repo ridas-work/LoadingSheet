@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import mongoose from "mongoose";
 
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
+import { closeTicketWon, isFieldVisitRep } from "@/lib/fieldVisitTickets";
+import { FieldVisitTicket } from "@/lib/models/FieldVisitTicket";
 import { Order } from "@/lib/models/Order";
 import { parseOrderBody, type OrderBody } from "@/lib/orderPayload";
 import { roleFromSession } from "@/lib/roles";
@@ -65,8 +68,54 @@ export async function POST(req: Request) {
   }
 
   const { payload } = parsed;
+  const username = (session.user as { username?: string })?.username;
 
   await connectToDatabase();
+
+  let visitTicket = null;
+  if (payload.visitTicketId) {
+    if (!isFieldVisitRep(username)) {
+      return NextResponse.json(
+        { errors: { visitTicketId: "Only field reps can link a visit ticket." } },
+        { status: 403 },
+      );
+    }
+    if (!mongoose.Types.ObjectId.isValid(payload.visitTicketId)) {
+      return NextResponse.json(
+        { errors: { visitTicketId: "Invalid visit ticket id." } },
+        { status: 400 },
+      );
+    }
+    visitTicket = await FieldVisitTicket.findById(payload.visitTicketId);
+    if (!visitTicket) {
+      return NextResponse.json(
+        { errors: { visitTicketId: "Visit ticket not found." } },
+        { status: 400 },
+      );
+    }
+    if (visitTicket.createdByUserId.toString() !== userId) {
+      return NextResponse.json(
+        { errors: { visitTicketId: "You can only link your own visit tickets." } },
+        { status: 403 },
+      );
+    }
+    if (visitTicket.status !== "visit_concluded") {
+      return NextResponse.json(
+        {
+          errors: {
+            visitTicketId: "Visit must be concluded before creating a PO from it.",
+          },
+        },
+        { status: 400 },
+      );
+    }
+    if (visitTicket.linkedOrderId) {
+      return NextResponse.json(
+        { errors: { visitTicketId: "This visit ticket is already linked to an order." } },
+        { status: 400 },
+      );
+    }
+  }
 
   const created = await Order.create({
     poNumber: payload.poNumber,
@@ -82,5 +131,28 @@ export async function POST(req: Request) {
     createdByName: session.user.name ?? "",
   });
 
-  return NextResponse.json({ id: created._id.toString() }, { status: 200 });
+  if (visitTicket) {
+    try {
+      await closeTicketWon(visitTicket, created._id, payload.poNumber);
+    } catch (e) {
+      await Order.findByIdAndDelete(created._id);
+      return NextResponse.json(
+        {
+          errors: {
+            visitTicketId: e instanceof Error ? e.message : "Could not link visit ticket.",
+          },
+        },
+        { status: 400 },
+      );
+    }
+  }
+
+  return NextResponse.json(
+    {
+      id: created._id.toString(),
+      visitTicketClosed: visitTicket ? true : undefined,
+      pointsAwarded: visitTicket?.pointsAwarded,
+    },
+    { status: 200 },
+  );
 }

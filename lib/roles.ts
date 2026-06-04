@@ -46,6 +46,14 @@ export function canCreateOrders(role: AppRole | null): boolean {
   return role === "po_creator";
 }
 
+/** Nouman & Javeria — field visit / sample ticket workflow. */
+export function canAccessFieldVisits(role: AppRole | null, username: string | undefined | null): boolean {
+  if (role === "admin") return true;
+  if (role !== "po_creator") return false;
+  const u = username?.toLowerCase().trim() ?? "";
+  return u === "nouman" || u === "javeria";
+}
+
 export function canEditProductionBatches(role: AppRole | null): boolean {
   return role === "batch_editor";
 }

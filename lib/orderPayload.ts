@@ -13,6 +13,8 @@ export type OrderBody = {
   customCartons?: unknown;
   productName?: unknown;
   bottles?: unknown;
+  /** Field visit ticket to close as won when this PO is created (Nouman/Javeria). */
+  visitTicketId?: unknown;
 };
 
 export type ParsedOrderItem = OrderItemInput;
@@ -28,6 +30,7 @@ export type ParsedOrderPayload = {
   /** Multi-product cartons alongside standard lines; empty unless hybrid (or unused). */
   customCartons: CustomCartonDef[];
   sheetLines: SheetLine[];
+  visitTicketId: string | null;
 };
 
 export type { CustomCartonDef };
@@ -170,6 +173,16 @@ export function parseOrderBody(
   const poNumber = String(body.poNumber ?? "").trim();
   const customerName = String(body.customerName ?? "").trim();
 
+  let visitTicketId: string | null = null;
+  if (body.visitTicketId !== undefined && body.visitTicketId !== null && body.visitTicketId !== "") {
+    const raw = String(body.visitTicketId).trim();
+    if (!/^[a-f0-9]{24}$/i.test(raw)) {
+      errors.visitTicketId = "Invalid visit ticket id.";
+    } else {
+      visitTicketId = raw;
+    }
+  }
+
   if (orderKindInput === "mixed_sample") {
     const mixed = parseMixedSample(body as Record<string, unknown>);
     if (!mixed.ok) {
@@ -194,6 +207,7 @@ export function parseOrderBody(
         mixedSample: { boxCount: mixed.boxCount, contents: mixed.contents },
         customCartons: [],
         sheetLines,
+        visitTicketId,
       },
     };
   }
@@ -264,6 +278,7 @@ export function parseOrderBody(
       mixedSample: null,
       customCartons,
       sheetLines,
+      visitTicketId,
     },
   };
 }
