@@ -55,5 +55,10 @@
   { "code": "brighten-bottles-3ltr", "name": "BRIGHTEN BOTTLES 3 LTR", "category": "bottle", "sortOrder": 54, "linkedProductCode": "brighten-liquid-laundry-detergent", "deductAs": "bottle" },
   { "code": "brighten-bottles-5ltr", "name": "BRIGHTEN BOTTLES 5 LTR", "category": "bottle", "sortOrder": 55, "linkedProductCode": "brighten-liquid-laundry-detergent", "deductAs": "bottle" },
   { "code": "ph-stickers-power-wash", "name": "PH STICKERS POWER WASH", "category": "sticker", "sortOrder": 56, "linkedProductCode": "power-wash", "deductAs": "sticker" },
-  { "code": "packing-tape-packing-machine", "name": "packing TAPE packing machine", "category": "other", "sortOrder": 56 }
+  { "code": "packing-tape-packing-machine", "name": "packing TAPE packing machine", "category": "other", "sortOrder": 56 },
+  { "code": "custom-box-5l-jar", "name": "CUSTOM BOX 5 LITRE JAR", "category": "box", "sortOrder": 60, "deductAs": "box", "customCartonBox": true },
+  { "code": "custom-box-1l", "name": "CUSTOM BOX 1 LITRE", "category": "box", "sortOrder": 61, "deductAs": "box", "customCartonBox": true },
+  { "code": "custom-box-500ml", "name": "CUSTOM BOX 500 ML", "category": "box", "sortOrder": 62, "deductAs": "box", "customCartonBox": true },
+  { "code": "custom-box-250ml", "name": "CUSTOM BOX 250 ML", "category": "box", "sortOrder": 63, "deductAs": "box", "customCartonBox": true },
+  { "code": "custom-box-100ml", "name": "CUSTOM BOX 100 ML", "category": "box", "sortOrder": 64, "deductAs": "box", "customCartonBox": true }
 ]

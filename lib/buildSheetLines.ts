@@ -12,9 +12,11 @@ export type SheetLine = {
   bottlesPerBox: number;
   batchNo: string;
   weight: number | null;
+  cartonWeightKg?: number | null;
   lineKind?: "standard" | "mixed_sample";
   mixedContents?: Array<{ productName: string; bottles: number }>;
   componentBatches?: Array<{ productName: string; batchNo: string }>;
+  customBoxCode?: string;
 };
 
 export function buildSheetLines(items: OrderItemInput[]): SheetLine[] {

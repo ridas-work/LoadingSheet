@@ -15,7 +15,8 @@ export function serializeProductionBatch(b: {
   solids?: string | null;
   appearance?: string | null;
   provider?: string | null;
-  drum?: string | null;
+  hcl?: string | null;
+  viscosity?: string | null;
   quantity?: string | null;
   notes?: string | null;
   createdByName?: string | null;
@@ -36,7 +37,8 @@ export function serializeProductionBatch(b: {
     solids: b.solids ?? "",
     appearance: b.appearance ?? "",
     provider: b.provider ?? "",
-    drum: b.drum ?? "",
+    hcl: b.hcl ?? "",
+    viscosity: b.viscosity ?? "",
     quantity: b.quantity ?? "",
     notes: b.notes ?? "",
     createdByName: b.createdByName ?? "",
@@ -74,7 +76,8 @@ export function parseQcBody(body: Record<string, unknown>, requireAll: boolean) 
     solids: trimQcField(body.solids),
     appearance: trimQcField(body.appearance),
     provider: trimQcField(body.provider),
-    drum: trimQcField(body.drum),
+    hcl: trimQcField(body.hcl),
+    viscosity: trimQcField(body.viscosity),
     quantity: trimQcField(body.quantity),
   };
 
@@ -85,7 +88,7 @@ export function parseQcBody(body: Record<string, unknown>, requireAll: boolean) 
   if (!fields.solids) missing.push("solids");
   if (!fields.appearance) missing.push("appearance");
   if (!fields.provider) missing.push("provider");
-  if (!fields.drum) missing.push("drum");
+  if (!fields.hcl) missing.push("HCL");
   if (!fields.quantity) missing.push("quantity");
 
   if (missing.length > 0) {

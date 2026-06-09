@@ -6,6 +6,12 @@ import { DispatchTripForm } from "@/components/DispatchTripForm";
 import type { PickerOrder } from "@/components/DispatchTripOrderPicker";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
+import {
+  GATE_STATUS_LABELS,
+  isRashidActiveGateStatus,
+  normalizeGateStatus,
+  rashidActiveOrdersMongoFilter,
+} from "@/lib/gateDelivery";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
 import { batchProgress } from "@/lib/orderBatchStatus";
@@ -56,13 +62,19 @@ export default async function DispatchTripDetailPage(props: PageProps) {
   const trip = await DispatchTrip.findById(id).lean();
   if (!trip) notFound();
 
+  const tripOrderIds = trip.orderIds ?? [];
+  const pickerQuery =
+    tripOrderIds.length > 0
+      ? { $or: [rashidActiveOrdersMongoFilter(), { _id: { $in: tripOrderIds } }] }
+      : rashidActiveOrdersMongoFilter();
+
   const [orderDocs, linkedOrders] = await Promise.all([
-    Order.find({})
+    Order.find(pickerQuery)
       .sort({ createdAt: -1 })
       .select({ poNumber: 1, customerName: 1, dispatchTripId: 1 })
       .lean(),
-    Order.find({ _id: { $in: trip.orderIds ?? [] } })
-      .select({ poNumber: 1, customerName: 1, sheetLines: 1 })
+    Order.find({ _id: { $in: tripOrderIds } })
+      .select({ poNumber: 1, customerName: 1, sheetLines: 1, gateDeliveryStatus: 1 })
       .lean(),
   ]);
 
@@ -104,6 +116,8 @@ export default async function DispatchTripDetailPage(props: PageProps) {
             {linkedOrders.map((o) => {
               const oid = o._id.toString();
               const { filled, total, complete } = batchProgress(o.sheetLines);
+              const gateStatus = normalizeGateStatus(o.gateDeliveryStatus);
+              const rashidActive = isRashidActiveGateStatus(gateStatus);
               return (
                 <li
                   key={oid}
@@ -119,19 +133,24 @@ export default async function DispatchTripDetailPage(props: PageProps) {
                         : total > 0
                           ? `${filled}/${total} batches assigned`
                           : "No carton rows"}
+                      {!rashidActive ? ` · ${GATE_STATUS_LABELS[gateStatus]}` : ""}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {canEdit && !complete ? (
+                    {canEdit && rashidActive && !complete ? (
                       <Link
                         href={`/orders/${oid}/loading-sheet?dispatch=1`}
                         className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white"
                       >
                         Assign batches
                       </Link>
-                    ) : canEdit && complete ? (
+                    ) : canEdit && rashidActive && complete ? (
                       <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
                         Batches assigned
+                      </span>
+                    ) : !rashidActive ? (
+                      <span className="rounded-lg bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200">
+                        {GATE_STATUS_LABELS[gateStatus]}
                       </span>
                     ) : null}
                     <Link

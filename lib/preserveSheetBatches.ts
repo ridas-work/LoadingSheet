@@ -16,7 +16,7 @@ function lineKey(line: LineWithBatches): string {
   return `std:${line.boxNo}:${line.productName.trim().toLowerCase()}:${line.bottlesPerBox}`;
 }
 
-/** Copy batchNo, componentBatches, and weight from old lines when row identity matches. */
+/** Copy batchNo, componentBatches, weight, and cartonWeightKg from old lines when row identity matches. */
 export function preserveSheetBatches(
   oldLines: LineWithBatches[],
   newLines: SheetLine[],
@@ -37,6 +37,7 @@ export function preserveSheetBatches(
           ? prev.componentBatches
           : line.componentBatches,
       weight: prev.weight ?? line.weight,
+      cartonWeightKg: prev.cartonWeightKg ?? line.cartonWeightKg,
     };
   });
 }

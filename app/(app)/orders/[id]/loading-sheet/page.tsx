@@ -10,7 +10,10 @@ import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
-import { isBatchAssignmentLocked } from "@/lib/orderBatchStatus";
+import { bottlesPerProductFromSheetLines } from "@/lib/bottlesFromSheetLines";
+import { isBatchAssignmentLocked, readyAllocationForOrder } from "@/lib/orderBatchStatus";
+import { getReadyStockMap, listBatchLots } from "@/lib/readyBottleLedger";
+import type { DeductionPacking, DeductionSheetLine } from "@/lib/packagingDeduction";
 import { roleFromSession, EMPTY_DISPATCH, type DispatchFields } from "@/lib/roles";
 
 type PageProps = {
@@ -64,6 +67,8 @@ function normalizeSheetLines(order: {
         batchNo: c.batchNo ?? "",
       })),
       weight: row.weight ?? null,
+      cartonWeightKg:
+        (row as { cartonWeightKg?: number | null }).cartonWeightKg ?? null,
     };
   });
 }
@@ -91,8 +96,35 @@ export default async function LoadingSheetPage(props: PageProps) {
   if (!order) notFound();
 
   const catalog = packingCatalogFromDocs(catalogDocs);
-  const batchesLocked = isBatchAssignmentLocked(order.sheetLines, catalog);
-  const initialDispatchEditMode = canEditDispatch && dispatchParam === "1" && !batchesLocked;
+  const sheetLines = normalizeSheetLines(order as Parameters<typeof normalizeSheetLines>[0]);
+  const catalogDeduction: DeductionPacking[] = catalog.map((p) => ({
+    code: p.code,
+    name: p.name,
+    bottlesPerCarton: p.bottlesPerCarton,
+    aliases: p.aliases,
+    batchFamily: p.batchFamily,
+    bundleComponents: p.bundleComponents,
+  }));
+  const [readyStockMap, readyBatchLots] = await Promise.all([getReadyStockMap(), listBatchLots()]);
+  const readyByBox = readyAllocationForOrder(
+    sheetLines,
+    catalogDeduction,
+    readyStockMap,
+    readyBatchLots.map((l) => ({
+      batchNo: l.batchNo,
+      productCode: l.productCode,
+      bottles: l.bottles,
+      createdAt: l.createdAt,
+    })),
+  );
+  const batchesLocked = isBatchAssignmentLocked(order.sheetLines, catalog, readyByBox);
+  const weightsVerifiedEarly = Boolean(
+    (order as { weightsVerifiedAt?: Date | null }).weightsVerifiedAt,
+  );
+  const initialDispatchEditMode =
+    canEditDispatch &&
+    dispatchParam === "1" &&
+    (!batchesLocked || !weightsVerifiedEarly);
 
   const catalogForUsage: CatalogProduct[] = catalog.map((p) => ({
     name: p.name,
@@ -113,7 +145,10 @@ export default async function LoadingSheetPage(props: PageProps) {
     usedLitersElsewhere[key] = liters;
   }
 
-  const sheetLines = normalizeSheetLines(order as Parameters<typeof normalizeSheetLines>[0]);
+  const { needs: readyStockNeeds } = bottlesPerProductFromSheetLines(
+    sheetLines as DeductionSheetLine[],
+    catalogDeduction,
+  );
   const created = order.createdAt ? new Date(order.createdAt).toISOString().slice(0, 10) : "";
   const backHref = role === "batch_editor" ? "/production/batches" : "/orders";
 
@@ -132,6 +167,15 @@ export default async function LoadingSheetPage(props: PageProps) {
   const dispatchTripIdRaw = (order as { dispatchTripId?: { toString(): string } | null }).dispatchTripId;
   const dispatchTripId = dispatchTripIdRaw ? dispatchTripIdRaw.toString() : null;
   const dispatchTripHref = dispatchTripId ? `/dispatch/trips/${dispatchTripId}` : null;
+  const weightsVerified = Boolean(
+    (order as { weightsVerifiedAt?: Date | null }).weightsVerifiedAt,
+  );
+  const dispatchReadyForGate = Boolean(
+    dispatchTripId &&
+      initialDispatch.vehicleNo.trim() &&
+      initialDispatch.driverName.trim() &&
+      initialDispatch.dcNo.trim(),
+  );
 
   return (
     <LoadingSheetBatchEditor
@@ -150,6 +194,9 @@ export default async function LoadingSheetPage(props: PageProps) {
       dispatchTripId={dispatchTripId}
       dispatchTripHref={dispatchTripHref}
       batchesLocked={batchesLocked}
+      readyStockNeeds={readyStockNeeds}
+      weightsVerified={weightsVerified}
+      dispatchReadyForGate={dispatchReadyForGate}
     />
   );
 }

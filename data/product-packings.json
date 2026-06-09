@@ -11,7 +11,7 @@
   { "code": "rhino-250ml", "name": "Rhino 250ml", "summaryLabel": "RHINO 250", "batchFamily": "Rhino", "bottlesPerCarton": 20, "litersPerBottle": 0.25 },
   { "code": "rhino-500ml", "name": "Rhino 500ml", "summaryLabel": "RHINO 500", "batchFamily": "Rhino", "bottlesPerCarton": 30, "litersPerBottle": 0.5 },
   { "code": "rhino-750ml", "name": "Rhino 750ml", "summaryLabel": "RHINO 750", "batchFamily": "Rhino", "bottlesPerCarton": 10, "litersPerBottle": 0.75 },
-  { "code": "rhino-2x2-750ml", "name": "Rhino 2x2 750ml", "summaryLabel": "RHINO SET 2x2", "batchFamily": "Rhino", "bottlesPerCarton": 5, "litersPerBottle": 0.75 },
+  { "code": "rhino-2x2-750ml", "name": "Rhino 2x2 750ml", "summaryLabel": "RHINO SET 2x2", "bottlesPerCarton": 5, "litersPerBottle": 0.75, "bundleComponents": [{ "code": "rhino-750ml", "bottlesPerUnit": 2 }] },
   { "code": "hand-sanitizer-500ml", "name": "Hand Sanitizer 500ml", "summaryLabel": "HAND SAN 500", "batchFamily": "Hand Sanitizer", "bottlesPerCarton": 20, "litersPerBottle": 0.5 },
   { "code": "titan", "name": "Titan Stain Remover", "summaryLabel": "TITAN", "batchFamily": "Titan", "bottlesPerCarton": 8, "litersPerBottle": 1 },
   { "code": "washout-floral", "name": "Washout Multi-surface Disinfectant Floral Red", "summaryLabel": "WASHOUT FLORAL", "batchFamily": "Washout Floral Red", "bottlesPerCarton": 10, "litersPerBottle": 1 },

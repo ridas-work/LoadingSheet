@@ -8,6 +8,14 @@ const PackagingUipAppliedSchema = new mongoose.Schema(
   { _id: false },
 );
 
+const ReadyLedgerAppliedSchema = new mongoose.Schema(
+  {
+    productCode: { type: String, required: true, trim: true, lowercase: true },
+    readyBottlesApplied: { type: Number, required: true, default: 0, min: 0 },
+  },
+  { _id: false },
+);
+
 const BatchFillingPackingLineSchema = new mongoose.Schema(
   {
     productCode: { type: String, required: true, trim: true, lowercase: true },
@@ -30,6 +38,8 @@ const BatchFillingDailyEntrySchema = new mongoose.Schema(
     packingLines: { type: [BatchFillingPackingLineSchema], required: false, default: [] },
     /** Filled-bottle counts already applied to packaging UIP for this entry (idempotent re-save). */
     packagingUipApplied: { type: [PackagingUipAppliedSchema], required: false, default: [] },
+    /** Ready-bottle counts already applied to ready stock ledger (idempotent re-save). */
+    readyLedgerApplied: { type: [ReadyLedgerAppliedSchema], required: false, default: [] },
     /** Derived from packingLines; old records may contain manually-entered liter values. */
     filledLitersToday: { type: Number, required: true, default: 0, min: 0 },
     readyToDeliverLiters: { type: Number, required: true, default: 0, min: 0 },

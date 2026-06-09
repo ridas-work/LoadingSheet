@@ -38,6 +38,8 @@ const PackagingItemSchema = new mongoose.Schema(
     linkedBatchFamily: { type: String, required: false, default: "", trim: true, lowercase: true },
     deductAs: { type: String, required: false, enum: DEDUCT_AS, default: "other" },
     active: { type: Boolean, required: false, default: true },
+    /** Size-based outer box for hybrid custom cartons (not linked to one product). */
+    customCartonBox: { type: Boolean, required: false, default: false },
   },
   { timestamps: { createdAt: true, updatedAt: true } },
 );

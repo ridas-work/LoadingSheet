@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
+import { isOrderLockedAfterDelivery, normalizeGateStatus } from "@/lib/gateDelivery";
 import { parseOrderBody, type OrderBody } from "@/lib/orderPayload";
 import { preserveSheetBatches } from "@/lib/preserveSheetBatches";
 import { canEditOrders, roleFromSession } from "@/lib/roles";
@@ -53,6 +54,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const existing = await Order.findById(id);
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  if (isOrderLockedAfterDelivery(normalizeGateStatus(existing.gateDeliveryStatus))) {
+    return NextResponse.json(
+      { error: "This order was delivered and cannot be edited." },
+      { status: 403 },
+    );
   }
 
   const { payload } = parsed;

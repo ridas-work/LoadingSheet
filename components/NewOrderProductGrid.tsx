@@ -2,6 +2,8 @@
 
 import { useMemo, type RefObject } from "react";
 
+import { previewCartonsFromBottles } from "@/lib/poBottleEntry";
+
 export type CatalogProduct = {
   code: string;
   name: string;
@@ -62,7 +64,7 @@ export function otherRowIsActive(row: OtherRow): boolean {
   return Boolean(row.productName.trim()) && Number.isInteger(n) && n >= 1;
 }
 
-export type GridEntryMode = "cartons" | "bottles";
+export type GridEntryMode = "cartons" | "bottles" | "standard_bottles";
 
 type Props = {
   catalog: CatalogProduct[];
@@ -101,25 +103,37 @@ export function NewOrderProductGrid({
   onAddOther,
   onRemoveOther,
 }: Props) {
-  const isBottles = mode === "bottles";
+  const isMixedBottles = mode === "bottles";
+  const isStandardBottles = mode === "standard_bottles";
 
   const summary = useMemo(() => {
     let productCount = 0;
     let totalQty = 0;
+    let totalCartons = 0;
     for (const p of catalog) {
       const row = state[p.code];
       if (!row) continue;
       if (!rowIsActive(row)) continue;
       productCount += 1;
-      totalQty += Number(row.cartons);
+      const bottles = Number(row.cartons);
+      totalQty += bottles;
+      if (isStandardBottles) {
+        const bpc = row.useDefaultPacking ? p.bottlesPerCarton : Number(row.bottlesPerBox);
+        const c = previewCartonsFromBottles(row.cartons, bpc);
+        if (c !== null) totalCartons += c;
+      }
     }
     for (const r of otherRows) {
       if (!otherRowIsActive(r)) continue;
       productCount += 1;
       totalQty += Number(r.cartons);
+      if (isStandardBottles) {
+        const c = previewCartonsFromBottles(r.cartons, Number(r.bottlesPerBox));
+        if (c !== null) totalCartons += c;
+      }
     }
-    return { productCount, totalQty };
-  }, [catalog, otherRows, state]);
+    return { productCount, totalQty, totalCartons };
+  }, [catalog, isStandardBottles, otherRows, state]);
 
   return (
     <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
@@ -129,9 +143,11 @@ export function NewOrderProductGrid({
           <div className="mt-0.5 text-xs text-zinc-600">
             {catalogLoading
               ? "Loading catalog…"
-              : isBottles
+              : isMixedBottles
                 ? "Enter bottles per product for one mixed sample box. Leave the rest blank."
-                : "Enter cartons next to each product you want on this order. Leave the rest blank."}
+                : isStandardBottles
+                  ? "Enter total bottles per product. Full cartons are calculated automatically (e.g. 30 bottles Rhino 500ml = 1 carton). Odd counts — use Add custom carton."
+                  : "Enter cartons next to each product you want on this order. Leave the rest blank."}
           </div>
         </div>
         <div className="text-right text-xs text-zinc-600">
@@ -141,7 +157,11 @@ export function NewOrderProductGrid({
           </div>
           <div>
             <span className="font-semibold text-zinc-900">{summary.totalQty}</span>{" "}
-            {isBottles ? "bottles in mix" : "cartons total"}
+            {isMixedBottles
+              ? "bottles in mix"
+              : isStandardBottles
+                ? `bottles · ${summary.totalCartons} carton${summary.totalCartons === 1 ? "" : "s"}`
+                : "cartons total"}
           </div>
         </div>
       </div>
@@ -154,13 +174,19 @@ export function NewOrderProductGrid({
             <tr className="border-b border-zinc-200 bg-zinc-50 text-left">
               <th className="min-w-[16rem] px-3 py-2 font-medium text-zinc-700">Product</th>
               <th className="w-28 px-3 py-2 text-center font-medium text-zinc-700">
-                {isBottles ? "Bottles" : "Cartons"}
+                {isMixedBottles || isStandardBottles ? "Bottles" : "Cartons"}
               </th>
-              {!isBottles ? (
+              {isStandardBottles ? (
+                <th className="w-24 px-3 py-2 text-center font-medium text-zinc-700">Cartons</th>
+              ) : null}
+              {!isMixedBottles && !isStandardBottles ? (
                 <>
                   <th className="w-32 px-3 py-2 text-center font-medium text-zinc-700">Bottles / carton</th>
                   <th className="w-32 px-3 py-2 font-medium text-zinc-700" />
                 </>
+              ) : null}
+              {isStandardBottles ? (
+                <th className="w-32 px-3 py-2 font-medium text-zinc-700" />
               ) : null}
             </tr>
           </thead>
@@ -181,14 +207,15 @@ export function NewOrderProductGrid({
                 >
                   <td className="px-3 py-2">
                     <div className="font-medium text-zinc-900">{p.name}</div>
-                    {!isBottles ? (
+                    {isStandardBottles || !isMixedBottles ? (
                       <div className="mt-0.5 text-[11px] text-zinc-500">
-                        Default {p.bottlesPerCarton} bottles / carton
+                        {p.bottlesPerCarton} bottles / carton
                       </div>
                     ) : null}
                   </td>
                   <td className="px-3 py-2 text-center">
                     <input
+                      id={`grid-${p.code}-cartons`}
                       ref={idx === 0 ? firstInputRef : undefined}
                       inputMode="numeric"
                       value={row.cartons}
@@ -204,9 +231,32 @@ export function NewOrderProductGrid({
                     />
                     {cartonsErr ? (
                       <p className="mt-1 text-[11px] text-red-700">{cartonsErr}</p>
+                    ) : isStandardBottles && active ? (
+                      (() => {
+                        const bpc = row.useDefaultPacking
+                          ? p.bottlesPerCarton
+                          : Number(row.bottlesPerBox);
+                        const valid = previewCartonsFromBottles(row.cartons, bpc) !== null;
+                        return valid ? null : (
+                          <p className="mt-1 text-[11px] text-amber-800">
+                            Not a full carton — fix count or use custom carton
+                          </p>
+                        );
+                      })()
                     ) : null}
                   </td>
-                  {!isBottles ? (
+                  {isStandardBottles ? (
+                    <td className="px-3 py-2 text-center tabular-nums text-sm font-medium text-zinc-800">
+                      {(() => {
+                        const bpc = row.useDefaultPacking
+                          ? p.bottlesPerCarton
+                          : Number(row.bottlesPerBox);
+                        const c = previewCartonsFromBottles(row.cartons, bpc);
+                        return c !== null ? c : row.cartons.trim() ? "—" : "";
+                      })()}
+                    </td>
+                  ) : null}
+                  {!isMixedBottles && !isStandardBottles ? (
                     <>
                       <td className="px-3 py-2 text-center">
                         <input
@@ -232,6 +282,32 @@ export function NewOrderProductGrid({
                         </label>
                       </td>
                     </>
+                  ) : null}
+                  {isStandardBottles ? (
+                    <td className="px-3 py-2">
+                      <label className="flex cursor-pointer items-center gap-1.5 text-xs text-zinc-600">
+                        <input
+                          type="checkbox"
+                          checked={!row.useDefaultPacking}
+                          onChange={(e) => onUseDefaultPackingChange(p.code, !e.target.checked)}
+                          className="rounded border-zinc-300"
+                        />
+                        <span>Custom / carton</span>
+                      </label>
+                      {!row.useDefaultPacking ? (
+                        <div className="mt-1">
+                          <input
+                            inputMode="numeric"
+                            value={row.bottlesPerBox}
+                            onChange={(e) => onBottlesPerBoxChange(p.code, e.target.value)}
+                            placeholder="Bottles/carton"
+                            className={`w-24 rounded-lg border px-2 py-1 text-center text-xs outline-none ${
+                              bpbErr ? "border-red-400" : "border-zinc-200"
+                            }`}
+                          />
+                        </div>
+                      ) : null}
+                    </td>
                   ) : null}
                 </tr>
               );
@@ -279,7 +355,12 @@ export function NewOrderProductGrid({
                       <p className="mt-1 text-[11px] text-red-700">{cartonsErr}</p>
                     ) : null}
                   </td>
-                  {!isBottles ? (
+                  {isStandardBottles ? (
+                    <td className="px-3 py-2 text-center tabular-nums text-sm text-zinc-800">
+                      {previewCartonsFromBottles(r.cartons, Number(r.bottlesPerBox)) ?? (r.cartons.trim() ? "—" : "")}
+                    </td>
+                  ) : null}
+                  {!isMixedBottles && !isStandardBottles ? (
                     <>
                       <td className="px-3 py-2 text-center">
                         <input
@@ -303,7 +384,7 @@ export function NewOrderProductGrid({
                       </td>
                     </>
                   ) : (
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2" colSpan={isStandardBottles ? 2 : 1}>
                       <button
                         type="button"
                         onClick={() => onRemoveOther(r.code)}
@@ -331,12 +412,17 @@ export function NewOrderProductGrid({
               <td className="px-3 py-2 text-center text-sm font-semibold text-zinc-900">
                 {summary.totalQty > 0 ? summary.totalQty : "—"}
               </td>
-              <td colSpan={isBottles ? 1 : 2} className="px-3 py-2 text-xs text-zinc-500">
+              <td
+                colSpan={isMixedBottles ? 1 : isStandardBottles ? 3 : 2}
+                className="px-3 py-2 text-xs text-zinc-500"
+              >
                 {summary.productCount > 0
                   ? `${summary.productCount} product${summary.productCount === 1 ? "" : "s"} on this order`
-                  : isBottles
+                  : isMixedBottles
                     ? "Enter bottles for each product in the mixed box"
-                    : "Enter cartons next to any product to include it"}
+                    : isStandardBottles
+                      ? "Enter bottle counts; cartons fill in when the count is a full multiple"
+                      : "Enter cartons next to any product to include it"}
               </td>
             </tr>
           </tfoot>

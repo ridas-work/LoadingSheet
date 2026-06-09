@@ -20,6 +20,14 @@ import {
   buildPackagingDeductionPreview,
   type DeductionSheetLine,
 } from "@/lib/packagingDeduction";
+import {
+  deductReadyBottlesForDelivered,
+  restoreReadyBottlesAfterReturn,
+  type ReadyDeductionSummaryLine,
+} from "@/lib/readyBottleDispatch";
+import { getReadyStockMap } from "@/lib/readyBottleLedger";
+import { readyAllocationForOrder } from "@/lib/orderBatchStatus";
+import type { DeductionPacking } from "@/lib/packagingDeduction";
 import { canEditGateDelivery, roleFromSession } from "@/lib/roles";
 
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -62,48 +70,108 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const $set = gateDeliveryUpdateFields(parsed.status, { userId, userName });
-  if (parsed.status === "delivered" && !existing.packagingDeductedAt) {
+  const audit = { userId, userName };
+  const sheetLines = (existing.sheetLines ?? []) as DeductionSheetLine[];
+
+  if (parsed.status === "pending_redelivery" && from === "delivered" && existing.readyBottleDeductedAt) {
+    const summary = (existing.readyBottleDeductionSummary ?? []) as ReadyDeductionSummaryLine[];
+    const restoreError = await restoreReadyBottlesAfterReturn({
+      orderId: id,
+      poNumber: existing.poNumber,
+      summary,
+      audit,
+    });
+    if (restoreError) {
+      return NextResponse.json({ error: restoreError }, { status: 400 });
+    }
+    $set.readyBottleRestoredAt = new Date();
+  }
+
+  if (parsed.status === "delivered") {
     const [catalogDocs, packagingItems] = await Promise.all([
       ProductPacking.find({ active: true })
         .select({ code: 1, name: 1, bottlesPerCarton: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1, bundleComponents: 1 })
         .lean(),
       PackagingItem.find({ active: true }).lean(),
     ]);
-    const preview = buildPackagingDeductionPreview({
-      sheetLines: (existing.sheetLines ?? []) as DeductionSheetLine[],
-      catalog: packingCatalogFromDocs(catalogDocs),
-      packagingItems,
-    });
-    const previewError = assertPackagingDeductionPreview(preview);
-    if (previewError) {
-      return NextResponse.json({ error: previewError }, { status: 400 });
-    }
-
-    const applyError = await applyPackagingUipIncrements(
-      preview.lines.map((line) => ({
-        itemCode: line.itemCode,
-        quantity: line.quantity,
-        detail: line.reasonDetail,
-      })),
-      {
-        reason: "delivered",
-        note: `PO ${existing.poNumber} delivered`,
-        recordedByUserId: userId,
-        recordedByName: userName,
-      },
-    );
-    if (applyError) {
-      return NextResponse.json({ error: applyError }, { status: 400 });
-    }
-
-    $set.packagingDeductedAt = new Date();
-    $set.packagingDeductedByUserId = userId;
-    $set.packagingDeductedByName = userName;
-    $set.packagingDeductionSummary = preview.lines.map((line) => ({
-      itemCode: line.itemCode,
-      itemName: line.itemName,
-      quantity: line.quantity,
+    const catalog = packingCatalogFromDocs(catalogDocs);
+    const catalogDeduction: DeductionPacking[] = catalog.map((p) => ({
+      code: p.code,
+      name: p.name,
+      bottlesPerCarton: p.bottlesPerCarton,
+      aliases: p.aliases,
+      batchFamily: p.batchFamily,
+      bundleComponents: p.bundleComponents,
     }));
+    const readyStockMap = await getReadyStockMap();
+    const readyByBox = readyAllocationForOrder(
+      sheetLines.map((l, i) => ({
+        boxNo: l.boxNo ?? i + 1,
+        productName: l.productName,
+        bottlesPerBox: l.bottlesPerBox,
+        lineKind: l.lineKind,
+        mixedContents: l.mixedContents,
+      })),
+      catalogDeduction,
+      readyStockMap,
+    );
+
+    if (!existing.readyBottleDeductedAt) {
+      const readyResult = await deductReadyBottlesForDelivered({
+        orderId: id,
+        poNumber: existing.poNumber,
+        sheetLines,
+        catalog,
+        audit,
+      });
+      if (readyResult.error) {
+        return NextResponse.json({ error: readyResult.error }, { status: 400 });
+      }
+      $set.readyBottleDeductedAt = new Date();
+      $set.readyBottleDeductedByUserId = userId;
+      $set.readyBottleDeductedByName = userName;
+      $set.readyBottleDeductionSummary = readyResult.summary;
+      $set.readyBottleRestoredAt = null;
+    }
+
+    if (!existing.packagingDeductedAt) {
+      const preview = buildPackagingDeductionPreview({
+        sheetLines,
+        catalog: catalogDeduction,
+        packagingItems,
+        readyByBox,
+      });
+      const previewError = assertPackagingDeductionPreview(preview);
+      if (previewError) {
+        return NextResponse.json({ error: previewError }, { status: 400 });
+      }
+
+      const applyError = await applyPackagingUipIncrements(
+        preview.lines.map((line) => ({
+          itemCode: line.itemCode,
+          quantity: line.quantity,
+          detail: line.reasonDetail,
+        })),
+        {
+          reason: "delivered",
+          note: `PO ${existing.poNumber} delivered`,
+          recordedByUserId: userId,
+          recordedByName: userName,
+        },
+      );
+      if (applyError) {
+        return NextResponse.json({ error: applyError }, { status: 400 });
+      }
+
+      $set.packagingDeductedAt = new Date();
+      $set.packagingDeductedByUserId = userId;
+      $set.packagingDeductedByName = userName;
+      $set.packagingDeductionSummary = preview.lines.map((line) => ({
+        itemCode: line.itemCode,
+        itemName: line.itemName,
+        quantity: line.quantity,
+      }));
+    }
   }
 
   const doc = await Order.findByIdAndUpdate(id, { $set }, { new: true }).lean();
@@ -131,5 +199,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     },
     packagingStockUpdated: parsed.status === "delivered" && Boolean(doc.packagingDeductedAt),
     packagingDeductionSummary: deductionSummary,
+    readyBottleStockUpdated: parsed.status === "delivered" && Boolean(doc.readyBottleDeductedAt),
+    readyBottleDeductionSummary: doc.readyBottleDeductionSummary ?? [],
   });
 }

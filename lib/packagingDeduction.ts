@@ -1,4 +1,5 @@
 import { isMixedSampleLine } from "@/lib/mixedSampleBox";
+import type { LineReadySplit } from "@/lib/readyStockAllocation";
 import { packagingBalance, type PackagingQtyFields } from "@/lib/packagingInventory";
 
 type BundleComponentRef = { code: string; bottlesPerUnit: number };
@@ -28,6 +29,7 @@ export type DeductionSheetLine = {
   bottlesPerBox: number;
   lineKind?: string | null;
   mixedContents?: Array<{ productName: string; bottles: number }> | null;
+  customBoxCode?: string | null;
 };
 
 export type PackagingDeductionLine = {
@@ -49,7 +51,23 @@ type Consumption = {
   productBottles: Map<string, number>;
   productCartons: Map<string, number>;
   mixedBoxFamilies: Map<string, number>;
+  customCartonBoxes: Map<string, number>;
 };
+
+function emptyConsumption(): Consumption {
+  return {
+    productBottles: new Map(),
+    productCartons: new Map(),
+    mixedBoxFamilies: new Map(),
+    customCartonBoxes: new Map(),
+  };
+}
+
+function addCustomCartonBox(consumption: Consumption, customBoxCode: string | null | undefined) {
+  const code = key(customBoxCode);
+  if (!code) return;
+  add(consumption.customCartonBoxes, code, 1);
+}
 
 function key(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
@@ -101,11 +119,7 @@ export function summarizePackagingConsumption(
   sheetLines: DeductionSheetLine[],
   catalog: DeductionPacking[],
 ): { consumption: Consumption; missingProducts: string[] } {
-  const consumption: Consumption = {
-    productBottles: new Map(),
-    productCartons: new Map(),
-    mixedBoxFamilies: new Map(),
-  };
+  const consumption = emptyConsumption();
   const missingProducts = new Set<string>();
 
   for (const line of sheetLines) {
@@ -120,8 +134,12 @@ export function summarizePackagingConsumption(
         consumePacking(consumption, packing, part.bottles, 0);
         families.add(packingFamily(packing));
       }
-      const family = [...families][0];
-      if (family) add(consumption.mixedBoxFamilies, key(family), 1);
+      if (line.customBoxCode?.trim()) {
+        addCustomCartonBox(consumption, line.customBoxCode);
+      } else {
+        const family = [...families][0];
+        if (family) add(consumption.mixedBoxFamilies, key(family), 1);
+      }
       continue;
     }
 
@@ -131,6 +149,84 @@ export function summarizePackagingConsumption(
       continue;
     }
     consumePacking(consumption, packing, line.bottlesPerBox, 1);
+  }
+
+  return { consumption, missingProducts: [...missingProducts] };
+}
+
+/**
+ * Packaging consumption for gate delivery: only bottles/cartons that still need
+ * Nimra fill. Ready-shelf bottles are already labelled, capped, and boxed.
+ */
+export function summarizePackagingConsumptionExcludingReady(
+  sheetLines: DeductionSheetLine[],
+  catalog: DeductionPacking[],
+  readyByBox: Map<number, LineReadySplit>,
+): { consumption: Consumption; missingProducts: string[] } {
+  const consumption = emptyConsumption();
+  const missingProducts = new Set<string>();
+
+  for (const line of sheetLines) {
+    const boxNo = line.boxNo ?? 0;
+    const split = readyByBox.get(boxNo);
+    if (!split || split.bottlesNeedingBatch <= 0) continue;
+
+    const deductCarton = split.bottlesFromReady <= 0;
+
+    if (isMixedSampleLine(line) && line.mixedContents?.length) {
+      const families = new Set<string>();
+      for (const part of line.mixedContents) {
+        const packing = findPackingByName(part.productName, catalog);
+        if (!packing) {
+          missingProducts.add(part.productName);
+          continue;
+        }
+        const comp = split.components?.find(
+          (c) => key(c.productName) === key(packing.name) || key(c.productCode) === key(packing.code),
+        );
+        const needing = comp?.bottlesNeedingBatch ?? part.bottles;
+        if (needing > 0) {
+          add(consumption.productBottles, key(packing.code), needing);
+        }
+        families.add(packingFamily(packing));
+      }
+      if (deductCarton) {
+        if (line.customBoxCode?.trim()) {
+          addCustomCartonBox(consumption, line.customBoxCode);
+        } else {
+          const family = [...families][0];
+          if (family) add(consumption.mixedBoxFamilies, key(family), 1);
+        }
+      }
+      continue;
+    }
+
+    const packing = findPackingByName(line.productName, catalog);
+    if (!packing) {
+      missingProducts.add(line.productName);
+      continue;
+    }
+
+    if (packing.bundleComponents?.length) {
+      for (const ref of packing.bundleComponents) {
+        const partPacking = catalog.find((p) => key(p.code) === key(ref.code));
+        if (!partPacking) continue;
+        const comp = split.components?.find((c) => key(c.productCode) === key(ref.code));
+        const needing = comp?.bottlesNeedingBatch ?? line.bottlesPerBox * ref.bottlesPerUnit;
+        if (needing > 0) {
+          add(consumption.productBottles, key(partPacking.code), needing);
+        }
+      }
+      if (deductCarton) {
+        add(consumption.productCartons, key(packing.code), 1);
+      }
+      continue;
+    }
+
+    add(consumption.productBottles, key(packing.code), split.bottlesNeedingBatch);
+    if (deductCarton) {
+      add(consumption.productCartons, key(packing.code), 1);
+    }
   }
 
   return { consumption, missingProducts: [...missingProducts] };
@@ -164,12 +260,28 @@ function findFamilyBoxItem(
   );
 }
 
+function findCustomCartonBoxItem(
+  items: DeductionPackagingItem[],
+  boxCode: string,
+): DeductionPackagingItem | null {
+  const code = key(boxCode);
+  return (
+    items.find(
+      (item) => item.active !== false && key(item.code) === code && key(item.deductAs || item.category) === "box",
+    ) ?? null
+  );
+}
+
 export function buildPackagingDeductionPreview(args: {
   sheetLines: DeductionSheetLine[];
   catalog: DeductionPacking[];
   packagingItems: DeductionPackagingItem[];
+  /** When set, skip packaging for ready-shelf bottles (already assembled). */
+  readyByBox?: Map<number, LineReadySplit>;
 }): PackagingDeductionPreview {
-  const { consumption, missingProducts } = summarizePackagingConsumption(args.sheetLines, args.catalog);
+  const { consumption, missingProducts } = args.readyByBox
+    ? summarizePackagingConsumptionExcludingReady(args.sheetLines, args.catalog, args.readyByBox)
+    : summarizePackagingConsumption(args.sheetLines, args.catalog);
   const quantities = new Map<string, PackagingDeductionLine>();
   const missingMappings = new Set<string>(missingProducts.map((name) => `No product packing found for "${name}"`));
 
@@ -188,6 +300,7 @@ export function buildPackagingDeductionPreview(args: {
   }
 
   for (const [productCode, bottles] of consumption.productBottles) {
+    if (bottles <= 0) continue;
     const packing = args.catalog.find((p) => key(p.code) === productCode);
     if (!packing) continue;
     const primaryKind = containerKind(packing);
@@ -202,6 +315,7 @@ export function buildPackagingDeductionPreview(args: {
   }
 
   for (const [productCode, cartons] of consumption.productCartons) {
+    if (cartons <= 0) continue;
     const packing = args.catalog.find((p) => key(p.code) === productCode);
     if (!packing) continue;
     const item = findProductItem(args.packagingItems, packing, "box");
@@ -210,9 +324,17 @@ export function buildPackagingDeductionPreview(args: {
   }
 
   for (const [family, boxes] of consumption.mixedBoxFamilies) {
+    if (boxes <= 0) continue;
     const item = findFamilyBoxItem(args.packagingItems, family);
     if (item) push(item, boxes, `${boxes} mixed/custom carton(s) for ${family}`);
     else missingMappings.add(`No carton/box packaging item mapped for mixed/custom carton family "${family}"`);
+  }
+
+  for (const [boxCode, boxes] of consumption.customCartonBoxes) {
+    if (boxes <= 0) continue;
+    const item = findCustomCartonBoxItem(args.packagingItems, boxCode);
+    if (item) push(item, boxes, `${boxes} custom outer box (${boxCode})`);
+    else missingMappings.add(`No custom carton box item for code "${boxCode}"`);
   }
 
   const lines = [...quantities.values()].sort((a, b) => a.itemName.localeCompare(b.itemName));

@@ -17,6 +17,7 @@ type SeedRow = {
   linkedProductCode?: string;
   linkedBatchFamily?: string;
   deductAs?: string;
+  customCartonBox?: boolean;
 };
 
 const VALID_CATEGORIES = new Set([
@@ -76,6 +77,7 @@ async function main() {
           linkedProductCode: r.linkedProductCode?.trim().toLowerCase() ?? "",
           linkedBatchFamily: r.linkedBatchFamily?.trim().toLowerCase() ?? "",
           deductAs: r.deductAs?.trim().toLowerCase() || category,
+          customCartonBox: Boolean(r.customCartonBox),
           active: true,
         },
         $setOnInsert: {

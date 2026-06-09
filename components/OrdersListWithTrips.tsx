@@ -3,6 +3,13 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import {
+  GATE_STATUS_LABELS,
+  isOrderLockedAfterDelivery,
+  isRashidActiveGateStatus,
+  type GateDeliveryStatus,
+} from "@/lib/gateDelivery";
+
 type OrderRow = {
   id: string;
   poNumber: string;
@@ -13,6 +20,7 @@ type OrderRow = {
   total: number;
   dispatchTripId: string | null;
   vehicleNo: string;
+  gateDeliveryStatus?: GateDeliveryStatus;
 };
 
 type Props = {
@@ -20,6 +28,8 @@ type Props = {
   isDispatchEditor: boolean;
   showEnteredBy?: boolean;
   canEditOrders?: boolean;
+  /** Admin oversight — show gate delivery status on every row. */
+  showGateStatus?: boolean;
 };
 
 export function OrdersListWithTrips({
@@ -27,6 +37,7 @@ export function OrdersListWithTrips({
   isDispatchEditor,
   showEnteredBy = false,
   canEditOrders = false,
+  showGateStatus = false,
 }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
 
@@ -59,6 +70,11 @@ export function OrdersListWithTrips({
           const onTrip = o.dispatchTripId != null && o.dispatchTripId.length > 0;
           const batchesLocked = o.total > 0 && o.filled === o.total;
           const checked = selected.includes(o.id);
+          const rashidActive = isRashidActiveGateStatus(o.gateDeliveryStatus);
+          const gateStatus = o.gateDeliveryStatus ?? "none";
+          const showAssignBatches = isDispatchEditor && rashidActive && !batchesLocked;
+          const showEditOrder =
+            canEditOrders && !isOrderLockedAfterDelivery(gateStatus);
 
           return (
             <li key={o.id} className="px-4 py-3">
@@ -90,10 +106,23 @@ export function OrdersListWithTrips({
                         </Link>
                       </p>
                     ) : null}
+                    {(showGateStatus || (!rashidActive && isDispatchEditor)) ? (
+                      <p
+                        className={`mt-1 text-xs font-medium ${
+                          gateStatus === "delivered"
+                            ? "text-green-800"
+                            : gateStatus === "out_for_delivery"
+                              ? "text-amber-900"
+                              : "text-zinc-600"
+                        }`}
+                      >
+                        {GATE_STATUS_LABELS[gateStatus]}
+                      </p>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {canEditOrders ? (
+                  {showEditOrder ? (
                     <Link
                       href={`/orders/${o.id}/edit`}
                       className="rounded-lg bg-amber-700 px-3 py-2 text-sm font-medium text-white"
@@ -107,14 +136,14 @@ export function OrdersListWithTrips({
                   >
                     View loading sheet
                   </Link>
-                  {isDispatchEditor && !batchesLocked ? (
+                  {showAssignBatches ? (
                     <Link
                       href={`/orders/${o.id}/loading-sheet?dispatch=1`}
                       className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
                     >
                       Assign batches
                     </Link>
-                  ) : isDispatchEditor && batchesLocked ? (
+                  ) : isDispatchEditor && rashidActive && batchesLocked ? (
                     <span className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
                       Batches assigned
                     </span>

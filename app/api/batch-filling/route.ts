@@ -19,6 +19,7 @@ import {
 import { connectToDatabase } from "@/lib/db";
 import { computeFillingUipIncrements } from "@/lib/packagingFillingDeduction";
 import { applyPackagingUipIncrements } from "@/lib/packagingStockApply";
+import { syncReadyBottleLedgerFromFilling } from "@/lib/readyBottleFillingSync";
 import { BatchFillingDailyEntry } from "@/lib/models/BatchFillingDailyEntry";
 import { PackagingItem } from "@/lib/models/PackagingItem";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
@@ -296,6 +297,29 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: applyError }, { status: 400 });
   }
 
+  const readySync = await syncReadyBottleLedgerFromFilling({
+    previousApplied: (previousEntry?.readyLedgerApplied ?? []).map((a) => ({
+      productCode: a.productCode,
+      readyBottlesApplied: a.readyBottlesApplied,
+    })),
+    previousPackingLines: (previousEntry?.packingLines ?? []).map((l) => ({
+      productCode: l.productCode,
+      productName: l.productName,
+      readyToDeliverBottles: l.readyToDeliverBottles ?? 0,
+    })),
+    newPackingLines: packingLines.map((l) => ({
+      productCode: l.productCode,
+      productName: l.productName,
+      readyToDeliverBottles: l.readyToDeliverBottles,
+    })),
+    batchNo,
+    entryDate,
+    audit: { userId, userName: session.user.name ?? "" },
+  });
+  if (readySync.error) {
+    return NextResponse.json({ error: readySync.error }, { status: 400 });
+  }
+
   const packagingUipApplied = newLines.map((l) => ({
     productCode: l.productCode,
     filledBottlesApplied: l.filledBottlesToday,
@@ -313,6 +337,7 @@ export async function PATCH(req: Request) {
         wasteLiters,
         note,
         packagingUipApplied,
+        readyLedgerApplied: readySync.applied,
         recordedByUserId: userId,
         recordedByName: session.user.name ?? "",
       },

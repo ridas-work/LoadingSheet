@@ -103,19 +103,26 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
         error?: string;
         packagingStockUpdated?: boolean;
         packagingDeductionSummary?: Array<{ itemName?: string; quantity?: number }>;
+        readyBottleStockUpdated?: boolean;
+        readyBottleDeductionSummary?: Array<{ productName?: string; bottles?: number }>;
       };
       if (!res.ok) {
         setRowError((prev) => ({ ...prev, [orderId]: data.error || `Save failed (${res.status})` }));
         return;
       }
-      if (status === "delivered" && data.packagingStockUpdated) {
-        const n = data.packagingDeductionSummary?.length ?? 0;
+      if (status === "delivered" && (data.packagingStockUpdated || data.readyBottleStockUpdated)) {
+        const pkg = data.packagingDeductionSummary?.length ?? 0;
+        const ready = data.readyBottleDeductionSummary?.length ?? 0;
         setRowSuccess((prev) => ({
           ...prev,
           [orderId]:
-            n > 0
-              ? `Packaging stock updated (${n} line${n === 1 ? "" : "s"}).`
-              : "Delivered — packaging stock updated.",
+            ready > 0 && pkg > 0
+              ? `Delivered — ready bottles (${ready} product${ready === 1 ? "" : "s"}) and packaging (${pkg} line${pkg === 1 ? "" : "s"}) updated.`
+              : ready > 0
+                ? `Delivered — ready bottle stock updated (${ready} product${ready === 1 ? "" : "s"}).`
+                : pkg > 0
+                  ? `Packaging stock updated (${pkg} line${pkg === 1 ? "" : "s"}).`
+                  : "Delivered.",
         }));
         setTimeout(() => {
           setRowSuccess((p) => {

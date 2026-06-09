@@ -4,6 +4,7 @@ import { DispatchTripForm } from "@/components/DispatchTripForm";
 import type { PickerOrder } from "@/components/DispatchTripOrderPicker";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
+import { rashidActiveOrdersMongoFilter } from "@/lib/gateDelivery";
 import { Order } from "@/lib/models/Order";
 import { canEditDispatch, EMPTY_DISPATCH, roleFromSession } from "@/lib/roles";
 
@@ -28,7 +29,7 @@ export default async function NewDispatchTripPage(props: PageProps) {
       : [];
 
   await connectToDatabase();
-  const orderDocs = await Order.find({})
+  const orderDocs = await Order.find(rashidActiveOrdersMongoFilter())
     .sort({ createdAt: -1 })
     .select({ poNumber: 1, customerName: 1, dispatchTripId: 1 })
     .lean();

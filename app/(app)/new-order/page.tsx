@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { SerializedTicket } from "@/lib/fieldVisitTickets";
 
+import { isCustomBottleSizeCode, normalizeBottleSizeCode } from "@/lib/customBottleSizes";
 import {
   CustomCartonBuilder,
   buildCustomCartonsPayload,
@@ -24,13 +25,11 @@ import {
   type GridState,
   type OtherRow,
 } from "@/components/NewOrderProductGrid";
+import { catalogForCustomCartonBuilder } from "@/lib/customCartonProducts";
+import { bottlesToStandardCartons } from "@/lib/poBottleEntry";
 
-type FieldErrors = Partial<
-  Record<"poNumber" | "customerName" | "items" | "mixedSample" | "mixedBoxCount", string>
-> &
+type FieldErrors = Partial<Record<"poNumber" | "customerName" | "items", string>> &
   Record<string, string>;
-
-type OrderKind = "standard" | "mixed_sample";
 
 export default function NewOrderPage() {
   const searchParams = useSearchParams();
@@ -40,8 +39,6 @@ export default function NewOrderPage() {
   const [visitTicketId, setVisitTicketId] = useState("");
   const [visitTickets, setVisitTickets] = useState<SerializedTicket[]>([]);
   const [deadlineDate, setDeadlineDate] = useState("");
-  const [orderKind, setOrderKind] = useState<OrderKind>("standard");
-  const [mixedBoxCount, setMixedBoxCount] = useState("1");
   const [grid, setGrid] = useState<GridState>({});
   const [otherRows, setOtherRows] = useState<OtherRow[]>([]);
   const [customCartons, setCustomCartons] = useState<CustomCartonDraft[]>([]);
@@ -122,6 +119,11 @@ export default function NewOrderPage() {
     [catalog],
   );
 
+  const customBoxCatalog = useMemo(
+    () => catalogForCustomCartonBuilder(catalog),
+    [catalog],
+  );
+
   const activeCount = useMemo(() => {
     let n = 0;
     for (const p of catalog) {
@@ -134,96 +136,161 @@ export default function NewOrderPage() {
     return n;
   }, [catalog, grid, otherRows]);
 
-  const isMixed = orderKind === "mixed_sample";
+  const invalidFilledCount = useMemo(() => {
+    let n = 0;
+    for (const p of catalog) {
+      const row = grid[p.code];
+      if (!row || !rowIsActive(row)) continue;
+      const bottles = Number(row.cartons);
+      if (!Number.isInteger(bottles) || bottles < 1) {
+        n += 1;
+        continue;
+      }
+      const perCarton = row.useDefaultPacking ? p.bottlesPerCarton : Number(row.bottlesPerBox);
+      if (!bottlesToStandardCartons(bottles, perCarton, p.name).ok) n += 1;
+    }
+    for (const r of otherRows) {
+      if (!otherRowIsActive(r)) continue;
+      const bottles = Number(r.cartons);
+      const bpb = Number(r.bottlesPerBox);
+      if (!Number.isInteger(bottles) || bottles < 1 || !Number.isInteger(bpb) || bpb < 1) {
+        n += 1;
+        continue;
+      }
+      if (!bottlesToStandardCartons(bottles, bpb, r.productName.trim()).ok) n += 1;
+    }
+    return n;
+  }, [catalog, grid, otherRows]);
 
   const customCartonPayload = useMemo(
-    () => buildCustomCartonsPayload(customCartons, catalog),
-    [catalog, customCartons],
+    () => buildCustomCartonsPayload(customCartons, customBoxCatalog),
+    [customBoxCatalog, customCartons],
   );
 
-  const canSubmit = useMemo(() => {
-    if (!poNumber.trim() || !customerName.trim()) return false;
-    if (isMixed) {
-      const boxes = Number(mixedBoxCount);
-      return activeCount > 0 && Number.isInteger(boxes) && boxes >= 1;
+  const submitBlockReason = useMemo(() => {
+    if (catalogLoading) return "Loading product catalog…";
+    if (!poNumber.trim()) return "Enter a PO number above.";
+    if (!customerName.trim()) return "Enter a customer name above.";
+    if (activeCount === 0 && customCartonPayload.length === 0) {
+      return "Enter bottles for at least one product, or add a custom carton.";
     }
-    return activeCount > 0 || customCartonPayload.length > 0;
-  }, [activeCount, customCartonPayload.length, customerName, isMixed, mixedBoxCount, poNumber]);
+    if (invalidFilledCount > 0) {
+      return `${invalidFilledCount} product${invalidFilledCount === 1 ? "" : "s"} need full-carton bottle counts — scroll the list or use Add custom carton.`;
+    }
+    if (customCartons.length > 0) {
+      for (let ci = 0; ci < customCartons.length; ci++) {
+        const c = customCartons[ci];
+        const bc = Number(c.boxCount);
+        if (!c.boxCount.trim() || !Number.isInteger(bc) || bc < 1) {
+          return `Custom carton ${ci + 1}: enter how many cartons (e.g. 1) in the number field — put names like "FOC rhino 500ml" in Label on sheet.`;
+        }
+        let any = false;
+        for (const r of c.rows) {
+          const pn = resolvedCustomRowProductName(r, customBoxCatalog);
+          const b = Number(r.bottles);
+          if (pn && Number.isInteger(b) && b >= 1) any = true;
+        }
+        if (!any) {
+          return `Custom carton ${ci + 1}: add at least one product with bottles.`;
+        }
+      }
+    }
+    return null;
+  }, [
+    activeCount,
+    customBoxCatalog,
+    catalogLoading,
+    customCartonPayload.length,
+    customCartons,
+    customerName,
+    invalidFilledCount,
+    poNumber,
+  ]);
+
+  const canSubmit = submitBlockReason === null;
 
   function validate(): FieldErrors {
     const next: FieldErrors = {};
     if (!poNumber.trim()) next.poNumber = "PO number is required.";
     if (!customerName.trim()) next.customerName = "Customer name is required.";
 
-    if (isMixed) {
-      const boxes = Number(mixedBoxCount);
-      if (!mixedBoxCount.trim()) {
-        next.mixedBoxCount = "Number of mixed boxes is required.";
-      } else if (!Number.isInteger(boxes) || boxes < 1) {
-        next.mixedBoxCount = "Must be an integer ≥ 1.";
-      }
-    }
-
     let validCount = 0;
     for (const p of catalog) {
       const row = grid[p.code];
       if (!row) continue;
-      const cartonsRaw = row.cartons.trim();
-      if (!cartonsRaw) continue;
+      const qtyRaw = row.cartons.trim();
+      if (!qtyRaw) continue;
 
-      const cartons = Number(cartonsRaw);
+      const bottles = Number(qtyRaw);
       const bpb = Number(row.bottlesPerBox);
-      if (!Number.isInteger(cartons) || cartons < 1) {
-        next[`item.${p.code}.cartons`] = "Must be an integer ≥ 1.";
-      }
-      if (!isMixed) {
-        if (!row.bottlesPerBox.trim()) {
-          next[`item.${p.code}.bottlesPerBox`] = "Required.";
-        } else if (!Number.isInteger(bpb) || bpb < 1) {
-          next[`item.${p.code}.bottlesPerBox`] = "Must be an integer ≥ 1.";
+      if (!Number.isInteger(bottles) || bottles < 1) {
+        next[`item.${p.code}.cartons`] = "Enter whole bottles (1 or more).";
+      } else {
+        const perCarton = row.useDefaultPacking ? p.bottlesPerCarton : bpb;
+        if (!row.useDefaultPacking) {
+          if (!row.bottlesPerBox.trim()) {
+            next[`item.${p.code}.bottlesPerBox`] = "Bottles per carton required for custom packing.";
+          } else if (!Number.isInteger(bpb) || bpb < 1) {
+            next[`item.${p.code}.bottlesPerBox`] = "Must be an integer ≥ 1.";
+          }
+        }
+        const resolved = bottlesToStandardCartons(bottles, perCarton, p.name);
+        if (!resolved.ok) {
+          next[`item.${p.code}.cartons`] = resolved.message.replace(/\*\*/g, "");
         }
       }
 
-      const qtyOk = Number.isInteger(cartons) && cartons >= 1;
-      const bpbOk = isMixed || (Number.isInteger(bpb) && bpb >= 1);
-      if (qtyOk && bpbOk) validCount += 1;
+      const qtyOk = Number.isInteger(bottles) && bottles >= 1;
+      const bpbOk =
+        row.useDefaultPacking || (Number.isInteger(bpb) && bpb >= 1);
+      const cartonOk =
+        qtyOk &&
+        bpbOk &&
+        bottlesToStandardCartons(
+          bottles,
+          row.useDefaultPacking ? p.bottlesPerCarton : bpb,
+          p.name,
+        ).ok;
+      if (qtyOk && bpbOk && cartonOk) validCount += 1;
     }
 
     otherRows.forEach((r) => {
       const hasName = r.productName.trim().length > 0;
-      const cartonsRaw = r.cartons.trim();
-      if (!hasName && !cartonsRaw) return;
+      const qtyRaw = r.cartons.trim();
+      if (!hasName && !qtyRaw) return;
 
-      const cartons = Number(cartonsRaw);
+      const bottles = Number(qtyRaw);
       const bpb = Number(r.bottlesPerBox);
       if (!hasName) next[`item.${r.code}.productName`] = "Product name is required.";
-      if (!cartonsRaw) {
-        next[`item.${r.code}.cartons`] = isMixed ? "Bottles is required." : "Cartons is required.";
-      } else if (!Number.isInteger(cartons) || cartons < 1) {
-        next[`item.${r.code}.cartons`] = "Must be an integer ≥ 1.";
-      }
-      if (!isMixed) {
+      if (!qtyRaw) {
+        next[`item.${r.code}.cartons`] = "Bottles is required.";
+      } else if (!Number.isInteger(bottles) || bottles < 1) {
+        next[`item.${r.code}.cartons`] = "Enter whole bottles (1 or more).";
+      } else {
         if (!r.bottlesPerBox.trim()) {
-          next[`item.${r.code}.bottlesPerBox`] = "Required.";
+          next[`item.${r.code}.bottlesPerBox`] = "Bottles per carton is required.";
         } else if (!Number.isInteger(bpb) || bpb < 1) {
           next[`item.${r.code}.bottlesPerBox`] = "Must be an integer ≥ 1.";
+        } else {
+          const resolved = bottlesToStandardCartons(bottles, bpb, r.productName.trim());
+          if (!resolved.ok) {
+            next[`item.${r.code}.cartons`] = resolved.message.replace(/\*\*/g, "");
+          }
         }
       }
 
-      const qtyOk = hasName && Number.isInteger(cartons) && cartons >= 1;
-      const bpbOk = isMixed || (Number.isInteger(bpb) && bpb >= 1);
-      if (qtyOk && bpbOk) validCount += 1;
+      const qtyOk = hasName && Number.isInteger(bottles) && bottles >= 1;
+      const bpbOk = Number.isInteger(bpb) && bpb >= 1;
+      const cartonOk =
+        qtyOk && bpbOk && bottlesToStandardCartons(bottles, bpb, r.productName.trim()).ok;
+      if (qtyOk && bpbOk && cartonOk) validCount += 1;
     });
 
-    if (validCount === 0) {
-      if (isMixed) {
-        next.items = "Enter bottles for at least one product in the mixed box.";
-      } else if (buildCustomCartonsPayload(customCartons, catalog).length === 0) {
-        next.items = "Enter cartons for at least one product, or add a custom carton.";
-      }
+    if (validCount === 0 && buildCustomCartonsPayload(customCartons, customBoxCatalog).length === 0) {
+      next.items = "Enter bottles for at least one product, or add a custom carton.";
     }
 
-    if (!isMixed && customCartons.length > 0) {
+    if (customCartons.length > 0) {
       customCartons.forEach((c, ci) => {
         const bc = Number(c.boxCount);
         if (!c.boxCount.trim() || !Number.isInteger(bc) || bc < 1) {
@@ -231,7 +298,7 @@ export default function NewOrderPage() {
         }
         let any = false;
         c.rows.forEach((r, ri) => {
-          const pn = resolvedCustomRowProductName(r, catalog);
+          const pn = resolvedCustomRowProductName(r, customBoxCatalog);
           const b = Number(r.bottles);
           if (!pn && !r.bottles.trim()) return;
           if (!pn) next[`customCartons.${ci}.rows.${ri}.productName`] = "Product name is required.";
@@ -241,6 +308,12 @@ export default function NewOrderPage() {
           if (pn && Number.isInteger(b) && b >= 1) any = true;
         });
         if (!any) next[`customCartons.${ci}.contents`] = "Add at least one product line with bottles.";
+        c.rows.forEach((r, ri) => {
+          const code = normalizeBottleSizeCode(r.bottleSizeCode);
+          if (code && code !== "catalog" && !isCustomBottleSizeCode(code)) {
+            next[`customCartons.${ci}.rows.${ri}.bottleSizeCode`] = "Invalid container size.";
+          }
+        });
       });
     }
 
@@ -300,25 +373,6 @@ export default function NewOrderPage() {
     setOtherRows((prev) => prev.filter((r) => r.code !== code));
   }
 
-  function buildMixedContents(): Array<{ productName: string; bottles: number }> {
-    const out: Array<{ productName: string; bottles: number }> = [];
-    for (const p of catalog) {
-      const row = grid[p.code];
-      if (!row) continue;
-      const bottles = Number(row.cartons);
-      if (!Number.isInteger(bottles) || bottles < 1) continue;
-      out.push({ productName: p.name, bottles });
-    }
-    for (const r of otherRows) {
-      const bottles = Number(r.cartons);
-      const pn = r.productName.trim();
-      if (!pn) continue;
-      if (!Number.isInteger(bottles) || bottles < 1) continue;
-      out.push({ productName: pn, bottles });
-    }
-    return out;
-  }
-
   function buildSubmitItems(): Array<{
     productName: string;
     boxes: number;
@@ -328,22 +382,78 @@ export default function NewOrderPage() {
     for (const p of catalog) {
       const row = grid[p.code];
       if (!row) continue;
-      const cartons = Number(row.cartons);
-      const bpb = Number(row.bottlesPerBox);
-      if (!Number.isInteger(cartons) || cartons < 1) continue;
-      if (!Number.isInteger(bpb) || bpb < 1) continue;
-      out.push({ productName: p.name, boxes: cartons, bottlesPerBox: bpb });
+      const bottles = Number(row.cartons);
+      if (!Number.isInteger(bottles) || bottles < 1) continue;
+      const perCarton = row.useDefaultPacking ? p.bottlesPerCarton : Number(row.bottlesPerBox);
+      const resolved = bottlesToStandardCartons(bottles, perCarton, p.name);
+      if (!resolved.ok) continue;
+      out.push({
+        productName: p.name,
+        boxes: resolved.cartons,
+        bottlesPerBox: resolved.bottlesPerBox,
+      });
     }
     for (const r of otherRows) {
-      const cartons = Number(r.cartons);
+      const bottles = Number(r.cartons);
       const bpb = Number(r.bottlesPerBox);
       const pn = r.productName.trim();
       if (!pn) continue;
-      if (!Number.isInteger(cartons) || cartons < 1) continue;
-      if (!Number.isInteger(bpb) || bpb < 1) continue;
-      out.push({ productName: pn, boxes: cartons, bottlesPerBox: bpb });
+      if (!Number.isInteger(bottles) || bottles < 1) continue;
+      const resolved = bottlesToStandardCartons(bottles, bpb, pn);
+      if (!resolved.ok) continue;
+      out.push({ productName: pn, boxes: resolved.cartons, bottlesPerBox: resolved.bottlesPerBox });
     }
     return out;
+  }
+
+  function elementForErrorKey(key: string): HTMLElement | null {
+    if (key === "poNumber" || key === "customerName") return document.getElementById(key);
+    const itemMatch = /^item\.([^.]+)\.([^.]+)$/.exec(key);
+    if (itemMatch) return document.getElementById(`grid-${itemMatch[1]}-${itemMatch[2]}`);
+    const ccBox = /^customCartons\.(\d+)\.boxCount$/.exec(key);
+    if (ccBox) {
+      const carton = customCartons[Number(ccBox[1])];
+      return carton ? document.getElementById(`cc-${carton.id}-count`) : null;
+    }
+    const ccRow = /^customCartons\.(\d+)\.rows\.(\d+)\.(productName|bottles|bottleSizeCode)$/.exec(key);
+    if (ccRow) {
+      const row = customCartons[Number(ccRow[1])]?.rows[Number(ccRow[2])];
+      if (!row) return null;
+      if (ccRow[3] === "bottles") return document.getElementById(`cc-row-${row.id}-bottles`);
+      if (ccRow[3] === "bottleSizeCode") return document.getElementById(`cc-row-${row.id}-size`);
+      return document.getElementById(`cc-row-${row.id}-pick`);
+    }
+    const ccContents = /^customCartons\.(\d+)\.contents$/.exec(key);
+    if (ccContents) {
+      const carton = customCartons[Number(ccContents[1])];
+      const row = carton?.rows[0];
+      return row ? document.getElementById(`cc-row-${row.id}-pick`) : null;
+    }
+    return null;
+  }
+
+  function scrollToFirstError(errs: FieldErrors) {
+    const keys = Object.keys(errs);
+    if (keys.length === 0) return;
+
+    const rank = (k: string) => {
+      if (k === "poNumber") return 0;
+      if (k === "customerName") return 1;
+      if (k.startsWith("customCartons.")) return 2;
+      if (k.startsWith("item.")) return 3;
+      return 4;
+    };
+    const sorted = [...keys].sort((a, b) => rank(a) - rank(b));
+
+    for (const key of sorted) {
+      const el = elementForErrorKey(key);
+      if (!el) continue;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) {
+        el.focus();
+      }
+      return;
+    }
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -352,7 +462,10 @@ export default function NewOrderPage() {
 
     const nextErrors = validate();
     setErrors(nextErrors);
-    if (Object.keys(nextErrors).length > 0) return;
+    if (Object.keys(nextErrors).length > 0) {
+      scrollToFirstError(nextErrors);
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -361,19 +474,9 @@ export default function NewOrderPage() {
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          ...(isMixed
-            ? {
-                orderKind: "mixed_sample",
-                mixedSample: {
-                  boxCount: Number(mixedBoxCount),
-                  contents: buildMixedContents(),
-                },
-              }
-            : {
-                orderKind: "standard",
-                items: buildSubmitItems(),
-                customCartons: buildCustomCartonsPayload(customCartons, catalog),
-              }),
+          orderKind: "standard",
+          items: buildSubmitItems(),
+          customCartons: buildCustomCartonsPayload(customCartons, customBoxCatalog),
           poNumber: poNumber.trim(),
           customerName: customerName.trim(),
           city: city.trim(),
@@ -416,8 +519,6 @@ export default function NewOrderPage() {
       });
       setOtherRows([]);
       setCustomCartons([]);
-      setOrderKind("standard");
-      setMixedBoxCount("1");
       setErrors({});
     } finally {
       setSubmitting(false);
@@ -458,9 +559,8 @@ export default function NewOrderPage() {
     <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
       <h1 className="text-lg font-semibold text-zinc-900">New Order</h1>
       <p className="mt-1 text-sm text-zinc-600">
-        {isMixed
-          ? "Mixed sample box: enter how many bottles of each product go in one shared carton. All selected products ship together in the same physical box."
-          : "Every catalog product is listed below. Type cartons for normal lines, or leave rows blank and use Add custom carton to pack several SKUs in one box (you can combine both on the same PO). Use Sample / custom for non-default bottles per carton on standard lines."}
+        Enter total bottles per product (e.g. 30 bottles Rhino 500ml = 1 carton). If the count is not a
+        full carton, use Add custom carton for mixed or odd quantities.
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
@@ -499,32 +599,6 @@ export default function NewOrderPage() {
             ) : null}
           </div>
         ) : null}
-        <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
-          <div className="text-sm font-medium text-zinc-900">Order type</div>
-          <div className="mt-2 flex flex-wrap gap-4">
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
-              <input
-                type="radio"
-                name="orderKind"
-                checked={orderKind === "standard"}
-                onChange={() => setOrderKind("standard")}
-              />
-              Standard (cartons per product)
-            </label>
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-zinc-800">
-              <input
-                type="radio"
-                name="orderKind"
-                checked={orderKind === "mixed_sample"}
-                onChange={() => {
-                  setOrderKind("mixed_sample");
-                  setCustomCartons([]);
-                }}
-              />
-              Mixed sample box (several products, one carton)
-            </label>
-          </div>
-        </div>
         <div>
           <label className="block text-sm font-medium text-zinc-800" htmlFor="poNumber">
             PO number
@@ -588,7 +662,7 @@ export default function NewOrderPage() {
           </div>
         </div>
 
-        {!isMixed && customCartons.length === 0 ? (
+        {customCartons.length === 0 ? (
           <button
             type="button"
             onClick={() => setCustomCartons([emptyCartonDraft()])}
@@ -598,40 +672,29 @@ export default function NewOrderPage() {
           </button>
         ) : null}
 
-        {!isMixed && customCartons.length > 0 ? (
+        {customCartons.length > 0 ? (
           <CustomCartonBuilder
             cartons={customCartons}
-            onChange={setCustomCartons}
+            onChange={(next) => {
+              setCustomCartons(next);
+              setErrors((prev) => {
+                const cleaned = { ...prev };
+                for (const k of Object.keys(cleaned)) {
+                  if (k.startsWith("customCartons.")) delete cleaned[k];
+                }
+                return cleaned;
+              });
+            }}
             disabled={submitting}
-            catalogProducts={catalog}
+            errors={errors}
+            catalogProducts={customBoxCatalog}
           />
-        ) : null}
-
-        {isMixed ? (
-          <div>
-            <label className="block text-sm font-medium text-zinc-800" htmlFor="mixedBoxCount">
-              Number of identical mixed boxes
-            </label>
-            <input
-              id="mixedBoxCount"
-              inputMode="numeric"
-              value={mixedBoxCount}
-              onChange={(e) => setMixedBoxCount(e.target.value)}
-              className="mt-1 w-32 rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
-            />
-            <p className="mt-1 text-xs text-zinc-500">
-              Usually 1. Use 2+ only if you ship multiple boxes with the same product mix inside each.
-            </p>
-            {errors.mixedBoxCount ? (
-              <p className="mt-1 text-sm text-red-700">{errors.mixedBoxCount}</p>
-            ) : null}
-          </div>
         ) : null}
 
         <NewOrderProductGrid
           catalog={catalog}
           catalogLoading={catalogLoading}
-          mode={isMixed ? "bottles" : "cartons"}
+          mode="standard_bottles"
           state={grid}
           otherRows={otherRows}
           errors={errors as GridErrors}
@@ -645,10 +708,20 @@ export default function NewOrderPage() {
           onRemoveOther={onRemoveOther}
         />
 
+        {submitBlockReason ? (
+          <p className="text-sm text-amber-800">{submitBlockReason}</p>
+        ) : Object.keys(errors).length > 0 ? (
+          <ul className="list-disc space-y-1 pl-5 text-sm text-red-700">
+            {[...new Set(Object.values(errors))].slice(0, 4).map((msg) => (
+              <li key={msg}>{msg}</li>
+            ))}
+          </ul>
+        ) : null}
+
         <button
           type="submit"
-          disabled={!canSubmit || submitting || catalogLoading}
-          className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
+          disabled={!canSubmit || submitting}
+          className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitting ? "Saving…" : "Create order"}
         </button>

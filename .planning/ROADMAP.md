@@ -162,3 +162,38 @@ Rashid’s daily filling screen should match factory work: he records **how many
 Executable plans:
 - `.planning/phases/23-rashid-bottle-filling-readiness/01-PLAN.md` — data/API conversion from bottle entries to liter snapshots; support one or more packing lines per batch/day
 - `.planning/phases/23-rashid-bottle-filling-readiness/02-PLAN.md` — `/dispatch/filling` UI wording and admin read-only display for bottle-based daily filling
+
+## Phase 26: Ready bottle stock ledger — legacy shelf + order deduct ✓
+Bottles **already filled** on the production floor (including stock from before the software existed) need a **running balance per product**. **Rashid** sets **opening balance** and daily **ready to deliver** entries **add** to the pool. When Zaman marks an order **out for delivery**, the app **deducts** bottles on that PO’s loading sheet from ready stock; **pending redelivery** restores them. Loading sheet and gate show **shortfall** so production fills more from batches when the pool runs low.
+
+Executable plans:
+- `.planning/phases/26-ready-bottle-stock-ledger/01-PLAN.md` — models, ledger API, sheet-line bottle aggregation
+- `.planning/phases/26-ready-bottle-stock-ledger/02-PLAN.md` — Rashid opening stock + filling sync on `/dispatch/filling`
+- `.planning/phases/26-ready-bottle-stock-ledger/03-PLAN.md` — gate delivered deduct, shortage UX, admin movements
+
+## Phase 27: Legacy orphan batch ready stock ✓
+Some physical batches are **fully used in Nimra** (0 L remaining) or were **never registered**, but **filled bottles still sit on the production floor**. Rashid must add **batch label + product + bottles** to ready stock **without** requiring a Nimra `ProductionBatch`. Discourages creating **0-liter dummy batches** in Nimra. Phase 26 ledger + delivered deduct unchanged.
+
+Executable plan:
+- `.planning/phases/27-legacy-orphan-batch-ready-stock/01-PLAN.md` — orphan lots API + Rashid UI + docs
+
+## Phase 28: Custom carton box sizes (5L / 1L / 500ml / 250ml / 100ml) ✓
+**Custom cartons** (hybrid PO / Add custom carton) use **generic outer boxes by container size**, shared across **all products** — not per-family mixed boxes (Rhino / Washout / …). Haider stocks five SKUs: **5 litre jar**, **1 litre**, **500 ml**, **250 ml**, **100 ml**. PO team **selects outer box size** per custom carton definition; gate delivery deducts that box when the line is filled from Nimra (ready-shelf lines skip packaging per Phase 26). Standard full-carton lines unchanged.
+
+Executable plans:
+- `.planning/phases/28-custom-carton-box-sizes/01-PLAN.md` — packaging SKUs, order/sheet `customBoxCode`, deduction by size
+- `.planning/phases/28-custom-carton-box-sizes/02-PLAN.md` — CustomCartonBuilder + admin edit + docs
+
+## Phase 29: Hide gate-completed orders from Rashid queue ✓
+When Zaman marks an order **out for delivery** or **delivered**, it leaves Rashid’s active work. **`/orders`** and trip PO pickers should only show POs still at the factory (`gateDeliveryStatus` **`none`** or **`pending_redelivery`**). Stops confusing **Assign batches** on completed trips (e.g. CSD Fortress delivered but still on list). Admin and PO creators keep full list; trip history pages unchanged.
+
+Executable plan:
+- `.planning/phases/29-rashid-hide-completed-orders/01-PLAN.md` — `rashidActiveOrdersMongoFilter`, query + UI guards
+
+## Phase 30: Standard carton weight check (Rashid)
+Before the truck leaves, Rashid **weighs each carton** and enters **kg** on the loading sheet. System compares to the **factory standard weight list** (16 SKUs — Washout, Rhino, Power Wash, Brighten, Fabrito, Degrease, Titan, bundles) with **±8% tolerance**. Outside range → **error: check the box again** (missing/extra bottles). Separate from **Weight (L)** liters used for Nimra batch math. Optional: gate list requires weights complete.
+
+Executable plans:
+- `.planning/phases/30-standard-carton-weight-check/01-PLAN.md` — standard weight JSON + `cartonWeightKg` schema + validation lib
+- `.planning/phases/30-standard-carton-weight-check/02-PLAN.md` — Rashid UI inputs + API validation on save
+- `.planning/phases/30-standard-carton-weight-check/03-PLAN.md` — gate eligibility until weights pass

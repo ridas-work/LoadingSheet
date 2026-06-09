@@ -43,7 +43,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     solids: batch.solids ?? "",
     appearance: batch.appearance ?? "",
     provider: batch.provider ?? "",
-    drum: batch.drum ?? "",
+    hcl: batch.hcl ?? "",
+    viscosity: batch.viscosity ?? "",
     quantity: batch.quantity ?? "",
     notes: batch.notes ?? "",
     createdByName: batch.createdByName ?? "",
@@ -116,7 +117,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (body.solids !== undefined) batch.solids = qc.fields.solids;
     if (body.appearance !== undefined) batch.appearance = qc.fields.appearance;
     if (body.provider !== undefined) batch.provider = qc.fields.provider;
-    if (body.drum !== undefined) batch.drum = qc.fields.drum;
+    if (body.hcl !== undefined) batch.hcl = qc.fields.hcl;
+    if (body.viscosity !== undefined) batch.viscosity = qc.fields.viscosity;
     if (body.quantity !== undefined) batch.quantity = qc.fields.quantity;
   }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import type { AdminOrderSummary } from "@/lib/adminOrderSummary";
@@ -41,9 +42,9 @@ export function AdminSummaryDashboard() {
     <div className="-mx-4 print:mx-0">
       <div className="flex flex-wrap items-start justify-between gap-3 px-4 print:hidden">
         <div>
-          <h1 className="text-lg font-semibold text-zinc-900">Pending orders</h1>
+          <h1 className="text-lg font-semibold text-zinc-900">Orders summary</h1>
           <p className="mt-1 text-sm text-zinc-600">
-            Management summary — carton counts per product column.
+            All POs including delivered — click PO no to open the loading sheet.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -54,7 +55,7 @@ export function AdminSummaryDashboard() {
               onChange={(e) => setPendingOnly(e.target.checked)}
               className="rounded border-zinc-300"
             />
-            Pending only
+            Hide delivered
           </label>
           <button
             type="button"
@@ -75,7 +76,7 @@ export function AdminSummaryDashboard() {
           <div className="min-w-max rounded-xl border border-zinc-200 bg-white p-4 shadow-sm print:border-0 print:p-0 print:shadow-none">
             <div className="mb-4 text-center print:mb-2">
               <div className="text-base font-bold uppercase tracking-wide text-zinc-900 print:text-sm">
-                Pending orders
+                Orders summary
               </div>
               <div className="text-sm text-zinc-700 print:text-xs">{data.reportDate}</div>
             </div>
@@ -88,6 +89,7 @@ export function AdminSummaryDashboard() {
                   <th className="border border-zinc-400 px-2 py-1 text-left font-semibold">City</th>
                   <th className="border border-zinc-400 px-2 py-1 text-left font-semibold">Deadline</th>
                   <th className="border border-zinc-400 px-2 py-1 text-left font-semibold">PO no</th>
+                  <th className="border border-zinc-400 px-2 py-1 text-left font-semibold">Status</th>
                   {data.columns.map((col) => (
                     <th
                       key={col.key}
@@ -103,26 +105,60 @@ export function AdminSummaryDashboard() {
                 {data.rows.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={6 + data.columns.length}
+                      colSpan={7 + data.columns.length}
                       className="border border-zinc-400 px-2 py-4 text-center text-zinc-600"
                     >
                       No orders to show.
                     </td>
                   </tr>
                 ) : (
-                  data.rows.map((row) => (
-                    <tr key={`${row.poNumber}-${row.sr}`}>
+                  data.rows.map((row) => {
+                    const delivered = row.gateDeliveryStatus === "delivered";
+                    const outForDelivery = row.gateDeliveryStatus === "out_for_delivery";
+                    return (
+                    <tr
+                      key={`${row.poNumber}-${row.sr}`}
+                      className={delivered ? "bg-green-50/60 print:bg-transparent" : undefined}
+                    >
                       <td className="border border-zinc-400 px-2 py-1">{row.sr}</td>
                       <td className="border border-zinc-400 px-2 py-1 whitespace-nowrap">{row.customerName}</td>
                       <td className="border border-zinc-400 px-2 py-1 whitespace-nowrap">{row.city}</td>
                       <td
                         className={`border border-zinc-400 px-2 py-1 whitespace-nowrap ${
-                          row.builtyDone ? "font-semibold text-emerald-800" : ""
+                          delivered
+                            ? "font-semibold text-green-900"
+                            : outForDelivery
+                              ? "font-semibold text-amber-900"
+                              : row.builtyDone
+                                ? "font-semibold text-emerald-800"
+                                : ""
                         }`}
                       >
                         {row.deadlineDisplay}
                       </td>
-                      <td className="border border-zinc-400 px-2 py-1 whitespace-nowrap">{row.poNumber}</td>
+                      <td className="border border-zinc-400 px-2 py-1 whitespace-nowrap">
+                        <Link
+                          href={`/orders/${row.orderId}/loading-sheet`}
+                          className="font-medium text-zinc-900 underline print:no-underline"
+                        >
+                          {row.poNumber}
+                        </Link>
+                      </td>
+                      <td className="border border-zinc-400 px-2 py-1 whitespace-nowrap">
+                        <span
+                          className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                            delivered
+                              ? "bg-green-100 text-green-900"
+                              : outForDelivery
+                                ? "bg-amber-100 text-amber-950"
+                                : row.gateDeliveryStatus === "pending_redelivery"
+                                  ? "bg-orange-100 text-orange-950"
+                                  : "bg-zinc-100 text-zinc-700"
+                          }`}
+                        >
+                          {row.statusLabel}
+                        </span>
+                      </td>
                       {data.columns.map((col) => {
                         const n = row.cells[col.key] ?? 0;
                         return (
@@ -133,14 +169,15 @@ export function AdminSummaryDashboard() {
                       })}
                       <td className="border border-zinc-400 px-2 py-1 text-center font-medium">{row.rowTotal}</td>
                     </tr>
-                  ))
+                  );
+                  })
                 )}
               </tbody>
               {data.rows.length > 0 ? (
                 <tfoot>
                   <tr className="bg-zinc-50 font-semibold print:bg-transparent">
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="border border-zinc-400 px-2 py-1 text-right uppercase tracking-wide"
                     >
                       Totals

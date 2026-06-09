@@ -74,15 +74,39 @@ export function gateDeliveryUpdateFields(
   return $set;
 }
 
-/** Orders Rashid has prepared for dispatch (on a trip or vehicle recorded). */
+const NON_EMPTY = /\S/;
+
+/**
+ * Orders Zaman should see: on a **vehicle trip** and dispatch header is **complete**
+ * (vehicle, driver, DC) — i.e. Rashid finished trip details so the load is ready to leave.
+ */
 export function gateEligibleMongoFilter() {
   return {
-    $or: [
+    $and: [
       { dispatchTripId: { $ne: null } },
-      { "dispatch.vehicleNo": { $regex: /\S/ } },
-      { "dispatch.dcNo": { $regex: /\S/ } },
+      { "dispatch.vehicleNo": { $regex: NON_EMPTY } },
+      { "dispatch.driverName": { $regex: NON_EMPTY } },
+      { "dispatch.dcNo": { $regex: NON_EMPTY } },
+      { weightsVerifiedAt: { $ne: null } },
     ],
   };
+}
+
+const RASHID_INACTIVE_GATE_STATUSES: GateDeliveryStatus[] = ["out_for_delivery", "delivered"];
+
+/** Orders still in Rashid's active queue (at factory or pending redelivery). */
+export function rashidActiveOrdersMongoFilter() {
+  return { gateDeliveryStatus: { $nin: RASHID_INACTIVE_GATE_STATUSES } };
+}
+
+export function isRashidActiveGateStatus(status: unknown): boolean {
+  const s = normalizeGateStatus(status);
+  return !RASHID_INACTIVE_GATE_STATUSES.includes(s);
+}
+
+/** Delivered POs are locked — admin may view but not edit order or trip-linked data. */
+export function isOrderLockedAfterDelivery(status: unknown): boolean {
+  return normalizeGateStatus(status) === "delivered";
 }
 
 export function nextGateActions(status: GateDeliveryStatus): GateDeliveryStatus[] {

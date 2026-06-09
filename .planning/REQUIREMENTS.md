@@ -554,6 +554,21 @@ Executable plans:
 
 ---
 
+## Phase 28 (Custom carton box sizes) — **complete** ✓
+
+### Problem
+
+Custom / hybrid cartons need **size-based outer boxes** (5L jar, 1L, 500ml, 250ml, 100ml) shared across all products. Family-based mixed box mapping (Rhino, Washout, …) fails for many POs.
+
+### Solution (v1)
+
+- Five Haider SKUs `custom-box-*`; PO team picks **outer box size** per custom carton.
+- Sheet lines store `customBoxCode`; gate delivery deducts that box (when not ready-shelf).
+
+Plans: `.planning/phases/28-custom-carton-box-sizes/01-PLAN.md`, `02-PLAN.md`
+
+---
+
 ## Phase 24 (Field visit tickets — Nouman & Javeria) — **complete**
 
 ### Problem

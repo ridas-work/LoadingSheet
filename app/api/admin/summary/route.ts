@@ -23,12 +23,13 @@ export async function GET(req: Request) {
 
   const [orders, catalog] = await Promise.all([
     Order.find({})
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: -1 })
       .select({
         poNumber: 1,
         customerName: 1,
         city: 1,
         deadlineDate: 1,
+        gateDeliveryStatus: 1,
         dispatchTripId: 1,
         dispatch: 1,
         items: 1,
@@ -45,15 +46,26 @@ export async function GET(req: Request) {
 
   const summary = buildAdminOrderSummary(
     orders.map((o) => ({
+      orderId: o._id.toString(),
       poNumber: o.poNumber,
       customerName: o.customerName,
       city: o.city,
       deadlineDate: o.deadlineDate,
+      gateDeliveryStatus: o.gateDeliveryStatus,
       dispatchTripId: o.dispatchTripId,
       dispatch: o.dispatch,
       items: o.items,
       orderKind: o.orderKind,
       mixedSample: o.mixedSample,
+      customCartons: o.customCartons
+        ? o.customCartons.map((c) => ({
+            boxCount: c.boxCount,
+            contents: c.contents?.map((item) => ({
+              productName: item.productName,
+              bottles: item.bottles,
+            })),
+          }))
+        : undefined,
     })),
     catalog.map((p) => ({
       code: p.code,

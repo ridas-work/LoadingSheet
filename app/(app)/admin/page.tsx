@@ -8,7 +8,7 @@ export default function AdminPage() {
       <div className="rounded-xl border border-zinc-200 bg-white p-4 print:hidden">
         <h2 className="text-sm font-semibold text-zinc-900">Oversight</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Read-only access to orders, Nimra&apos;s production batches, dispatch trips, packaging inventory, and daily bottle filling records.
+          Read-only access to orders, QC production batches, dispatch trips, packaging inventory, and daily bottle filling records.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <Link

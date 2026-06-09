@@ -1,0 +1,18 @@
+[
+  { "packingCode": "washout-lemon", "bottlesPerCarton": 10, "standardWeightKg": 11.395 },
+  { "packingCode": "washout-floral", "bottlesPerCarton": 10, "standardWeightKg": 11.395 },
+  { "packingCode": "washout-ocean", "bottlesPerCarton": 10, "standardWeightKg": 11.395 },
+  { "packingCode": "rhino-750ml", "bottlesPerCarton": 10, "standardWeightKg": 9.17 },
+  { "packingCode": "rhino-500ml", "bottlesPerCarton": 30, "standardWeightKg": 17.4 },
+  { "packingCode": "power-wash", "bottlesPerCarton": 10, "standardWeightKg": 5.8 },
+  { "packingCode": "power-wash-pouch", "bottlesPerCarton": 20, "standardWeightKg": 21.99 },
+  { "packingCode": "brighten-liquid-laundry-detergent", "bottlesPerCarton": 10, "standardWeightKg": 11.7 },
+  { "packingCode": "brighten-laundry-detergent-pouch", "bottlesPerCarton": 20, "standardWeightKg": 21.42 },
+  { "packingCode": "fabrito-fabric-softener", "bottlesPerCarton": 10, "standardWeightKg": 11.05 },
+  { "packingCode": "fabrito-fabric-softener-pouch", "bottlesPerCarton": 20, "standardWeightKg": 21.43 },
+  { "packingCode": "degrease-spray", "bottlesPerCarton": 10, "standardWeightKg": 6.01 },
+  { "packingCode": "titan", "bottlesPerCarton": 8, "standardWeightKg": 11.37 },
+  { "packingCode": "power-wash-dish-degrease-bundle", "bottlesPerCarton": 5, "standardWeightKg": 6.795 },
+  { "packingCode": "rhino-2x2-750ml", "bottlesPerCarton": 5, "standardWeightKg": 8.99 },
+  { "packingCode": "brighten-fabrito-bundle-1l", "bottlesPerCarton": 5, "standardWeightKg": 11.22 }
+]

@@ -10,15 +10,22 @@ import {
   type PackingCatalogRow,
   validateSheetBatchAllocations,
 } from "@/lib/bundleCatalog";
+import { enrichWeightsWithReadyShelf, validateReadyBatchRequirements } from "@/lib/readyStockAllocation";
 import { isMixedSampleLine } from "@/lib/mixedSampleBox";
 import { effectiveBatchDefsForOrder, normalizeBatchNo, poolToBatchDefs, productsMatch } from "@/lib/batchVolume";
 import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
-import { isBatchAssignmentLocked } from "@/lib/orderBatchStatus";
+import { isBatchAssignmentLocked, readyAllocationForOrder } from "@/lib/orderBatchStatus";
+import { getReadyStockMap, listBatchLots } from "@/lib/readyBottleLedger";
+import type { DeductionPacking } from "@/lib/packagingDeduction";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
 import { roleFromSession } from "@/lib/roles";
+import {
+  allStandardCartonWeightsValid,
+  validateAllSheetCartonWeights,
+} from "@/lib/standardCartonWeight";
 
 type AssignmentInput = {
   boxNo?: unknown;
@@ -45,9 +52,24 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Invalid order id" }, { status: 400 });
   }
 
-  const body = (await req.json().catch(() => null)) as { assignments?: unknown } | null;
+  const body = (await req.json().catch(() => null)) as {
+    assignments?: unknown;
+    cartonWeights?: unknown;
+  } | null;
   if (!body || !Array.isArray(body.assignments)) {
     return NextResponse.json({ error: "assignments array is required" }, { status: 400 });
+  }
+
+  const weightByBox = new Map<number, number>();
+  if (Array.isArray(body.cartonWeights)) {
+    for (const raw of body.cartonWeights as Array<{ boxNo?: unknown; cartonWeightKg?: unknown }>) {
+      const boxNo = typeof raw.boxNo === "number" ? raw.boxNo : Number(raw.boxNo);
+      const kg =
+        typeof raw.cartonWeightKg === "number" ? raw.cartonWeightKg : Number(raw.cartonWeightKg);
+      if (Number.isInteger(boxNo) && boxNo >= 1 && Number.isFinite(kg) && kg > 0) {
+        weightByBox.set(boxNo, kg);
+      }
+    }
   }
 
   const assignmentMap = new Map<
@@ -90,10 +112,38 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const catalog: PackingCatalogRow[] = packingCatalogFromDocs(catalogDocs);
+  const catalogDeduction: DeductionPacking[] = catalog.map((p) => ({
+    code: p.code,
+    name: p.name,
+    bottlesPerCarton: p.bottlesPerCarton,
+    aliases: p.aliases,
+    batchFamily: p.batchFamily,
+    bundleComponents: p.bundleComponents,
+  }));
+  const [readyStockMap, readyBatchLots] = await Promise.all([getReadyStockMap(), listBatchLots()]);
+  const readyByBox = readyAllocationForOrder(
+    order.sheetLines,
+    catalogDeduction,
+    readyStockMap,
+    readyBatchLots.map((l) => ({
+      batchNo: l.batchNo,
+      productCode: l.productCode,
+      bottles: l.bottles,
+      createdAt: l.createdAt,
+    })),
+  );
 
-  if (isBatchAssignmentLocked(order.sheetLines, catalog)) {
+  const batchesLocked = isBatchAssignmentLocked(order.sheetLines, catalog, readyByBox);
+  const weightOnlyUpdate = batchesLocked && weightByBox.size > 0;
+  if (batchesLocked && weightByBox.size === 0) {
     return NextResponse.json(
-      { error: "Batch assignments are locked — all rows already have batches assigned." },
+      { error: "Batch assignments are locked — use carton weight fields to update weights." },
+      { status: 403 },
+    );
+  }
+  if (batchesLocked && Boolean(order.weightsVerifiedAt) && weightByBox.size > 0) {
+    return NextResponse.json(
+      { error: "Carton weights are already verified for this PO." },
       { status: 403 },
     );
   }
@@ -164,30 +214,85 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const usedElsewhere = accumulateBatchUsageFromSheetLines(allOrders, catalog, id);
   const effectiveDefs = effectiveBatchDefsForOrder(poolToBatchDefs(pool), usedElsewhere);
 
-  const validation = validateSheetBatchAllocations(workingLines, effectiveDefs, catalog);
-  if (!validation.ok) {
-    return NextResponse.json({ error: validation.error }, { status: 400 });
+  let validationWeights: Map<number, number | null>;
+  if (weightOnlyUpdate) {
+    validationWeights = new Map(
+      (order.sheetLines ?? []).map((line) => [line.boxNo, line.weight ?? null] as const),
+    );
+  } else {
+    const validation = validateSheetBatchAllocations(workingLines, effectiveDefs, catalog);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+
+    const readyValidation = validateReadyBatchRequirements(workingLines, catalog, readyByBox);
+    if (!readyValidation.ok) {
+      return NextResponse.json({ error: readyValidation.error }, { status: 400 });
+    }
+    validationWeights = validation.weights;
   }
+
+  const mergedWeightByBox = new Map<number, number>();
+  for (const line of order.sheetLines ?? []) {
+    const fromInput = weightByBox.get(line.boxNo);
+    const existing =
+      typeof line.cartonWeightKg === "number" && line.cartonWeightKg > 0
+        ? line.cartonWeightKg
+        : null;
+    const kg = fromInput ?? existing;
+    if (kg != null && kg > 0) mergedWeightByBox.set(line.boxNo, kg);
+  }
+
+  const sheetLinesForWeight = (order.sheetLines ?? []).map((line) => ({
+    boxNo: line.boxNo,
+    productName: line.productName,
+    bottlesPerBox: line.bottlesPerBox,
+  }));
+
+  const weightValidation = validateAllSheetCartonWeights(
+    sheetLinesForWeight,
+    mergedWeightByBox,
+    catalog,
+  );
+  if (!weightValidation.ok) {
+    return NextResponse.json({ errors: weightValidation.errors }, { status: 400 });
+  }
+
+  const finalWeights = weightOnlyUpdate
+    ? validationWeights
+    : enrichWeightsWithReadyShelf(workingLines, catalog, validationWeights, readyByBox);
 
   for (const line of order.sheetLines ?? []) {
     const working = workingLines.find((w) => w.boxNo === line.boxNo);
     if (!working) continue;
 
-    if (isBundleProduct(line.productName, catalog) || isMixedSampleLine(line)) {
-      line.set("batchNo", "");
-      line.set(
-        "componentBatches",
-        (working.componentBatches ?? []).map((c) => ({
-          productName: c.productName,
-          batchNo: c.batchNo,
-        })),
-      );
-    } else {
-      line.set("batchNo", working.batchNo);
-      line.set("componentBatches", []);
+    if (!weightOnlyUpdate) {
+      if (isBundleProduct(line.productName, catalog) || isMixedSampleLine(line)) {
+        line.set("batchNo", "");
+        line.set(
+          "componentBatches",
+          (working.componentBatches ?? []).map((c) => ({
+            productName: c.productName,
+            batchNo: c.batchNo,
+          })),
+        );
+      } else {
+        line.set("batchNo", working.batchNo);
+        line.set("componentBatches", []);
+      }
+      line.weight = finalWeights.get(line.boxNo) ?? null;
     }
-    line.weight = validation.weights.get(line.boxNo) ?? null;
+    const kg = mergedWeightByBox.get(line.boxNo);
+    line.cartonWeightKg = kg != null ? kg : null;
   }
+
+  const linesWithKg = sheetLinesForWeight.map((l) => ({
+    ...l,
+    cartonWeightKg: mergedWeightByBox.get(l.boxNo) ?? null,
+  }));
+  order.weightsVerifiedAt = allStandardCartonWeightsValid(linesWithKg, catalog)
+    ? new Date()
+    : null;
 
   order.batchUpdatedByUserId = userId;
   order.batchUpdatedByName = session.user.name ?? "";

@@ -313,7 +313,7 @@ export function BatchFillingGrid({ date, initialRows, readOnly }: Props) {
   if (rows.length === 0) {
     return (
       <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
-        No active batches. Nimra registers batches in Production.
+        No active batches. QC registers batches in Production.
       </p>
     );
   }
@@ -322,8 +322,8 @@ export function BatchFillingGrid({ date, initialRows, readOnly }: Props) {
     <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
       {!readOnly ? (
         <p className="border-b border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-          Enter bottle counts by product/packing. <strong>Ready to deliver</strong> means fully finished:
-          capped, labeled/stickered, packed, and ready to leave with dispatch. Save each batch after editing.
+          Enter bottle counts by product/packing. <strong>Ready to deliver</strong> adds to the ready stock pool when saved (fully
+          finished: capped, labeled/stickered, packed, and ready to leave with dispatch). Save each batch after editing.
           Variance stays in liters using product bottle sizes.
         </p>
       ) : null}
@@ -333,7 +333,7 @@ export function BatchFillingGrid({ date, initialRows, readOnly }: Props) {
             <tr className="border-b border-zinc-200 bg-zinc-50 text-left text-xs text-zinc-600">
               <th className="min-w-[12rem] px-3 py-2.5 font-semibold text-zinc-800">Batch / Product</th>
               <th className="w-28 px-3 py-2.5 text-right font-semibold">
-                Nimra remaining (L)
+                QC remaining (L)
                 <div className="font-normal text-zinc-500">(system)</div>
               </th>
               <th className="px-3 py-2.5 font-semibold" colSpan={2}>

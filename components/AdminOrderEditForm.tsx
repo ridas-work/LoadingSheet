@@ -4,13 +4,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { isCustomBottleSizeCode, normalizeBottleSizeCode } from "@/lib/customBottleSizes";
 import {
   CustomCartonBuilder,
   buildCustomCartonsPayload,
   draftsFromSavedCartons,
   emptyCartonDraft,
+  resolvedCustomRowProductName,
   type CustomCartonDraft,
 } from "@/components/CustomCartonBuilder";
+import { catalogForCustomCartonBuilder } from "@/lib/customCartonProducts";
 import {
   NewOrderProductGrid,
   defaultGridRow,
@@ -42,8 +45,9 @@ export type AdminOrderInitial = {
   mixedContents: Array<{ productName: string; bottles: number }>;
   customCartons: Array<{
     boxCount: number;
-    contents: Array<{ productName: string; bottles: number }>;
+    contents: Array<{ productName: string; bottles: number; bottleSizeCode?: string }>;
     label?: string;
+    customBoxCode?: string;
   }>;
   hasBatchAssignments: boolean;
   onDispatchTrip: boolean;
@@ -130,7 +134,9 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
           setGrid(g);
           setOtherRows(o);
           if (initial.customCartons?.length) {
-            setCustomCartons(draftsFromSavedCartons(initial.customCartons));
+            setCustomCartons(
+              draftsFromSavedCartons(initial.customCartons, catalogForCustomCartonBuilder(list)),
+            );
           } else {
             setCustomCartons([]);
           }
@@ -148,6 +154,11 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
   }, [initial]);
 
   const isMixed = orderKind === "mixed_sample";
+
+  const customBoxCatalog = useMemo(
+    () => catalogForCustomCartonBuilder(catalog),
+    [catalog],
+  );
 
   const activeCount = useMemo(() => {
     let n = 0;
@@ -208,7 +219,7 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
     if (validCount === 0) {
       if (isMixed) {
         next.items = "Enter bottles for at least one product in the mixed box.";
-      } else if (buildCustomCartonsPayload(customCartons).length === 0) {
+      } else if (buildCustomCartonsPayload(customCartons, customBoxCatalog).length === 0) {
         next.items = "Enter cartons for at least one product, or add a custom carton.";
       }
     }
@@ -221,7 +232,7 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
         }
         let any = false;
         c.rows.forEach((r, ri) => {
-          const pn = r.productName.trim();
+          const pn = resolvedCustomRowProductName(r, customBoxCatalog);
           const b = Number(r.bottles);
           if (!pn && !r.bottles.trim()) return;
           if (!pn) next[`customCartons.${ci}.rows.${ri}.productName`] = "Product name is required.";
@@ -231,6 +242,12 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
           if (pn && Number.isInteger(b) && b >= 1) any = true;
         });
         if (!any) next[`customCartons.${ci}.contents`] = "Add at least one product line with bottles.";
+        c.rows.forEach((r, ri) => {
+          const code = normalizeBottleSizeCode(r.bottleSizeCode);
+          if (code && code !== "catalog" && !isCustomBottleSizeCode(code)) {
+            next[`customCartons.${ci}.rows.${ri}.bottleSizeCode`] = "Invalid container size.";
+          }
+        });
       });
     }
 
@@ -309,7 +326,7 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
                 deadlineDate: deadlineDate.trim() || undefined,
                 orderKind: "standard",
                 items: buildSubmitItems(),
-                customCartons: buildCustomCartonsPayload(customCartons),
+                customCartons: buildCustomCartonsPayload(customCartons, customBoxCatalog),
               },
         ),
       });
@@ -342,8 +359,8 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
   }
 
   const customPayloadLen = useMemo(
-    () => buildCustomCartonsPayload(customCartons).length,
-    [customCartons],
+    () => buildCustomCartonsPayload(customCartons, customBoxCatalog).length,
+    [customBoxCatalog, customCartons],
   );
 
   const gridHandlers = {
@@ -519,7 +536,15 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
         ) : null}
 
         {!isMixed && customCartons.length > 0 ? (
-          <CustomCartonBuilder cartons={customCartons} onChange={setCustomCartons} disabled={submitting} />
+          <>
+            <CustomCartonBuilder
+              cartons={customCartons}
+              onChange={setCustomCartons}
+              disabled={submitting}
+              errors={errors}
+              catalogProducts={customBoxCatalog}
+            />
+          </>
         ) : null}
 
         <div className="flex flex-wrap gap-2">

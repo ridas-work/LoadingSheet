@@ -57,7 +57,8 @@ export default async function EditProductionBatchPage(props: PageProps) {
           initialSolids={batch.solids ?? ""}
           initialAppearance={batch.appearance ?? ""}
           initialProvider={batch.provider ?? ""}
-          initialDrum={batch.drum ?? ""}
+          initialHcl={batch.hcl ?? ""}
+          initialViscosity={batch.viscosity ?? ""}
           initialQuantity={batch.quantity ?? ""}
         />
       </div>

@@ -6,6 +6,7 @@ import { AdminOrderEditForm, type AdminOrderInitial } from "@/components/AdminOr
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
+import { isOrderLockedAfterDelivery, normalizeGateStatus } from "@/lib/gateDelivery";
 import { canEditOrders, roleFromSession } from "@/lib/roles";
 
 type PageProps = {
@@ -43,10 +44,39 @@ export default async function EditOrderPage({ params }: PageProps) {
   const customCartons = Array.isArray(customCartonsRaw)
     ? (customCartonsRaw as Array<{
         boxCount: number;
-        contents: Array<{ productName: string; bottles: number }>;
+        contents: Array<{ productName: string; bottles: number; bottleSizeCode?: string }>;
         label?: string;
+        customBoxCode?: string;
       }>)
     : [];
+
+  const gateDeliveryStatus = normalizeGateStatus(
+    (order as { gateDeliveryStatus?: unknown }).gateDeliveryStatus,
+  );
+  const lockedAfterDelivery = isOrderLockedAfterDelivery(gateDeliveryStatus);
+
+  if (lockedAfterDelivery) {
+    return (
+      <div className="space-y-4">
+        <Link href="/orders" className="text-sm font-medium text-zinc-700 underline">
+          ← Orders
+        </Link>
+        <div className="rounded-xl border border-green-200 bg-green-50 p-6">
+          <h1 className="text-lg font-semibold text-green-950">Order delivered — read only</h1>
+          <p className="mt-2 text-sm text-green-900">
+            PO <strong>{order.poNumber}</strong> ({order.customerName}) was marked delivered at the
+            gate. Delivered orders cannot be edited.
+          </p>
+          <Link
+            href={`/orders/${id}/loading-sheet`}
+            className="mt-4 inline-block rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
+          >
+            View loading sheet
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const initial: AdminOrderInitial = {
     orderId: order._id.toString(),

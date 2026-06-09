@@ -1,3 +1,5 @@
+import { assertValidCustomBoxCode } from "@/lib/customCartonBoxes";
+import { isCustomBottleSizeCode } from "@/lib/customBottleSizes";
 import { buildMixedSampleSheetLines, mixedSampleItemsFromContents, type MixedSampleContent } from "@/lib/mixedSampleBox";
 import { buildSheetLines, type OrderItemInput, type SheetLine } from "@/lib/buildSheetLines";
 import { mergeStandardAndCustomSheetLines, type CustomCartonDef } from "@/lib/hybridSheetLines";
@@ -125,18 +127,33 @@ function parseCustomCartons(body: Record<string, unknown>):
         if (bottles === null) {
           errors[`customCartons.${ci}.contents.${ri}.bottles`] = "Bottles must be an integer ≥ 1.";
         }
+        const bottleSizeCode =
+          typeof it.bottleSizeCode === "string" ? it.bottleSizeCode.trim().toLowerCase() : "";
+        if (bottleSizeCode && bottleSizeCode !== "catalog" && !isCustomBottleSizeCode(bottleSizeCode)) {
+          errors[`customCartons.${ci}.contents.${ri}.bottleSizeCode`] = "Invalid container size.";
+        }
         if (productName && bottles !== null) {
-          contents.push({ productName, bottles });
+          contents.push({
+            productName,
+            bottles,
+            ...(bottleSizeCode && bottleSizeCode !== "catalog" ? { bottleSizeCode } : {}),
+          });
         }
       });
     }
     if (contents.length === 0) {
       errors[`customCartons.${ci}.contents`] = "Add at least one product line in this carton.";
     }
+    const customBoxCodeRaw = typeof obj.customBoxCode === "string" ? obj.customBoxCode.trim() : "";
+    if (customBoxCodeRaw) {
+      const boxErr = assertValidCustomBoxCode(customBoxCodeRaw);
+      if (boxErr) errors[`customCartons.${ci}.customBoxCode`] = boxErr;
+    }
     if (boxCount !== null && contents.length > 0) {
       cartons.push({
         boxCount,
         contents,
+        ...(customBoxCodeRaw ? { customBoxCode: customBoxCodeRaw.toLowerCase() } : {}),
         ...(label ? { label } : {}),
       });
     }

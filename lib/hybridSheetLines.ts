@@ -7,6 +7,8 @@ export type CustomCartonDef = {
   contents: MixedSampleContent[];
   /** Optional override for the printed row title; default = auto label from contents. */
   label?: string;
+  /** Optional outer box packaging code (custom-box-*). */
+  customBoxCode?: string;
 };
 
 /**
@@ -24,6 +26,7 @@ export function mergeStandardAndCustomSheetLines(
     const lines = buildMixedSampleSheetLines({
       boxCount: carton.boxCount,
       contents: carton.contents,
+      customBoxCode: carton.customBoxCode,
     });
     const label = carton.label?.trim();
     for (const line of lines) {

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import type { FillingRow } from "@/components/BatchFillingGrid";
 import { BatchFillingGrid } from "@/components/BatchFillingGrid";
+import { ReadyBottleStockPanel } from "@/components/ReadyBottleStockPanel";
 import { DatePickerForm } from "@/components/DatePickerForm";
 import { auth } from "@/lib/auth";
 import { todayIsoDate } from "@/lib/batchFillingWaste";
@@ -85,6 +86,9 @@ export default async function BatchFillingPage({ searchParams }: PageProps) {
     })
     .filter((r): r is FillingRow => r !== null && r !== undefined);
 
+  const catalogOptions = catalog.map((p) => ({ code: p.code, name: p.name }));
+  const batchOptions = batches.map((b) => ({ batchNo: b.batchNo, productName: b.productName }));
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -100,9 +104,8 @@ export default async function BatchFillingPage({ searchParams }: PageProps) {
           </p>
           <p className="mt-1 text-xs text-zinc-500">
             <strong>Ready to deliver</strong> means capped, labeled/stickered, packed/finished, and ready for
-            dispatch. <strong>Waste (L)</strong> still compares Nimra remaining against the derived liters from
-            bottle counts plus physical liquid remaining. Red = missing liquid; amber = recorded more than
-            Nimra&apos;s pool.
+            dispatch. <strong>Waste (L)</strong> still compares QC remaining against the derived liters from bottle
+            counts plus physical liquid remaining. Red = missing liquid; amber = recorded more than QC&apos;s pool.
           </p>
         </div>
         <div className="flex items-center gap-2 text-sm text-zinc-600">
@@ -110,6 +113,12 @@ export default async function BatchFillingPage({ searchParams }: PageProps) {
           <DatePickerForm value={date} max={todayIsoDate()} />
         </div>
       </div>
+
+      <ReadyBottleStockPanel
+        readOnly={readOnly}
+        catalog={catalogOptions}
+        batchOptions={batchOptions}
+      />
 
       <BatchFillingGrid date={date} initialRows={rows} readOnly={readOnly} />
     </div>

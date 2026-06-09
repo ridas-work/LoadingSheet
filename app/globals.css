@@ -24,3 +24,36 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+@media print {
+  body.printing-carton-labels * {
+    visibility: hidden !important;
+  }
+
+  body.printing-carton-labels .carton-labels-overlay,
+  body.printing-carton-labels .carton-labels-overlay * {
+    visibility: visible !important;
+  }
+
+  body.printing-carton-labels .carton-labels-overlay {
+    position: absolute !important;
+    inset: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+
+  body.printing-carton-labels .carton-label-sheet {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  body.printing-carton-labels .carton-label-sheet:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  body.printing-carton-labels .print\:hidden {
+    display: none !important;
+    visibility: hidden !important;
+  }
+}

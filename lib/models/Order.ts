@@ -34,6 +34,8 @@ const MixedSampleContentSchema = new mongoose.Schema(
   {
     productName: { type: String, required: true, trim: true },
     bottles: { type: Number, required: true, min: 1 },
+    /** Custom carton: container size code (5l-jar, 1l, …) or catalog. */
+    bottleSizeCode: { type: String, required: false, default: "", trim: true, lowercase: true },
   },
   { _id: false },
 );
@@ -69,6 +71,7 @@ const CustomCartonSchema = new mongoose.Schema(
       },
     },
     label: { type: String, required: false, default: "", trim: true },
+    customBoxCode: { type: String, required: false, default: "", trim: true, lowercase: true },
   },
   { _id: false },
 );
@@ -105,6 +108,9 @@ const SheetLineSchema = new mongoose.Schema(
       default: [],
     },
     weight: { type: Number, required: false, default: null },
+    /** Rashid scale reading — physical carton mass in kg (validated vs standard list). */
+    cartonWeightKg: { type: Number, required: false, default: null, min: 0 },
+    customBoxCode: { type: String, required: false, default: "", trim: true, lowercase: true },
   },
   { _id: false },
 );
@@ -146,6 +152,8 @@ const OrderSchema = new mongoose.Schema(
     batchUpdatedByUserId: { type: String, required: false, default: null },
     batchUpdatedByName: { type: String, required: false, default: "" },
     batchUpdatedAt: { type: Date, required: false, default: null },
+    /** Set when every standard carton row has a weight within ±8% tolerance. */
+    weightsVerifiedAt: { type: Date, required: false, default: null },
     batchDefs: {
       type: [BatchDefSchema],
       required: false,
@@ -194,6 +202,21 @@ const OrderSchema = new mongoose.Schema(
       required: false,
       default: [],
     },
+    readyBottleDeductedAt: { type: Date, required: false, default: null },
+    readyBottleDeductedByUserId: { type: String, required: false, default: null },
+    readyBottleDeductedByName: { type: String, required: false, default: "", trim: true },
+    readyBottleDeductionSummary: {
+      type: [
+        {
+          productCode: { type: String, required: true, trim: true, lowercase: true },
+          productName: { type: String, required: true, trim: true },
+          bottles: { type: Number, required: true, min: 0 },
+        },
+      ],
+      required: false,
+      default: [],
+    },
+    readyBottleRestoredAt: { type: Date, required: false, default: null },
   },
   { timestamps: { createdAt: true, updatedAt: true } },
 );
