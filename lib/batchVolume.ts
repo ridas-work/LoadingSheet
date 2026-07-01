@@ -1,3 +1,6 @@
+import { batchProductMatchKey } from "@/lib/batchProductMatch";
+import { findPackingForLineName } from "@/lib/productPackingMatch";
+
 export type CatalogProduct = {
   name: string;
   litersPerBottle: number;
@@ -8,6 +11,12 @@ export type CatalogProduct = {
 export type BatchDef = {
   batchNo: string;
   totalLiters: number;
+  productName?: string;
+};
+
+export type BatchPoolRef = {
+  batchNo: string;
+  productName: string;
 };
 
 export type VolumeSheetLine = {
@@ -25,6 +34,10 @@ export function inferLitersPerBottleFromName(name: string, explicit?: number | n
   if (typeof explicit === "number" && explicit > 0) return explicit;
   const ml = name.match(/(\d+(?:\.\d+)?)\s*ml/i);
   if (ml) return Number(ml[1]) / 1000;
+  const ltrKgCan = name.match(/(\d+(?:\.\d+)?)\s*ltr\s*\/?\s*kg(?:\/kg)?(?:\s*can)?/i);
+  if (ltrKgCan) return Number(ltrKgCan[1]);
+  const ltr = name.match(/(\d+(?:\.\d+)?)\s*ltr\b/i);
+  if (ltr) return Number(ltr[1]);
   const litre = name.match(/(\d+(?:\.\d+)?)\s*l(?:itre|iter)?s?\b/i);
   if (litre) return Number(litre[1]);
   return 1;
@@ -318,13 +331,60 @@ export function catalogProductKey(productName: string, catalog: CatalogProduct[]
     if (family === key) return family;
   }
 
-  return key;
+  const packing = findPackingForLineName(
+    productName,
+    catalog.map((p) => ({
+      code: p.name,
+      name: p.name,
+      aliases: p.aliases,
+      batchFamily: p.batchFamily,
+    })),
+  );
+  if (packing) {
+    return (packing.batchFamily?.trim() || packing.name.trim()).toLowerCase();
+  }
+
+  return batchProductMatchKey(productName) || key;
+}
+
+/** Unique key for batch usage when the same batch no is used for different products. */
+export function batchUsageKey(
+  batchNo: string,
+  productName: string,
+  catalog: CatalogProduct[],
+): string {
+  const bn = normalizeBatchNo(batchNo).toLowerCase();
+  if (!bn) return "";
+  const pk = catalogProductKey(productName, catalog) ?? productName.trim().toLowerCase();
+  return `${bn}::${pk}`;
 }
 
 export function productsMatch(a: string, b: string, catalog: CatalogProduct[]): boolean {
   const keyA = catalogProductKey(a, catalog);
   const keyB = catalogProductKey(b, catalog);
   return keyA !== null && keyB !== null && keyA === keyB;
+}
+
+export function findPoolBatch(
+  pool: ProductionBatchPoolItem[],
+  batchNo: string,
+  productName: string,
+  catalog: CatalogProduct[],
+): ProductionBatchPoolItem | undefined {
+  const bn = normalizeBatchNo(batchNo).toLowerCase();
+  if (!bn) return undefined;
+  return pool.find(
+    (p) =>
+      normalizeBatchNo(p.batchNo).toLowerCase() === bn &&
+      productsMatch(p.productName, productName, catalog),
+  );
+}
+
+export function batchDefKey(def: BatchDef, catalog: CatalogProduct[]): string {
+  if (def.productName?.trim()) {
+    return batchUsageKey(def.batchNo, def.productName, catalog);
+  }
+  return normalizeBatchNo(def.batchNo).toLowerCase();
 }
 
 export function accumulateBatchUsageFromOrders(
@@ -353,7 +413,7 @@ export function accumulateBatchUsageFromOrders(
       );
       if (liters === null) continue;
 
-      const key = batchNo.toLowerCase();
+      const key = batchUsageKey(batchNo, line.productName ?? "", catalog);
       used.set(key, roundLiters((used.get(key) ?? 0) + liters));
     }
   }
@@ -364,19 +424,25 @@ export function accumulateBatchUsageFromOrders(
 export function effectiveBatchDefsForOrder(
   pool: BatchDef[],
   usedElsewhere: Map<string, number>,
+  catalog: CatalogProduct[],
 ): BatchDef[] {
   return pool.map((pb) => {
-    const key = normalizeBatchNo(pb.batchNo).toLowerCase();
+    const key = batchDefKey(pb, catalog);
     const elsewhere = usedElsewhere.get(key) ?? 0;
     return {
       batchNo: pb.batchNo,
+      productName: pb.productName,
       totalLiters: roundLiters(Math.max(0, pb.totalLiters - elsewhere)),
     };
   });
 }
 
 export function poolToBatchDefs(pool: ProductionBatchPoolItem[]): BatchDef[] {
-  return pool.map((p) => ({ batchNo: p.batchNo, totalLiters: p.totalLiters }));
+  return pool.map((p) => ({
+    batchNo: p.batchNo,
+    totalLiters: p.totalLiters,
+    productName: p.productName,
+  }));
 }
 
 export function usageLitersByBatchFromLines(
@@ -389,7 +455,7 @@ export function usageLitersByBatchFromLines(
     if (!batchNo) continue;
     const liters = rowLiters(line, catalog);
     if (liters === null) continue;
-    const key = batchNo.toLowerCase();
+    const key = batchUsageKey(batchNo, line.productName, catalog);
     used.set(key, roundLiters((used.get(key) ?? 0) + liters));
   }
   return used;

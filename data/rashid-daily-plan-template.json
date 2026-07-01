@@ -1,0 +1,17 @@
+[
+  { "employeeId": "qasim", "duty": "Rhino 500 ml Sticker", "baseTarget": 1000 },
+  { "employeeId": "qasim", "duty": "Rhino 500 ml Barcoding", "baseTarget": 1000 },
+  { "employeeId": "qasim", "duty": "Brighten Pouch Barcoding", "baseTarget": 500 },
+  { "employeeId": "rashid", "duty": "Rhino 500 ml Filling", "baseTarget": 1000 },
+  { "employeeId": "rashid", "duty": "Brighten Pouch Filling", "baseTarget": 500 },
+  { "employeeId": "zaheer", "duty": "Rhino 500 ml Partition", "baseTarget": 33 },
+  { "employeeId": "zaheer", "duty": "Brighten Pouch Partition", "baseTarget": 50 },
+  { "employeeId": "zaheer", "duty": "Washout ST", "baseTarget": 0 },
+  { "employeeId": "zubaid-ullah", "duty": "Rhino 500 ml Packing", "baseTarget": 33 },
+  { "employeeId": "zubaid-ullah", "duty": "Brighten Pouch Packing", "baseTarget": 50 },
+  { "employeeId": "zubaid-ullah", "duty": "Washout ST Filling", "baseTarget": 20 },
+  { "employeeId": "arsalan", "duty": "Brighten Pouch heat seal", "baseTarget": 500 },
+  { "employeeId": "arsalan", "duty": "Rhino 500 ml Lid + Cap", "baseTarget": 1000 },
+  { "employeeId": "arsalan", "duty": "Stacking all", "baseTarget": 85 },
+  { "employeeId": "arsalan", "duty": "Washout ST", "baseTarget": 20 }
+]

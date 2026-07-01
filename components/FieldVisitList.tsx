@@ -1,44 +1,71 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import type { SerializedTicket } from "@/lib/fieldVisitTickets";
+import {
+  SAMPLE_MODE_LABELS,
+  STATUS_LABELS,
+  type SampleMode,
+  type SerializedTicket,
+} from "@/lib/fieldVisitTickets";
 
 type Filter = "all" | "open" | "awaiting" | "closed" | "follow_up";
-
-const STATUS_LABELS: Record<string, string> = {
-  sample_requested: "Sample requested",
-  sample_delivered: "Sample delivered",
-  visit_concluded: "Awaiting order",
-  closed_won: "Won",
-  closed_lost: "Lost",
-};
 
 function statusBadgeClass(status: string): string {
   if (status === "closed_won") return "bg-emerald-100 text-emerald-800";
   if (status === "closed_lost") return "bg-red-100 text-red-800";
   if (status === "visit_concluded") return "bg-amber-100 text-amber-900";
-  if (status === "sample_delivered") return "bg-sky-100 text-sky-900";
-  return "bg-zinc-100 text-zinc-800";
+  return "bg-sky-100 text-sky-900";
 }
 
 function matchesFilter(t: SerializedTicket, filter: Filter): boolean {
   if (filter === "follow_up") return t.needsFollowUp;
-  if (filter === "open") return t.status === "sample_requested" || t.status === "sample_delivered";
+  if (filter === "open") return t.status === "active";
   if (filter === "awaiting") return t.status === "visit_concluded";
   if (filter === "closed") return t.status === "closed_won" || t.status === "closed_lost";
   return true;
 }
 
+function matchesSearch(t: SerializedTicket, query: string): boolean {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return true;
+
+  const haystack = [
+    t.placeName,
+    t.customerName,
+    t.city,
+    t.contactPhone,
+    t.contactPerson,
+    t.notes,
+    t.createdByName,
+    t.createdByUsername,
+    t.linkedPoNumber,
+    t.finalConclusion,
+    t.followUpComments,
+    t.feedbackComments,
+    t.closedReason,
+    STATUS_LABELS[t.status],
+    SAMPLE_MODE_LABELS[t.sampleMode as SampleMode],
+    ...t.sampleProducts.flatMap((p) => [p.productName, p.notes]),
+    ...t.visitLogs.flatMap((l) => [l.conclusion, l.recordedByName]),
+  ];
+
+  return haystack.some((part) => part?.toLowerCase().includes(needle));
+}
+
 type RepPoint = { username: string; name: string; points: number; won: number; lost: number };
 
 export function FieldVisitList({ showRep }: { showRep?: boolean }) {
+  const router = useRouter();
   const [tickets, setTickets] = useState<SerializedTicket[]>([]);
   const [repPoints, setRepPoints] = useState<RepPoint[]>([]);
   const [followUpCount, setFollowUpCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState("");
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -75,7 +102,32 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
     load();
   }, [load]);
 
-  const filtered = tickets.filter((t) => matchesFilter(t, filter));
+  async function createVisit() {
+    setCreating(true);
+    setError("");
+    try {
+      const res = await fetch("/api/field-visits", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      const data = (await res.json()) as { id?: string; ticket?: SerializedTicket; error?: string };
+      if (!res.ok || !data.ticket?.id) {
+        setError(data.error ?? "Could not create visit.");
+        return;
+      }
+      router.push(`/field-visits/${data.ticket.id}`);
+    } catch {
+      setError("Could not create visit.");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  const filtered = tickets.filter(
+    (t) => matchesFilter(t, filter) && matchesSearch(t, search),
+  );
 
   return (
     <div className="space-y-4">
@@ -104,16 +156,29 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
       {followUpCount > 0 ? (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <strong>{followUpCount}</strong> visit{followUpCount === 1 ? "" : "s"} need a{" "}
-          <strong>2-week follow-up</strong> — call the customer and record their comments.
+          <strong>2-week follow-up</strong> after sample delivery.
         </div>
       ) : null}
+
+      <div className="rounded-xl border border-zinc-200 bg-white p-3">
+        <label className="block text-xs font-medium uppercase tracking-wide text-zinc-500">
+          Search
+        </label>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Customer, place, city, phone, product, notes, rep…"
+          className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400"
+        />
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {(
           [
             ["all", "All"],
             ["follow_up", `Follow-up (${followUpCount})`],
-            ["open", "Open"],
+            ["open", "In progress"],
             ["awaiting", "Awaiting order"],
             ["closed", "Closed"],
           ] as const
@@ -132,12 +197,14 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
           </button>
         ))}
         {!showRep ? (
-          <Link
-            href="/field-visits/new"
-            className="ml-auto rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white"
+          <button
+            type="button"
+            disabled={creating}
+            onClick={() => void createVisit()}
+            className="ml-auto rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
           >
-            Request sample
-          </Link>
+            {creating ? "Creating…" : "New visit"}
+          </button>
         ) : null}
       </div>
 
@@ -146,7 +213,9 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
 
       {!loading && filtered.length === 0 ? (
         <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
-          No visits in this view.
+          {search.trim()
+            ? "No visits match your search."
+            : "No visits in this view."}
         </p>
       ) : null}
 
@@ -159,10 +228,21 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <div className="font-medium text-zinc-900">{t.placeName}</div>
+                  <div className="font-medium text-zinc-900">
+                    {t.placeName ||
+                      t.customerName ||
+                      (t.visitLogCount > 0 ? "Visit logged — add customer details" : "New visit (draft)")}
+                  </div>
                   <div className="text-sm text-zinc-600">
-                    {t.customerName}
-                    {t.city ? ` · ${t.city}` : ""}
+                    {t.placeName && t.customerName ? t.customerName : null}
+                    {t.city ? `${t.placeName || t.customerName ? " · " : ""}${t.city}` : ""}
+                  </div>
+                  <div className="mt-0.5 text-xs text-zinc-500">
+                    {t.visitLogCount} visit{t.visitLogCount !== 1 ? "s" : ""}
+                    {t.sampleMode !== "none"
+                      ? ` · ${SAMPLE_MODE_LABELS[t.sampleMode as SampleMode]}`
+                      : ""}
+                    {!showRep && t.createdByName ? ` · ${t.createdByName}` : ""}
                   </div>
                   {showRep ? (
                     <div className="mt-0.5 text-xs text-zinc-500">{t.createdByName}</div>
@@ -172,7 +252,7 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(t.status)}`}
                   >
-                    {STATUS_LABELS[t.status] ?? t.status}
+                    {STATUS_LABELS[t.status]}
                   </span>
                   {t.needsFollowUp ? (
                     <span className="text-xs font-medium text-amber-700">2-week follow-up due</span>

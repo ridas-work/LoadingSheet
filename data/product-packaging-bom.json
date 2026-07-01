@@ -1,0 +1,229 @@
+[
+  {
+    "productCode": "rhino-250ml",
+    "lines": [
+      { "packagingItemCode": "rhino-lids", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-caps", "qtyPerBottle": 1 },
+      { "packagingItemCode": "bottle-rhino-250ml", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-stickers-250ml-front", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-stickers-250ml-back", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-string", "qtyPerBottle": 1 },
+      { "packagingItemCode": "sticker-rs-199", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-boxes-250ml", "qtyPerCarton": 1 }
+    ]
+  },
+  {
+    "productCode": "rhino-500ml",
+    "lines": [
+      { "packagingItemCode": "rhino-lids", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-caps", "qtyPerBottle": 1 },
+      { "packagingItemCode": "bottle-rhino-500ml", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-stickers-500ml-front", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-stickers-500ml-back", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-boxes-500ml", "qtyPerCarton": 1 },
+      { "packagingItemCode": "rhino-partition-500ml-big", "qtyPerCarton": 4 },
+      { "packagingItemCode": "rhino-partition-500ml-small", "qtyPerCarton": 5 }
+    ]
+  },
+  {
+    "productCode": "rhino-750ml",
+    "lines": [
+      { "packagingItemCode": "rhino-lids", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-caps", "qtyPerBottle": 1 },
+      { "packagingItemCode": "bottle-rhino-750ml", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-stickers-750ml-front", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-stickers-750ml-back", "qtyPerBottle": 1 },
+      { "packagingItemCode": "rhino-boxes-750ml", "qtyPerCarton": 1 },
+      { "packagingItemCode": "rhino-partition-750ml-big", "qtyPerCarton": 1 },
+      { "packagingItemCode": "rhino-partition-750ml-small", "qtyPerCarton": 4 }
+    ]
+  },
+  {
+    "productCode": "brighten-liquid-laundry-detergent",
+    "lines": [
+      { "packagingItemCode": "brighten-fabrito-lids", "qtyPerBottle": 1 },
+      { "packagingItemCode": "brighten-cap", "qtyPerBottle": 1 },
+      { "packagingItemCode": "brighten-bottles-1ltr", "qtyPerBottle": 1 },
+      { "packagingItemCode": "brighten-stickers-1ltr-front", "qtyPerBottle": 1 },
+      { "packagingItemCode": "brighten-stickers-1ltr-back", "qtyPerBottle": 1 },
+      { "packagingItemCode": "baby-stickers-brighten", "qtyPerBottle": 1 },
+      { "packagingItemCode": "brighten-fabrito-boxes", "qtyPerCarton": 1 },
+      { "packagingItemCode": "brighten-fabrito-big-partition", "qtyPerCarton": 1 },
+      { "packagingItemCode": "brighten-fabrito-small-partition", "qtyPerCarton": 4 }
+    ]
+  },
+  {
+    "productCode": "fabrito-fabric-softener",
+    "lines": [
+      { "packagingItemCode": "brighten-fabrito-lids", "qtyPerBottle": 1 },
+      { "packagingItemCode": "fabrito-caps", "qtyPerBottle": 1 },
+      { "packagingItemCode": "fabrito-bottles", "qtyPerBottle": 1 },
+      { "packagingItemCode": "fabrito-front-stickers", "qtyPerBottle": 1 },
+      { "packagingItemCode": "fabrito-back-stickers", "qtyPerBottle": 1 },
+      { "packagingItemCode": "baby-stickers-fabrito", "qtyPerBottle": 1 },
+      { "packagingItemCode": "brighten-fabrito-boxes", "qtyPerCarton": 1 },
+      { "packagingItemCode": "brighten-fabrito-big-partition", "qtyPerCarton": 1 },
+      { "packagingItemCode": "brighten-fabrito-small-partition", "qtyPerCarton": 4 }
+    ]
+  },
+  {
+    "productCode": "power-wash",
+    "lines": [
+      { "packagingItemCode": "power-wash-flip-tip", "qtyPerBottle": 1 },
+      { "packagingItemCode": "power-wash-bottles", "qtyPerBottle": 1 },
+      { "packagingItemCode": "power-wash-stickers-front", "qtyPerBottle": 1 },
+      { "packagingItemCode": "power-wash-stickers-back", "qtyPerBottle": 1 },
+      { "packagingItemCode": "ph-stickers-power-wash", "qtyPerBottle": 1 },
+      { "packagingItemCode": "power-wash-degreaser-boxes", "qtyPerCarton": 1 },
+      { "packagingItemCode": "r-pw-degreaser-big-partition", "qtyPerCarton": 1 },
+      { "packagingItemCode": "r-pw-degreaser-small-partition", "qtyPerCarton": 4 }
+    ]
+  },
+  {
+    "productCode": "degrease-spray",
+    "lines": [
+      { "packagingItemCode": "degreaser-pumps-750ml", "qtyPerBottle": 1 },
+      { "packagingItemCode": "degreaser-bottles-750ml", "qtyPerBottle": 1 },
+      { "packagingItemCode": "degreaser-stickers-front", "qtyPerBottle": 1 },
+      { "packagingItemCode": "degreaser-stickers-back", "qtyPerBottle": 1 },
+      { "packagingItemCode": "power-wash-degreaser-boxes", "qtyPerCarton": 1 },
+      { "packagingItemCode": "r-pw-degreaser-big-partition", "qtyPerCarton": 1 },
+      { "packagingItemCode": "r-pw-degreaser-small-partition", "qtyPerCarton": 4 }
+    ]
+  },
+  {
+    "productCode": "glim",
+    "lines": [
+      { "packagingItemCode": "glim-spray", "qtyPerBottle": 1 },
+      { "packagingItemCode": "glim-bottle", "qtyPerBottle": 1 },
+      { "packagingItemCode": "glim-stickers-front", "qtyPerBottle": 1 },
+      { "packagingItemCode": "glim-stickers-back", "qtyPerBottle": 1 },
+      { "packagingItemCode": "power-wash-degreaser-boxes", "qtyPerCarton": 1 },
+      { "packagingItemCode": "r-pw-degreaser-big-partition", "qtyPerCarton": 1 },
+      { "packagingItemCode": "r-pw-degreaser-small-partition", "qtyPerCarton": 4 }
+    ]
+  },
+  {
+    "productCode": "titan-500g",
+    "lines": [
+      { "packagingItemCode": "titan-caps-print-area", "qtyPerBottle": 1 },
+      { "packagingItemCode": "titan-pink-jar", "qtyPerBottle": 1 },
+      { "packagingItemCode": "titan-spoons", "qtyPerBottle": 1 },
+      { "packagingItemCode": "titan-pink-labels", "qtyPerBottle": 1 },
+      { "packagingItemCode": "titan-string", "qtyPerBottle": 1 },
+      { "packagingItemCode": "sticker-rs-899", "qtyPerBottle": 1 },
+      { "packagingItemCode": "titan-box-500g", "qtyPerCarton": 1 }
+    ]
+  },
+  {
+    "productCode": "titan-1250g",
+    "lines": [
+      { "packagingItemCode": "titan-caps-1000g", "qtyPerBottle": 1 },
+      { "packagingItemCode": "titan-jar-1000g", "qtyPerBottle": 1 },
+      { "packagingItemCode": "titan-spoons-1000g", "qtyPerBottle": 1 },
+      { "packagingItemCode": "titan-stickers-1000g", "qtyPerBottle": 1 },
+      { "packagingItemCode": "sticker-25pct-extra", "qtyPerBottle": 1 },
+      { "packagingItemCode": "titan-box-1250g", "qtyPerCarton": 1 }
+    ]
+  },
+  {
+    "productCode": "washout-floral",
+    "lines": [
+      { "packagingItemCode": "wash-out-seal", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-caps", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-bottles", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-label-floral", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-label-floral", "qtyPerBottle": 1, "role": "label-back" },
+      { "packagingItemCode": "wash-out-boxes", "qtyPerCarton": 1 },
+      { "packagingItemCode": "wash-out-partition-big", "qtyPerCarton": 1 }
+    ]
+  },
+  {
+    "productCode": "washout-ocean",
+    "lines": [
+      { "packagingItemCode": "wash-out-seal", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-caps", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-bottles", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-label-ocean", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-label-ocean", "qtyPerBottle": 1, "role": "label-back" },
+      { "packagingItemCode": "wash-out-boxes", "qtyPerCarton": 1 },
+      { "packagingItemCode": "wash-out-partition-big", "qtyPerCarton": 1 }
+    ]
+  },
+  {
+    "productCode": "washout-lemon",
+    "lines": [
+      { "packagingItemCode": "wash-out-seal", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-caps", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-bottles", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-label-lemon", "qtyPerBottle": 1 },
+      { "packagingItemCode": "wash-out-label-lemon", "qtyPerBottle": 1, "role": "label-back" },
+      { "packagingItemCode": "wash-out-boxes", "qtyPerCarton": 1 },
+      { "packagingItemCode": "wash-out-partition-big", "qtyPerCarton": 1 }
+    ]
+  },
+  {
+    "productCode": "rhino-2x2-750ml",
+    "includes": [{ "productCode": "rhino-750ml", "bottlesPerUnit": 2 }],
+    "lines": [
+      { "packagingItemCode": "sticker-save-rs-65", "qtyPerCarton": 1 },
+      { "packagingItemCode": "rhino-boxes-750ml", "qtyPerCarton": 1 },
+      { "packagingItemCode": "rhino-partition-750ml-small", "qtyPerCarton": 4 }
+    ]
+  },
+  {
+    "productCode": "power-wash-dish-degrease-bundle",
+    "includes": [
+      { "productCode": "power-wash", "bottlesPerUnit": 1 },
+      { "productCode": "degrease-spray", "bottlesPerUnit": 1 }
+    ],
+    "lines": [
+      { "packagingItemCode": "sticker-save-rs-50", "qtyPerCarton": 1 },
+      { "packagingItemCode": "power-wash-degreaser-boxes", "qtyPerCarton": 1 },
+      { "packagingItemCode": "r-pw-degreaser-big-partition", "qtyPerCarton": 1 },
+      { "packagingItemCode": "r-pw-degreaser-small-partition", "qtyPerCarton": 4 }
+    ]
+  },
+  {
+    "productCode": "brighten-fabrito-bundle-1l",
+    "includes": [
+      { "productCode": "brighten-liquid-laundry-detergent", "bottlesPerUnit": 1 },
+      { "productCode": "fabrito-fabric-softener", "bottlesPerUnit": 1 }
+    ],
+    "lines": [
+      { "packagingItemCode": "sticker-save-rs-60", "qtyPerCarton": 1 },
+      { "packagingItemCode": "brighten-fabrito-boxes", "qtyPerCarton": 1 },
+      { "packagingItemCode": "brighten-fabrito-small-partition", "qtyPerCarton": 4 }
+    ]
+  },
+  {
+    "productCode": "power-wash-pouch",
+    "lines": [
+      { "packagingItemCode": "power-wash-pouches", "qtyPerBottle": 1 },
+      { "packagingItemCode": "sticker-save-rs-200", "qtyPerBottle": 1 },
+      { "packagingItemCode": "fabrito-brighten-pw-pouch-box", "qtyPerCarton": 1 },
+      { "packagingItemCode": "fabrito-brighten-pw-pouch-big-partition", "qtyPerCarton": 4 },
+      { "packagingItemCode": "fabrito-brighten-pw-pouch-small-partition", "qtyPerCarton": 3 }
+    ]
+  },
+  {
+    "productCode": "brighten-laundry-detergent-pouch",
+    "lines": [
+      { "packagingItemCode": "brighten-pouches", "qtyPerBottle": 1 },
+      { "packagingItemCode": "sticker-save-rs-95", "qtyPerBottle": 1 },
+      { "packagingItemCode": "fabrito-brighten-pw-pouch-box", "qtyPerCarton": 1 },
+      { "packagingItemCode": "fabrito-brighten-pw-pouch-big-partition", "qtyPerCarton": 4 },
+      { "packagingItemCode": "fabrito-brighten-pw-pouch-small-partition", "qtyPerCarton": 3 }
+    ]
+  },
+  {
+    "productCode": "fabrito-fabric-softener-pouch",
+    "lines": [
+      { "packagingItemCode": "fabrito-pouches", "qtyPerBottle": 1 },
+      { "packagingItemCode": "sticker-save-rs-105", "qtyPerBottle": 1 },
+      { "packagingItemCode": "fabrito-brighten-pw-pouch-box", "qtyPerCarton": 1 },
+      { "packagingItemCode": "fabrito-brighten-pw-pouch-big-partition", "qtyPerCarton": 4 },
+      { "packagingItemCode": "fabrito-brighten-pw-pouch-small-partition", "qtyPerCarton": 3 }
+    ]
+  }
+]

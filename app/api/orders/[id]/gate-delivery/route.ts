@@ -25,7 +25,7 @@ import {
   restoreReadyBottlesAfterReturn,
   type ReadyDeductionSummaryLine,
 } from "@/lib/readyBottleDispatch";
-import { getReadyStockMap } from "@/lib/readyBottleLedger";
+import { getReadyStockMap, listBatchLots } from "@/lib/readyBottleLedger";
 import { readyAllocationForOrder } from "@/lib/orderBatchStatus";
 import type { DeductionPacking } from "@/lib/packagingDeduction";
 import { canEditGateDelivery, roleFromSession } from "@/lib/roles";
@@ -104,6 +104,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       bundleComponents: p.bundleComponents,
     }));
     const readyStockMap = await getReadyStockMap();
+    const batchLotDocs = await listBatchLots();
+    const readyBatchLots = batchLotDocs.map((l) => ({
+      batchNo: l.batchNo,
+      productCode: l.productCode,
+      bottles: l.bottles,
+      createdAt: l.createdAt,
+    }));
     const readyByBox = readyAllocationForOrder(
       sheetLines.map((l, i) => ({
         boxNo: l.boxNo ?? i + 1,
@@ -114,6 +121,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       })),
       catalogDeduction,
       readyStockMap,
+      readyBatchLots,
     );
 
     if (!existing.readyBottleDeductedAt) {

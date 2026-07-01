@@ -1,122 +1,214 @@
 import Link from "next/link";
 
 import { AddProductModal } from "@/components/AddProductModal";
+import { PageHeader } from "@/components/PageHeader";
 import { ProductionBatchRowActions } from "@/components/ProductionBatchRowActions";
+import { ProductionBatchTabs } from "@/components/ProductionBatchTabs";
 import { auth } from "@/lib/auth";
 import { formatLiters } from "@/lib/batchVolume";
 import { connectToDatabase } from "@/lib/db";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
+import { openProductionBatchMongoFilter } from "@/lib/productionBatchClose";
 import {
   loadBatchUsageContext,
   statusLabel,
-  usageForBatchNo,
+  usageForProductionBatch,
   type ProductionBatchStatus,
 } from "@/lib/productionBatchStatus";
+import { inferNimraBatchKind } from "@/lib/nimraBatchProductLists";
+import {
+  remainingSampleLitersForBatch,
+  regularProductionBatchMongoFilter,
+  sampleProductionBatchMongoFilter,
+} from "@/lib/sampleProductionStock";
 import { roleFromSession } from "@/lib/roles";
+import { ui } from "@/lib/ui";
+
+type PurposeFilter = "all" | "regular" | "sample";
 
 function StatusBadge({ status, label }: { status: ProductionBatchStatus; label: string }) {
-  const styles =
+  const badgeClass =
     status === "available"
-      ? "bg-zinc-100 text-zinc-800 ring-zinc-200"
+      ? ui.badgeNeutral
       : status === "empty"
-        ? "bg-amber-50 text-amber-900 ring-amber-200"
-        : "bg-blue-50 text-blue-900 ring-blue-200";
-  return (
-    <span className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ring-1 ${styles}`}>
-      {label}
-    </span>
-  );
+        ? ui.badgeWarning
+        : ui.badgeInfo;
+  return <span className={badgeClass}>{label}</span>;
 }
 
-export default async function ProductionBatchesPage() {
+function purposeFilterFromParam(raw: string | undefined): PurposeFilter {
+  if (raw === "regular" || raw === "sample") return raw;
+  return "all";
+}
+
+function mongoFilterForPurpose(purpose: PurposeFilter): Record<string, unknown> {
+  if (purpose === "regular") return regularProductionBatchMongoFilter();
+  if (purpose === "sample") return sampleProductionBatchMongoFilter();
+  return openProductionBatchMongoFilter();
+}
+
+type PageProps = {
+  searchParams: Promise<{ purpose?: string }>;
+};
+
+export default async function ProductionBatchesPage({ searchParams }: PageProps) {
   await connectToDatabase();
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
   const isBatchEditor = role === "batch_editor";
 
-  const { usedMap } = await loadBatchUsageContext();
-  const batches = await ProductionBatch.find({}).sort({ preparedAt: -1, createdAt: -1 }).lean();
+  const sp = await searchParams;
+  const purpose = purposeFilterFromParam(sp.purpose);
+
+  const { usedMap, catalog } = await loadBatchUsageContext();
+  const batches = await ProductionBatch.find(mongoFilterForPurpose(purpose))
+    .sort({ preparedAt: -1, createdAt: -1 })
+    .lean();
+
+  const tabClass = (active: boolean) =>
+    `rounded-lg px-3 py-1.5 text-sm font-medium ${
+      active ? "bg-brand-800 text-white" : "bg-white text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-50"
+    }`;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-zinc-900">Production batches</h1>
-          <p className="mt-1 text-sm text-zinc-600">
-            Register each prepared batch with QC details. Batches in use or empty cannot be edited.
-          </p>
-        </div>
-        {isBatchEditor ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <AddProductModal />
-            <Link
-              href="/production/batches/new"
-              className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
-            >
-              Add batch
-            </Link>
-          </div>
-        ) : null}
+      <PageHeader
+        title="Production batches"
+        description="Register regular production for customer POs, or sample production for field visit samples. Sample batches are not used on loading sheets."
+        actions={
+          isBatchEditor ? (
+            <>
+              <AddProductModal />
+              <Link
+                href={
+                  purpose === "sample"
+                    ? "/production/batches/new?purpose=sample"
+                    : "/production/batches/new"
+                }
+                className={ui.btnPrimary}
+              >
+                Add batch
+              </Link>
+            </>
+          ) : undefined
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <ProductionBatchTabs active="open" />
+        <span className="text-zinc-300">|</span>
+        <Link href="/production/batches" className={tabClass(purpose === "all")}>
+          All
+        </Link>
+        <Link href="/production/batches?purpose=regular" className={tabClass(purpose === "regular")}>
+          Regular production
+        </Link>
+        <Link href="/production/batches?purpose=sample" className={tabClass(purpose === "sample")}>
+          Sample production
+        </Link>
       </div>
 
       {batches.length === 0 ? (
-        <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
+        <p className="empty-state">
           No production batches yet.
           {isBatchEditor ? " Use Add batch when a run is prepared." : null}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-          <table className="w-full min-w-[52rem] text-sm">
+        <div className={`${ui.card} overflow-x-auto`}>
+          <table className={`${ui.dataTable} min-w-[52rem]`}>
             <thead>
-              <tr className="border-b border-zinc-200 bg-zinc-50 text-left">
-                <th className="px-4 py-2 font-medium">Batch no</th>
-                <th className="px-4 py-2 font-medium">Product</th>
-                <th className="px-4 py-2 font-medium">Date</th>
-                <th className="px-4 py-2 font-medium">Status</th>
-                <th className="px-4 py-2 font-medium">pH</th>
-                <th className="px-4 py-2 font-medium">Quantity</th>
-                <th className="px-4 py-2 font-medium">Liters</th>
-                <th className="px-4 py-2 font-medium">By</th>
-                {isBatchEditor ? <th className="px-4 py-2 font-medium" /> : null}
+              <tr>
+                <th>Batch no</th>
+                <th>Product</th>
+                <th>Purpose</th>
+                <th>Type</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>pH</th>
+                <th>Quantity</th>
+                <th>Remaining</th>
+                <th>By</th>
+                {isBatchEditor ? <th /> : null}
               </tr>
             </thead>
             <tbody>
-              {batches.map((b) => {
-                const id = b._id.toString();
-                const usage = usageForBatchNo(b.batchNo, b.totalLiters, usedMap);
-                const label = statusLabel(usage.status, usage.remainingLiters);
-                return (
-                  <tr key={id} className="border-b border-zinc-100 last:border-0">
-                    <td className="px-4 py-2 font-medium text-zinc-900">
-                      <Link href={`/production/batches/${id}`} className="underline hover:text-zinc-700">
-                        {b.batchNo}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-2 text-zinc-700">{b.productName}</td>
-                    <td className="px-4 py-2 text-zinc-600">
-                      {new Date(b.preparedAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-4 py-2">
-                      <StatusBadge status={usage.status} label={label} />
-                    </td>
-                    <td className="px-4 py-2 text-zinc-700">{b.ph?.trim() || "—"}</td>
-                    <td className="px-4 py-2 text-zinc-700">{b.quantity?.trim() || "—"}</td>
-                    <td className="px-4 py-2 text-zinc-700">{formatLiters(b.totalLiters)} L</td>
-                    <td className="px-4 py-2 text-zinc-600">{b.createdByName || "—"}</td>
-                    {isBatchEditor ? (
-                      <td className="px-4 py-2">
-                        <ProductionBatchRowActions
-                          batchId={id}
-                          batchNo={b.batchNo}
-                          canManage={isBatchEditor}
-                          locked={usage.locked}
-                        />
+              {await Promise.all(
+                batches.map(async (b) => {
+                  const id = b._id.toString();
+                  const isSample = b.productionPurpose === "sample";
+                  const sampleRemaining = isSample
+                    ? await remainingSampleLitersForBatch({
+                        _id: b._id,
+                        totalLiters: b.totalLiters,
+                      })
+                    : null;
+                  const usage = isSample
+                    ? {
+                        usedLiters: Math.max(0, b.totalLiters - (sampleRemaining ?? 0)),
+                        remainingLiters: sampleRemaining ?? b.totalLiters,
+                        status: (sampleRemaining ?? 0) > 0 ? ("available" as const) : ("empty" as const),
+                        locked: false,
+                      }
+                    : usageForProductionBatch(b, usedMap, catalog);
+                  const batchKind = inferNimraBatchKind(b);
+                  const label = isSample
+                    ? sampleRemaining && sampleRemaining > 0
+                      ? `Sample (${formatLiters(sampleRemaining)} L left)`
+                      : "Sample (empty)"
+                    : statusLabel(usage.status, usage.remainingLiters);
+                  return (
+                    <tr key={id}>
+                      <td className="font-semibold text-slate-900">
+                        <Link
+                          href={`/production/batches/${id}`}
+                          className="text-brand-800 underline decoration-brand-200 underline-offset-2 hover:text-brand-950"
+                        >
+                          {b.batchNo}
+                        </Link>
                       </td>
-                    ) : null}
-                  </tr>
-                );
-              })}
+                      <td>{b.productName}</td>
+                      <td>
+                        <span
+                          className={
+                            isSample
+                              ? "rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-900"
+                              : "rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-700"
+                          }
+                        >
+                          {isSample ? "Sample" : "Regular"}
+                        </span>
+                      </td>
+                      <td>{batchKind === "custom_box" ? "Custom box" : "Standard"}</td>
+                      <td>{new Date(b.preparedAt).toLocaleDateString()}</td>
+                      <td>
+                        <StatusBadge status={usage.status} label={label} />
+                      </td>
+                      <td>{b.ph?.trim() || "—"}</td>
+                      <td>{b.quantity?.trim() || "—"}</td>
+                      <td>
+                        {formatLiters(usage.remainingLiters)} L
+                        {usage.usedLiters > 0 ? (
+                          <span className="block text-xs text-slate-500">
+                            of {formatLiters(b.totalLiters)} L
+                          </span>
+                        ) : null}
+                      </td>
+                      <td>{b.createdByName || "—"}</td>
+                      {isBatchEditor ? (
+                        <td>
+                          <ProductionBatchRowActions
+                            batchId={id}
+                            batchNo={b.batchNo}
+                            canManage={isBatchEditor}
+                            locked={usage.locked}
+                          />
+                        </td>
+                      ) : null}
+                    </tr>
+                  );
+                }),
+              )}
             </tbody>
           </table>
         </div>

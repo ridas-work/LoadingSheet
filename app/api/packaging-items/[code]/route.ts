@@ -65,7 +65,6 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   if (!canEditPackagingInventory(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  const haiderOnlyLedger = role === "packaging_editor";
 
   const userId = (session.user as { id?: string }).id;
   if (!userId) {
@@ -79,6 +78,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   }
 
   const body = (await req.json().catch(() => null)) as {
+    name?: unknown;
     purchasedQty?: unknown;
     rejectedDamage?: unknown;
     uip?: unknown;
@@ -99,13 +99,16 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
 
   const beforePurchased = item.purchasedQty ?? 0;
   const beforeRejected = item.rejectedDamage ?? 0;
+  const beforeUip = item.uip ?? 0;
+  const beforeName = item.name ?? "";
   const before = packagingBalance(item);
 
-  if (haiderOnlyLedger && body.uip !== undefined) {
-    return NextResponse.json(
-      { error: "UIP is updated automatically from filling and delivered orders." },
-      { status: 400 },
-    );
+  if (body.name !== undefined) {
+    const nextName = typeof body.name === "string" ? body.name.trim() : "";
+    if (!nextName) {
+      return NextResponse.json({ error: "Material name cannot be empty." }, { status: 400 });
+    }
+    item.name = nextName;
   }
 
   if (body.onHand !== undefined && body.purchasedQty === undefined) {
@@ -127,7 +130,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
       if (typeof v === "object") return NextResponse.json({ error: v.error }, { status: 400 });
       item.rejectedDamage = v;
     }
-    if (!haiderOnlyLedger && body.uip !== undefined) {
+    if (body.uip !== undefined) {
       const v = parseNonNegativeInt(body.uip, "UIP");
       if (typeof v === "object") return NextResponse.json({ error: v.error }, { status: 400 });
       item.uip = v;
@@ -135,8 +138,9 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   }
 
   const after = packagingBalance(item);
+  const nameChanged = (item.name ?? "") !== beforeName;
 
-  if (after === before && !note) {
+  if (after === before && !note && !nameChanged) {
     return NextResponse.json({ item: serializePackagingItem(item) });
   }
 
@@ -145,20 +149,36 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
 
   const purchasedChanged = (item.purchasedQty ?? 0) !== beforePurchased;
   const rejectedChanged = (item.rejectedDamage ?? 0) !== beforeRejected;
-  let reason: "purchase_adjust" | "rejected" | "count" = "count";
-  if (purchasedChanged && !rejectedChanged) reason = "purchase_adjust";
-  else if (rejectedChanged && !purchasedChanged) reason = "rejected";
+  const uipChanged = (item.uip ?? 0) !== beforeUip;
+  let reason: "purchase_adjust" | "rejected" | "adjustment" | "count" = "count";
+  if (nameChanged && !purchasedChanged && !rejectedChanged && !uipChanged && after === before) {
+    reason = "adjustment";
+  } else if (purchasedChanged && !rejectedChanged && !uipChanged) reason = "purchase_adjust";
+  else if (rejectedChanged && !purchasedChanged && !uipChanged) reason = "rejected";
+  else if (uipChanged && !purchasedChanged && !rejectedChanged) reason = "adjustment";
   else if (purchasedChanged || rejectedChanged) reason = "purchase_adjust";
 
-  await PackagingStockMovement.create({
-    itemCode,
-    quantityDelta: after - before,
-    quantityAfter: after,
-    reason,
-    note: note || (purchasedChanged ? "Purchased qty updated" : "Rejected/damage updated"),
-    recordedByUserId: userId,
-    recordedByName: session.user.name ?? "",
-  });
+  const defaultNote = nameChanged && after === before
+    ? `Renamed to "${item.name}"`
+    : purchasedChanged
+      ? "Purchased qty updated"
+      : rejectedChanged
+        ? "Rejected/damage updated"
+        : uipChanged
+          ? "UIP updated"
+          : "";
+
+  if (after !== before || note || nameChanged) {
+    await PackagingStockMovement.create({
+      itemCode,
+      quantityDelta: after - before,
+      quantityAfter: after,
+      reason,
+      note: note || defaultNote,
+      recordedByUserId: userId,
+      recordedByName: session.user.name ?? "",
+    });
+  }
 
   return NextResponse.json({ item: serializePackagingItem(item) });
 }

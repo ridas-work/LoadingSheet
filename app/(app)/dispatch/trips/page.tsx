@@ -3,29 +3,51 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
+import { isTripActiveForPlanner, normalizeGateStatus } from "@/lib/gateDelivery";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
-import { canEditDispatch, homePathForRole, roleFromSession } from "@/lib/roles";
+import {
+  canCreateDispatchTrips,
+  canEditDispatch,
+  homePathForRole,
+  isDispatchTripPlanner,
+  roleFromSession,
+} from "@/lib/roles";
 
 export default async function DispatchTripsPage() {
   await connectToDatabase();
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
+  const username = (session?.user as { username?: string })?.username;
   if (role && role !== "dispatch_editor" && role !== "admin") {
     redirect(homePathForRole(role));
   }
-  const canEdit = canEditDispatch(role);
+  const canEdit = canEditDispatch(role, username);
+  const canCreate = canCreateDispatchTrips(role, username);
+  const hideCompletedTrips = isDispatchTripPlanner(role, username) && role !== "admin";
 
-  const trips = await DispatchTrip.find({}).sort({ updatedAt: -1 }).lean();
-  const allOrderIds = trips.flatMap((t) => t.orderIds ?? []);
+  const allTrips = await DispatchTrip.find({}).sort({ updatedAt: -1 }).lean();
+  const allOrderIds = allTrips.flatMap((t) => t.orderIds ?? []);
   const orders =
     allOrderIds.length > 0
       ? await Order.find({ _id: { $in: allOrderIds } })
-          .select({ poNumber: 1 })
+          .select({ poNumber: 1, gateDeliveryStatus: 1 })
           .lean()
       : [];
   const poById = new Map(orders.map((o) => [o._id.toString(), o.poNumber]));
+  const gateStatusByOrderId = new Map(
+    orders.map((o) => [o._id.toString(), normalizeGateStatus(o.gateDeliveryStatus)]),
+  );
+
+  const trips = hideCompletedTrips
+    ? allTrips.filter((t) => {
+        const statuses = (t.orderIds ?? []).map((oid) =>
+          gateStatusByOrderId.get(oid.toString()),
+        ).filter((s): s is NonNullable<typeof s> => s !== undefined);
+        return isTripActiveForPlanner(statuses);
+      })
+    : allTrips;
 
   return (
     <div className="space-y-6">
@@ -35,10 +57,12 @@ export default async function DispatchTripsPage() {
           <p className="mt-1 text-sm text-zinc-600">
             {canEdit
               ? "Group multiple POs on one vehicle. Enter vehicle and driver once; assign batches per PO on each loading sheet."
-              : "View vehicle trips and linked POs (read-only)."}
+              : hideCompletedTrips
+                ? "Active vehicle trips only — trips where every PO is out for delivery or delivered are hidden."
+                : "View vehicle trips and linked POs (read-only)."}
           </p>
         </div>
-        {canEdit ? (
+        {canCreate ? (
           <Link
             href="/dispatch/trips/new"
             className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
@@ -50,7 +74,9 @@ export default async function DispatchTripsPage() {
 
       {trips.length === 0 ? (
         <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
-          No trips yet. Create one to dispatch several POs on the same truck.
+          {hideCompletedTrips
+            ? "No active trips. Delivered and out-for-delivery trips are hidden — create a new trip from Orders when POs are ready."
+            : "No trips yet. Create one to dispatch several POs on the same truck."}
         </p>
       ) : (
         <ul className="divide-y divide-zinc-200 overflow-hidden rounded-xl border border-zinc-200 bg-white">

@@ -26,6 +26,8 @@ export async function POST(req: Request) {
   const productCode = typeof body?.productCode === "string" ? body.productCode.trim().toLowerCase() : "";
   const bottles = Number(body?.bottles);
   let note = typeof body?.note === "string" ? body.note.trim() : "";
+  const bundleCode = typeof body?.bundleCode === "string" ? body.bundleCode.trim().toLowerCase() : "";
+  const bundleSetId = typeof body?.bundleSetId === "string" ? body.bundleSetId.trim() : "";
 
   if (!batchNo) return NextResponse.json({ error: "Batch number is required." }, { status: 400 });
   if (!productCode) return NextResponse.json({ error: "Product is required." }, { status: 400 });
@@ -72,6 +74,8 @@ export async function POST(req: Request) {
     note,
     nimraLinked,
     batchProductName,
+    bundleCode,
+    bundleSetId,
     audit: { userId, userName: session.user.name ?? "" },
   });
   if (err) return NextResponse.json({ error: err }, { status: 400 });

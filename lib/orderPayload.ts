@@ -37,6 +37,11 @@ export type ParsedOrderPayload = {
 
 export type { CustomCartonDef };
 
+export type ParseOrderOptions = {
+  /** Boss edit — allow empty load when all products moved to pending (not new PO create). */
+  allowEmptyItems?: boolean;
+};
+
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
@@ -47,7 +52,10 @@ function toPositiveInt(v: unknown): number | null {
   return n;
 }
 
-function parseMixedSample(body: Record<string, unknown>):
+function parseMixedSample(
+  body: Record<string, unknown>,
+  options?: ParseOrderOptions,
+):
   | { ok: true; boxCount: number; contents: MixedSampleContent[] }
   | { ok: false; errors: Record<string, string> } {
   const errors: Record<string, string> = {};
@@ -79,7 +87,7 @@ function parseMixedSample(body: Record<string, unknown>):
     });
   }
 
-  if (contents.length === 0 && !errors.mixedSample) {
+  if (contents.length === 0 && !options?.allowEmptyItems && !errors.mixedSample) {
     errors.mixedSample = "Add at least one product with bottles ≥ 1.";
   }
 
@@ -133,10 +141,13 @@ function parseCustomCartons(body: Record<string, unknown>):
           errors[`customCartons.${ci}.contents.${ri}.bottleSizeCode`] = "Invalid container size.";
         }
         if (productName && bottles !== null) {
+          const packingCode =
+            typeof it.packingCode === "string" ? it.packingCode.trim().toLowerCase() : "";
           contents.push({
             productName,
             bottles,
             ...(bottleSizeCode && bottleSizeCode !== "catalog" ? { bottleSizeCode } : {}),
+            ...(packingCode ? { packingCode } : {}),
           });
         }
       });
@@ -167,6 +178,7 @@ function parseCustomCartons(body: Record<string, unknown>):
 
 export function parseOrderBody(
   body: OrderBody | null,
+  options?: ParseOrderOptions,
 ): { ok: true; payload: ParsedOrderPayload } | { ok: false; errors: Record<string, string> } {
   if (!body) {
     return { ok: false, errors: { body: "Invalid JSON body" } };
@@ -201,7 +213,7 @@ export function parseOrderBody(
   }
 
   if (orderKindInput === "mixed_sample") {
-    const mixed = parseMixedSample(body as Record<string, unknown>);
+    const mixed = parseMixedSample(body as Record<string, unknown>, options);
     if (!mixed.ok) {
       return { ok: false, errors: mixed.errors };
     }
@@ -273,7 +285,7 @@ export function parseOrderBody(
     return { ok: false, errors: merged };
   }
 
-  if (parsedItems.length === 0 && customCartons.length === 0) {
+  if (parsedItems.length === 0 && customCartons.length === 0 && !options?.allowEmptyItems) {
     return {
       ok: false,
       errors: { items: "Enter at least one standard product line or add a custom carton." },

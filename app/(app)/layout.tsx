@@ -1,10 +1,30 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AppNavLink } from "@/components/AppNavLink";
 import { auth } from "@/lib/auth";
-import { canAccessFieldVisits, homePathForRole, isAdmin, roleFromSession } from "@/lib/roles";
+import {
+  canAccessFieldVisits,
+  canRecordChemicalIntake,
+  canViewAdminSummary,
+  homePathForRole,
+  isAdmin,
+  isDispatchBatchOperator,
+  isDispatchTripPlanner,
+  roleFromSession,
+} from "@/lib/roles";
+import { ui } from "@/lib/ui";
 
 import { LogoutButton } from "./logout-button";
+
+function mainWidthClass(
+  wideLayout: boolean,
+  role: ReturnType<typeof roleFromSession>,
+): string {
+  if (wideLayout) return "max-w-[1600px]";
+  if (role === "gate_guard") return "max-w-5xl";
+  return "max-w-4xl";
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -15,107 +35,105 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const role = roleFromSession(session.user as { role?: string });
   const username = (session.user as { username?: string })?.username;
-  const homeHref = role ? homePathForRole(role) : "/new-order";
+  const homeHref = role ? homePathForRole(role, username) : "/new-order";
   const admin = isAdmin(role);
+  const summaryViewer = canViewAdminSummary(role, username);
   const fieldVisits = canAccessFieldVisits(role, username);
+  const tripPlanner = isDispatchTripPlanner(role, username);
+  const batchOperator = isDispatchBatchOperator(role, username);
+  const chemicalIntake = canRecordChemicalIntake(role);
+  const wideLayout =
+    admin ||
+    summaryViewer ||
+    role === "dispatch_editor" ||
+    role === "packaging_editor" ||
+    role === "chemicals_editor";
+  const widthClass = mainWidthClass(wideLayout, role);
 
   return (
-    <div className="min-h-dvh bg-zinc-50">
-      <header className="border-b border-zinc-200 bg-white">
-        <div
-          className={`mx-auto flex items-center justify-between px-4 py-3 ${
-            admin || role === "dispatch_editor" || role === "packaging_editor"
-              ? "max-w-[1600px]"
-              : role === "gate_guard"
-                ? "max-w-5xl"
-                : "max-w-4xl"
-          }`}
-        >
-          <div className="flex flex-wrap items-center gap-4">
-            <Link href={homeHref} className="text-sm font-semibold text-zinc-900">
-              Loading Sheet
+    <div className={ui.shell}>
+      <header className={ui.header}>
+        <div className={`${ui.headerInner} ${widthClass}`}>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+            <Link href={homeHref} className={ui.brand}>
+              <span className={ui.brandMark}>LS</span>
+              <span>Loading Sheet</span>
             </Link>
-            {admin ? (
-              <>
-                <Link href="/admin" className="text-sm text-zinc-600 hover:text-zinc-900">
-                  Summary
-                </Link>
-                <Link href="/orders" className="text-sm text-zinc-600 hover:text-zinc-900">
-                  Orders
-                </Link>
-                <Link href="/production/batches" className="text-sm text-zinc-600 hover:text-zinc-900">
-                  Production batches
-                </Link>
-                <Link href="/dispatch/trips" className="text-sm text-zinc-600 hover:text-zinc-900">
-                  Dispatch trips
-                </Link>
-                <Link href="/dispatch/inventory" className="text-sm text-zinc-600 hover:text-zinc-900">
-                  Packaging inventory
-                </Link>
-                <Link href="/dispatch/filling" className="text-sm text-zinc-600 hover:text-zinc-900">
-                  Daily filling
-                </Link>
-                <Link href="/admin/field-visits" className="text-sm text-zinc-600 hover:text-zinc-900">
-                  Field visits
-                </Link>
-              </>
-            ) : null}
-            {role === "gate_guard" ? (
-              <Link href="/gate/orders" className="text-sm text-zinc-600 hover:text-zinc-900">
-                Gate orders
-              </Link>
-            ) : null}
-            {role !== "batch_editor" && role !== "gate_guard" && role !== "packaging_editor" && !admin ? (
-              <Link href="/orders" className="text-sm text-zinc-600 hover:text-zinc-900">
-                Orders
-              </Link>
-            ) : null}
-            {role === "dispatch_editor" ? (
-              <>
-                <Link href="/dispatch/trips" className="text-sm text-zinc-600 hover:text-zinc-900">
-                  Dispatch trips
-                </Link>
-                <Link href="/dispatch/inventory" className="text-sm text-zinc-600 hover:text-zinc-900">
-                  Packaging inventory
-                </Link>
-                <Link href="/dispatch/filling" className="text-sm text-zinc-600 hover:text-zinc-900">
-                  Daily filling
-                </Link>
-              </>
-            ) : null}
-            {role === "packaging_editor" ? (
-              <Link href="/dispatch/inventory" className="text-sm text-zinc-600 hover:text-zinc-900">
-                Packaging inventory
-              </Link>
-            ) : null}
-            {role === "po_creator" ? (
-              <Link href="/new-order" className="text-sm text-zinc-600 hover:text-zinc-900">
-                New order
-              </Link>
-            ) : null}
-            {fieldVisits && !admin ? (
-              <Link href="/field-visits" className="text-sm text-zinc-600 hover:text-zinc-900">
-                Field visits
-              </Link>
-            ) : null}
+            <nav className={ui.nav} aria-label="Main">
+              {admin ? (
+                <>
+                  <AppNavLink href="/admin" label="Summary" />
+                  <AppNavLink href="/admin/approvals" label="Sample approvals" />
+                  <AppNavLink href="/admin/delivery-summary" label="Delivered" />
+                  <AppNavLink href="/admin/reports" label="Reports" />
+                  <AppNavLink href="/admin/packaging-alerts" label="Packaging alerts" />
+                  <AppNavLink href="/admin/chemical-requests" label="Chemical requests" />
+                  <AppNavLink href="/orders" label="Orders" />
+                  <AppNavLink href="/production/batches" label="Batches" />
+                  <AppNavLink href="/production/chemical-intake" label="Chemical intake" />
+                  <AppNavLink href="/dispatch/trips" label="Trips" />
+                  <AppNavLink href="/dispatch/inventory" label="Packaging" />
+                  <AppNavLink href="/dispatch/filling" label="Filling" />
+                  <AppNavLink href="/dispatch/ready-stock" label="Ready stock" />
+                  <AppNavLink href="/chemicals/inventory" label="Chemicals" />
+                  <AppNavLink href="/admin/field-visits" label="Field visits" />
+                  <AppNavLink href="/admin/rashid-daily-plan" label="Rashid plan" />
+                  <AppNavLink href="https://fleet.waleedtech.com.pk/" label="Fleet" external />
+                  <AppNavLink href="https://work.waleedtech.com.pk/" label="QC Logs" external />
+                  <AppNavLink href="https://rnt.waleedtech.com.pk/login" label="RNT" external />
+                </>
+              ) : null}
+              {role === "gate_guard" ? <AppNavLink href="/gate/orders" label="Gate orders" /> : null}
+              {summaryViewer && !admin ? (
+                <>
+                  <AppNavLink href="/admin" label="Summary" />
+                  <AppNavLink href="/admin/delivery-summary" label="Delivered" />
+                </>
+              ) : null}
+              {role !== "batch_editor" &&
+              role !== "gate_guard" &&
+              role !== "packaging_editor" &&
+              !admin &&
+              !(role === "dispatch_editor" && batchOperator) ? (
+                <AppNavLink href="/orders" label="Orders" />
+              ) : null}
+              {role === "batch_editor" ? (
+                <>
+                  <AppNavLink href="/production/batches" label="Batches" />
+                  <AppNavLink href="/production/chemical-intake" label="Chemical intake" />
+                </>
+              ) : null}
+              {role === "dispatch_editor" && tripPlanner ? (
+                <AppNavLink href="/dispatch/trips" label="Dispatch trips" />
+              ) : null}
+              {role === "dispatch_editor" && batchOperator ? (
+                <>
+                  <AppNavLink href="/dispatch/trips" label="Trips & batches" />
+                  <AppNavLink href="/dispatch/po-orders" label="Pending POs" />
+                  <AppNavLink href="/dispatch/daily-plan" label="Daily plan" />
+                  <AppNavLink href="/dispatch/filling" label="Daily filling" />
+                  <AppNavLink href="/dispatch/ready-stock" label="Ready stock" />
+                </>
+              ) : null}
+              {role === "packaging_editor" ? (
+                <AppNavLink href="/dispatch/inventory" label="Packaging inventory" />
+              ) : null}
+              {role === "chemicals_editor" ? (
+                <AppNavLink href="/chemicals/inventory" label="Chemical materials" />
+              ) : null}
+              {role === "po_creator" ? <AppNavLink href="/new-order" label="New order" /> : null}
+              {fieldVisits && !admin ? (
+                <AppNavLink href="/field-visits" label="Field visits" />
+              ) : null}
+            </nav>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-zinc-700">{session.user.name}</span>
+          <div className={ui.userChip}>
+            <span className={ui.userName}>{session.user.name}</span>
             <LogoutButton />
           </div>
         </div>
       </header>
-      <main
-        className={`mx-auto px-4 py-6 ${
-          admin || role === "dispatch_editor" || role === "packaging_editor"
-            ? "max-w-[1600px]"
-            : role === "gate_guard"
-              ? "max-w-5xl"
-              : "max-w-4xl"
-        }`}
-      >
-        {children}
-      </main>
+      <main className={`${ui.main} ${widthClass}`}>{children}</main>
     </div>
   );
 }

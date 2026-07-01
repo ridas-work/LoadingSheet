@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { computeWasteLiters } from "@/lib/batchFillingWaste";
 import { roundLiters } from "@/lib/batchVolume";
+import { ui } from "@/lib/ui";
 
 export type PackingOption = {
   code: string;
@@ -75,6 +76,10 @@ function fmtL(n: number) {
 
 function fmtInt(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+function packingOptionLabel(option: PackingOption) {
+  return `${option.name} (${fmtL(option.litersPerBottle)} L)`;
 }
 
 function rid() {
@@ -312,18 +317,16 @@ export function BatchFillingGrid({ date, initialRows, readOnly }: Props) {
 
   if (rows.length === 0) {
     return (
-      <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
-        No active batches. QC registers batches in Production.
-      </p>
+      <p className="empty-state">No active batches. QC registers batches in Production.</p>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+    <div className={ui.card}>
       {!readOnly ? (
         <p className="border-b border-zinc-100 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
-          Enter bottle counts by product/packing. <strong>Ready to deliver</strong> adds to the ready stock pool when saved (fully
-          finished: capped, labeled/stickered, packed, and ready to leave with dispatch). Save each batch after editing.
+          Enter bottle counts by container size / packing. <strong>Ready to deliver</strong> adds to the ready stock pool when saved (fully
+          finished: capped, labeled/stickered, packed, and ready to leave with dispatch). Pick the size Rashid is filling — e.g. 500 ml, 200 L drum, 5 kg jar. Save each batch after editing.
           Variance stays in liters using product bottle sizes.
         </p>
       ) : null}
@@ -426,7 +429,7 @@ export function BatchFillingGrid({ date, initialRows, readOnly }: Props) {
                           <table className="w-full border-collapse text-xs">
                             <thead className="bg-zinc-50 text-zinc-500">
                               <tr>
-                                <th className="px-2 py-1 text-left font-medium">Product / packing</th>
+                                <th className="px-2 py-1 text-left font-medium">Container / packing</th>
                                 <th className="w-24 px-2 py-1 text-right font-medium">Filled bottles</th>
                                 <th className="w-24 px-2 py-1 text-right font-medium">Ready bottles</th>
                                 <th className="w-20 px-2 py-1 text-right font-medium">Liters</th>
@@ -446,10 +449,10 @@ export function BatchFillingGrid({ date, initialRows, readOnly }: Props) {
                                           updatePackingLine(row.batchNo, line.id, { productCode: e.target.value })
                                         }
                                       >
-                                        <option value="">Select product…</option>
+                                        <option value="">Select size…</option>
                                         {row.packingOptions.map((option) => (
                                           <option key={option.code} value={option.code}>
-                                            {option.name} ({fmtL(option.litersPerBottle)} L)
+                                            {packingOptionLabel(option)}
                                           </option>
                                         ))}
                                       </select>

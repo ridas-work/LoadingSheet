@@ -1,11 +1,15 @@
-import { inferLitersPerBottleFromName } from "@/lib/batchVolume";
-import { inferLitersForCustomLine } from "@/lib/customBottleSizes";
+import {
+  inferBottleSizeCodeFromSavedLine,
+  inferLitersForCustomLine,
+} from "@/lib/customBottleSizes";
 import { findPackingByName, type PackingCatalogRow } from "@/lib/bundleCatalog";
 
 export type MixedSampleContent = {
   productName: string;
   bottles: number;
   bottleSizeCode?: string;
+  /** Catalog packing code when picked from the product list (fabrito-fabric-softener-pouch, etc.). */
+  packingCode?: string;
 };
 
 export type MixedSampleInput = {
@@ -35,11 +39,7 @@ export function isMixedSampleLine(
 
 export function formatMixedSampleLabel(contents: MixedSampleContent[]): string {
   if (contents.length === 0) return "Mixed sample box";
-  const parts = contents.map((c) => {
-    const name = c.productName.trim();
-    const short = name.length > 22 ? `${name.slice(0, 20)}…` : name;
-    return `${short}×${c.bottles}`;
-  });
+  const parts = contents.map((c) => `${c.productName.trim()} ×${c.bottles}`);
   return `Mixed sample: ${parts.join(", ")}`;
 }
 
@@ -64,6 +64,7 @@ export function buildMixedSampleSheetLines(input: MixedSampleInput): MixedSheetL
         productName: c.productName,
         bottles: c.bottles,
         ...(c.bottleSizeCode?.trim() ? { bottleSizeCode: c.bottleSizeCode.trim().toLowerCase() } : {}),
+        ...(c.packingCode?.trim() ? { packingCode: c.packingCode.trim().toLowerCase() } : {}),
       })),
       componentBatches: input.contents.map((c) => ({
         productName: c.productName,
@@ -82,13 +83,18 @@ export function resolveMixedSampleParts(
 ): Array<{ productName: string; bottlesPerUnit: number; litersPerBottle: number }> {
   return (line.mixedContents ?? []).map((c) => {
     const packing = findPackingByName(c.productName, catalog);
+    const storedCode = c.bottleSizeCode?.trim();
+    const sizeCode =
+      storedCode && storedCode !== "catalog"
+        ? storedCode
+        : inferBottleSizeCodeFromSavedLine(c.productName, packing?.name, storedCode);
     return {
       productName: c.productName,
       bottlesPerUnit: c.bottles,
-      litersPerBottle:
-        c.bottleSizeCode?.trim() && c.bottleSizeCode !== "catalog"
-          ? inferLitersForCustomLine(c.productName, c.bottleSizeCode)
-          : inferLitersPerBottleFromName(c.productName, packing?.litersPerBottle),
+      litersPerBottle: inferLitersForCustomLine(
+        c.productName,
+        sizeCode !== "catalog" ? sizeCode : null,
+      ),
     };
   });
 }

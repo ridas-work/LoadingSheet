@@ -36,6 +36,8 @@ const MixedSampleContentSchema = new mongoose.Schema(
     bottles: { type: Number, required: true, min: 1 },
     /** Custom carton: container size code (5l-jar, 1l, …) or catalog. */
     bottleSizeCode: { type: String, required: false, default: "", trim: true, lowercase: true },
+    /** Catalog packing code when line was picked from product list. */
+    packingCode: { type: String, required: false, default: "", trim: true, lowercase: true },
   },
   { _id: false },
 );
@@ -74,6 +76,27 @@ const CustomCartonSchema = new mongoose.Schema(
     customBoxCode: { type: String, required: false, default: "", trim: true, lowercase: true },
   },
   { _id: false },
+);
+
+const SubtractedItemSchema = new mongoose.Schema(
+  {
+    productName: { type: String, required: true, trim: true },
+    boxes: { type: Number, required: true, min: 1 },
+    bottlesPerBox: { type: Number, required: true, min: 1 },
+    status: {
+      type: String,
+      enum: ["pending", "carried_out", "discarded"],
+      required: true,
+      default: "pending",
+    },
+    subtractedAt: { type: Date, required: true, default: () => new Date() },
+    subtractedByName: { type: String, required: false, default: "", trim: true },
+    batchNo: { type: String, required: false, default: "", trim: true },
+    carriedOutAt: { type: Date, required: false, default: null },
+    discardedAt: { type: Date, required: false, default: null },
+    resolvedByName: { type: String, required: false, default: "", trim: true },
+  },
+  { _id: true },
 );
 
 const SheetLineSchema = new mongoose.Schema(
@@ -176,6 +199,29 @@ const OrderSchema = new mongoose.Schema(
     },
     adminEditedAt: { type: Date, required: false, default: null },
     adminEditedByName: { type: String, required: false, default: "", trim: true },
+    /** Whole PO voided by boss — hidden from active lists; not the same as subtracted-line discard. */
+    discardedAt: { type: Date, required: false, default: null },
+    discardedByUserId: { type: String, required: false, default: null },
+    discardedByName: { type: String, required: false, default: "", trim: true },
+    subtractedItems: {
+      type: [SubtractedItemSchema],
+      required: false,
+      default: [],
+    },
+    approvalStatus: {
+      type: String,
+      enum: ["pending", "approved", "rejected"],
+      required: false,
+      default: "approved",
+    },
+    approvalRequestedAt: { type: Date, required: false, default: null },
+    approvedAt: { type: Date, required: false, default: null },
+    approvedByUserId: { type: String, required: false, default: null },
+    approvedByName: { type: String, required: false, default: "", trim: true },
+    rejectedAt: { type: Date, required: false, default: null },
+    rejectedByUserId: { type: String, required: false, default: null },
+    rejectedByName: { type: String, required: false, default: "", trim: true },
+    rejectionNote: { type: String, required: false, default: "", trim: true, maxlength: 500 },
     gateDeliveryStatus: {
       type: String,
       enum: ["none", "out_for_delivery", "delivered", "pending_redelivery"],
@@ -211,6 +257,16 @@ const OrderSchema = new mongoose.Schema(
           productCode: { type: String, required: true, trim: true, lowercase: true },
           productName: { type: String, required: true, trim: true },
           bottles: { type: Number, required: true, min: 0 },
+          lots: {
+            type: [
+              {
+                batchNo: { type: String, required: true, trim: true },
+                bottles: { type: Number, required: true, min: 0 },
+              },
+            ],
+            required: false,
+            default: [],
+          },
         },
       ],
       required: false,

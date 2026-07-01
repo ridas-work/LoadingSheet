@@ -4,9 +4,10 @@ import { DispatchTripForm } from "@/components/DispatchTripForm";
 import type { PickerOrder } from "@/components/DispatchTripOrderPicker";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
-import { rashidActiveOrdersMongoFilter } from "@/lib/gateDelivery";
+import { loadDispatchFleetOptions } from "@/lib/dispatchFleetOptions";
 import { Order } from "@/lib/models/Order";
-import { canEditDispatch, EMPTY_DISPATCH, roleFromSession } from "@/lib/roles";
+import { tripPlannerOrdersMongoFilter } from "@/lib/orderApproval";
+import { canCreateDispatchTrips, EMPTY_DISPATCH, roleFromSession } from "@/lib/roles";
 
 type PageProps = {
   searchParams: Promise<{ orderIds?: string }>;
@@ -15,7 +16,8 @@ type PageProps = {
 export default async function NewDispatchTripPage(props: PageProps) {
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
-  if (!canEditDispatch(role)) {
+  const username = (session?.user as { username?: string })?.username;
+  if (!canCreateDispatchTrips(role, username)) {
     redirect("/dispatch/trips");
   }
 
@@ -29,10 +31,13 @@ export default async function NewDispatchTripPage(props: PageProps) {
       : [];
 
   await connectToDatabase();
-  const orderDocs = await Order.find(rashidActiveOrdersMongoFilter())
-    .sort({ createdAt: -1 })
-    .select({ poNumber: 1, customerName: 1, dispatchTripId: 1 })
-    .lean();
+  const [orderDocs, fleetOptions] = await Promise.all([
+    Order.find(tripPlannerOrdersMongoFilter())
+      .sort({ createdAt: -1 })
+      .select({ poNumber: 1, customerName: 1, dispatchTripId: 1 })
+      .lean(),
+    loadDispatchFleetOptions(),
+  ]);
 
   const orders: PickerOrder[] = orderDocs.map((o) => ({
     id: o._id.toString(),
@@ -51,6 +56,8 @@ export default async function NewDispatchTripPage(props: PageProps) {
         initialOrderIds={preselected}
         orders={orders}
         initialDispatch={EMPTY_DISPATCH}
+        vehicleOptions={fleetOptions.vehicles}
+        driverOptions={fleetOptions.drivers}
       />
     </div>
   );

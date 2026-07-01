@@ -17,8 +17,9 @@ export default async function FieldVisitsPage() {
       <div>
         <h1 className="text-2xl font-semibold text-zinc-900">Field visits</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Request samples, record delivery and customer feedback, follow up after 2 weeks, then close
-          when the customer orders or the deal is lost.
+          Start a visit, choose whether there is a sample (none, we send, or customer gave), log each
+          trip back, then close when the customer orders or the deal is lost. Use search to find
+          customers or any visit detail.
         </p>
       </div>
       <FieldVisitList />

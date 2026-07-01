@@ -11,14 +11,16 @@ import {
   validateSheetBatchAllocations,
 } from "@/lib/bundleCatalog";
 import { enrichWeightsWithReadyShelf, validateReadyBatchRequirements } from "@/lib/readyStockAllocation";
+import { augmentPoolWithReadyBatches } from "@/lib/readyBatchPool";
 import { isMixedSampleLine } from "@/lib/mixedSampleBox";
-import { effectiveBatchDefsForOrder, normalizeBatchNo, poolToBatchDefs, productsMatch } from "@/lib/batchVolume";
+import { effectiveBatchDefsForOrder, findPoolBatch, normalizeBatchNo, poolToBatchDefs } from "@/lib/batchVolume";
 import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
 import { isBatchAssignmentLocked, readyAllocationForOrder } from "@/lib/orderBatchStatus";
 import { getReadyStockMap, listBatchLots } from "@/lib/readyBottleLedger";
 import type { DeductionPacking } from "@/lib/packagingDeduction";
+import { regularProductionBatchMongoFilter } from "@/lib/sampleProductionStock";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
 import { roleFromSession } from "@/lib/roles";
@@ -101,7 +103,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const [order, allOrders, poolDocs, catalogDocs] = await Promise.all([
     Order.findById(id),
     Order.find({}).select({ sheetLines: 1 }).lean(),
-    ProductionBatch.find({}).lean(),
+    ProductionBatch.find(regularProductionBatchMongoFilter()).lean(),
     ProductPacking.find({ active: true })
       .select({ code: 1, name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1, bundleComponents: 1 })
       .lean(),
@@ -148,13 +150,21 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     );
   }
 
-  const pool = poolDocs.map((p) => ({
-    batchNo: p.batchNo,
-    productName: p.productName,
-    totalLiters: p.totalLiters,
-  }));
-
-  const poolByKey = new Map(pool.map((p) => [normalizeBatchNo(p.batchNo).toLowerCase(), p]));
+  const pool = augmentPoolWithReadyBatches(
+    poolDocs.map((p) => ({
+      batchNo: p.batchNo,
+      productName: p.productName,
+      totalLiters: p.totalLiters,
+    })),
+    readyBatchLots.map((l) => ({
+      batchNo: l.batchNo,
+      productCode: l.productCode,
+      productName: l.productName,
+      bottles: l.bottles,
+      batchProductName: l.batchProductName,
+    })),
+    catalog,
+  );
 
   const workingLines = (order.sheetLines ?? []).map((line) => {
     const incoming = assignmentMap.get(line.boxNo);
@@ -196,23 +206,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   for (const line of workingLines) {
     for (const alloc of lineBatchAllocations(line, catalog)) {
-      const batch = poolByKey.get(alloc.batchNo.toLowerCase());
+      const batch = findPoolBatch(pool, alloc.batchNo, alloc.productName, catalog);
       if (!batch) {
         return NextResponse.json({ error: `Unknown batch "${alloc.batchNo}".` }, { status: 400 });
-      }
-      if (!productsMatch(batch.productName, alloc.productName, catalog)) {
-        return NextResponse.json(
-          {
-            error: `Batch "${alloc.batchNo}" is for ${batch.productName}, not ${alloc.productName} (box ${line.boxNo}).`,
-          },
-          { status: 400 },
-        );
       }
     }
   }
 
   const usedElsewhere = accumulateBatchUsageFromSheetLines(allOrders, catalog, id);
-  const effectiveDefs = effectiveBatchDefsForOrder(poolToBatchDefs(pool), usedElsewhere);
+  const effectiveDefs = effectiveBatchDefsForOrder(poolToBatchDefs(pool), usedElsewhere, catalog);
 
   let validationWeights: Map<number, number | null>;
   if (weightOnlyUpdate) {

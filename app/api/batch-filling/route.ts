@@ -97,7 +97,7 @@ export async function GET(req: Request) {
 
   await connectToDatabase();
 
-  const [batches, { usedMap }, entries, catalogDocs] = await Promise.all([
+  const [batches, { usedMap, catalog: usageCatalog }, entries, catalogDocs] = await Promise.all([
     ProductionBatch.find({}).sort({ preparedAt: -1 }).lean(),
     loadBatchUsageContext(),
     BatchFillingDailyEntry.find({ entryDate: date }).lean(),
@@ -111,7 +111,7 @@ export async function GET(req: Request) {
 
   const rows = batches
     .map((b) => {
-      const usage = usageForBatchNo(b.batchNo, b.totalLiters, usedMap);
+      const usage = usageForBatchNo(b.batchNo, b.totalLiters, usedMap, b.productName, usageCatalog);
       if (usage.status === "empty" && !entryByBatch.has(b.batchNo.toLowerCase())) {
         return null; // hide fully-used batches with no entry today
       }
@@ -184,8 +184,8 @@ export async function PATCH(req: Request) {
   const options = packingOptionsForBatchProduct(batch.productName, catalog);
   const optionByCode = new Map(options.map((option) => [option.code.trim().toLowerCase(), option]));
 
-  const { usedMap } = await loadBatchUsageContext();
-  const usage = usageForBatchNo(batchNo, batch.totalLiters, usedMap);
+  const { usedMap, catalog: usageCatalog } = await loadBatchUsageContext();
+  const usage = usageForBatchNo(batchNo, batch.totalLiters, usedMap, batch.productName, usageCatalog);
   const systemRemaining = roundLiters(usage.remainingLiters);
   const rawLines = Array.isArray(body.packingLines) ? body.packingLines : [];
   const packingLines: StoredPackingLine[] = [];
@@ -280,21 +280,23 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: uipPreview.insufficientStock.join("; ") }, { status: 400 });
   }
 
-  const applyError = await applyPackagingUipIncrements(
-    uipPreview.increments.map((i) => ({
-      itemCode: i.itemCode,
-      quantity: i.quantity,
-      detail: i.detail,
-    })),
-    {
-      reason: "filling",
-      note: `Batch ${batchNo} filling ${entryDate}`,
-      recordedByUserId: userId,
-      recordedByName: session.user.name ?? "",
-    },
-  );
-  if (applyError) {
-    return NextResponse.json({ error: applyError }, { status: 400 });
+  if (uipPreview.increments.length > 0) {
+    const applyError = await applyPackagingUipIncrements(
+      uipPreview.increments.map((i) => ({
+        itemCode: i.itemCode,
+        quantity: i.quantity,
+        detail: i.detail,
+      })),
+      {
+        reason: "filling",
+        note: `Batch ${batchNo} filling ${entryDate}`,
+        recordedByUserId: userId,
+        recordedByName: session.user.name ?? "",
+      },
+    );
+    if (applyError) {
+      return NextResponse.json({ error: applyError }, { status: 400 });
+    }
   }
 
   const readySync = await syncReadyBottleLedgerFromFilling({
@@ -313,6 +315,8 @@ export async function PATCH(req: Request) {
       readyToDeliverBottles: l.readyToDeliverBottles,
     })),
     batchNo,
+    batchProductName: batch.productName,
+    nimraLinked: true,
     entryDate,
     audit: { userId, userName: session.user.name ?? "" },
   });

@@ -85,6 +85,31 @@ export const CATEGORY_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+export const PACKAGING_CATEGORIES = [
+  "bottle",
+  "cap",
+  "sticker",
+  "label",
+  "box",
+  "pouch",
+  "partition",
+  "other",
+] as const;
+
+export type PackagingCategory = (typeof PACKAGING_CATEGORIES)[number];
+
+export function isPackagingCategory(value: string): value is PackagingCategory {
+  return (PACKAGING_CATEGORIES as readonly string[]).includes(value);
+}
+
+export function slugifyPackagingCode(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export function parseNonNegativeInt(value: unknown, field: string): number | { error: string } {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n) || !Number.isInteger(n) || n < 0) {

@@ -3,9 +3,11 @@ import mongoose from "mongoose";
 
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
-import { closeTicketWon, isFieldVisitRep } from "@/lib/fieldVisitTickets";
+import { closeTicketWon, canEditFieldVisit, isFieldVisitRep } from "@/lib/fieldVisitTickets";
 import { FieldVisitTicket } from "@/lib/models/FieldVisitTicket";
 import { Order } from "@/lib/models/Order";
+import { initialApprovalStatusForPoCreator } from "@/lib/orderApproval";
+import { notDiscardedOrdersMongoFilter } from "@/lib/orderDiscard";
 import { parseOrderBody, type OrderBody } from "@/lib/orderPayload";
 import { roleFromSession } from "@/lib/roles";
 
@@ -21,7 +23,7 @@ export async function GET() {
 
   await connectToDatabase();
 
-  const orders = await Order.find({})
+  const orders = await Order.find(notDiscardedOrdersMongoFilter())
     .sort({ createdAt: -1 })
     .select("_id poNumber customerName createdAt sheetLines")
     .lean();
@@ -72,6 +74,22 @@ export async function POST(req: Request) {
 
   await connectToDatabase();
 
+  const existing = await Order.findOne({
+    poNumber: payload.poNumber.trim(),
+    ...notDiscardedOrdersMongoFilter(),
+  }).select("_id");
+  if (existing) {
+    return NextResponse.json(
+      {
+        errors: {
+          poNumber:
+            "An order with this PO number already exists. Open Orders and edit the existing PO instead of creating a duplicate.",
+        },
+      },
+      { status: 400 },
+    );
+  }
+
   let visitTicket = null;
   if (payload.visitTicketId) {
     if (!isFieldVisitRep(username)) {
@@ -93,9 +111,9 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
-    if (visitTicket.createdByUserId.toString() !== userId) {
+    if (!canEditFieldVisit(roleFromSession(session.user as { role?: string }), username, visitTicket, userId)) {
       return NextResponse.json(
-        { errors: { visitTicketId: "You can only link your own visit tickets." } },
+        { errors: { visitTicketId: "You can only link visit tickets you have access to." } },
         { status: 403 },
       );
     }
@@ -117,6 +135,8 @@ export async function POST(req: Request) {
     }
   }
 
+  const approvalStatus = initialApprovalStatusForPoCreator();
+  const now = new Date();
   const created = await Order.create({
     poNumber: payload.poNumber,
     customerName: payload.customerName,
@@ -129,6 +149,8 @@ export async function POST(req: Request) {
     sheetLines: payload.sheetLines,
     createdByUserId: userId,
     createdByName: session.user.name ?? "",
+    approvalStatus,
+    approvalRequestedAt: approvalStatus === "pending" ? now : null,
   });
 
   if (visitTicket) {

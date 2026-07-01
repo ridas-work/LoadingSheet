@@ -11,7 +11,7 @@ function slugFromCustomCartonName(name: string): string {
   return `cc-${slug}`;
 }
 
-/** Extra products shown only in the custom-carton product dropdown (not the main PO grid). */
+/** Built-in extras from JSON (also seeded to DB). Used as fallback when API is unavailable. */
 export const CUSTOM_CARTON_ONLY_PRODUCTS: CustomCartonCatalogProduct[] = (
   customCartonProductNames as string[]
 ).map((name) => ({
@@ -19,13 +19,25 @@ export const CUSTOM_CARTON_ONLY_PRODUCTS: CustomCartonCatalogProduct[] = (
   name: name.trim(),
 }));
 
+function dedupeExtras(items: CustomCartonCatalogProduct[]): CustomCartonCatalogProduct[] {
+  const byCode = new Map<string, CustomCartonCatalogProduct>();
+  for (const p of items) {
+    const code = p.code.trim().toLowerCase();
+    const name = p.name.trim();
+    if (!code || !name) continue;
+    if (!byCode.has(code)) byCode.set(code, { code, name });
+  }
+  return [...byCode.values()];
+}
+
 /** Main catalog + custom-carton-only extras (deduped by code and name). */
 export function catalogForCustomCartonBuilder(
   mainCatalog: CustomCartonCatalogProduct[],
+  savedExtras: CustomCartonCatalogProduct[] = [],
 ): CustomCartonCatalogProduct[] {
-  const codes = new Set(mainCatalog.map((p) => p.code));
+  const codes = new Set(mainCatalog.map((p) => p.code.trim().toLowerCase()));
   const names = new Set(mainCatalog.map((p) => p.name.trim().toLowerCase()));
-  const extras = CUSTOM_CARTON_ONLY_PRODUCTS.filter(
+  const extras = dedupeExtras([...savedExtras, ...CUSTOM_CARTON_ONLY_PRODUCTS]).filter(
     (p) => !codes.has(p.code) && !names.has(p.name.trim().toLowerCase()),
   );
   return [...mainCatalog, ...extras];

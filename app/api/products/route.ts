@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
 import { connectToDatabase } from "@/lib/db";
+import {
+  listCustomBoxBatchProductNames,
+  listStandardBatchFamilies,
+} from "@/lib/nimraBatchProductLists";
 import { ProductPacking } from "@/lib/models/ProductPacking";
 
 export async function GET() {
@@ -29,14 +33,9 @@ export async function GET() {
     })),
   }));
 
-  const seen = new Set<string>();
-  const batchFamilies: Array<{ name: string; batchFamily: string }> = [];
-  for (const p of products) {
-    if (p.bundleComponents.length > 0) continue;
-    if (seen.has(p.batchFamily)) continue;
-    seen.add(p.batchFamily);
-    batchFamilies.push({ name: p.batchFamily, batchFamily: p.batchFamily });
-  }
+  const standardNames = await listStandardBatchFamilies();
+  const batchFamilies = standardNames.map((name) => ({ name, batchFamily: name }));
+  const customBoxProducts = await listCustomBoxBatchProductNames();
 
-  return NextResponse.json({ products, batchFamilies });
+  return NextResponse.json({ products, batchFamilies, customBoxProducts });
 }

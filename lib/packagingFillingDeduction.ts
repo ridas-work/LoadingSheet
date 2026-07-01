@@ -1,4 +1,4 @@
-import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
+import { isFillingContainerSizeCode, packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import {
   type DeductionPackagingItem,
   type DeductionPacking,
@@ -90,7 +90,9 @@ export function computeFillingUipIncrements(args: {
 
     const packing = args.catalog.find((p) => key(p.code) === productCode);
     if (!packing) {
-      missingMappings.add(`No catalog packing for code "${productCode}"`);
+      if (!isFillingContainerSizeCode(productCode)) {
+        missingMappings.add(`No catalog packing for code "${productCode}"`);
+      }
       continue;
     }
 

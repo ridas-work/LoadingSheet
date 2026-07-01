@@ -96,12 +96,21 @@ const RASHID_INACTIVE_GATE_STATUSES: GateDeliveryStatus[] = ["out_for_delivery",
 
 /** Orders still in Rashid's active queue (at factory or pending redelivery). */
 export function rashidActiveOrdersMongoFilter() {
-  return { gateDeliveryStatus: { $nin: RASHID_INACTIVE_GATE_STATUSES } };
+  return {
+    gateDeliveryStatus: { $nin: RASHID_INACTIVE_GATE_STATUSES },
+    discardedAt: null,
+  };
 }
 
 export function isRashidActiveGateStatus(status: unknown): boolean {
   const s = normalizeGateStatus(status);
   return !RASHID_INACTIVE_GATE_STATUSES.includes(s);
+}
+
+/** Ali trip list — show while at least one PO is still at factory or pending redelivery. */
+export function isTripActiveForPlanner(orderGateStatuses: GateDeliveryStatus[]): boolean {
+  if (orderGateStatuses.length === 0) return false;
+  return orderGateStatuses.some((s) => isRashidActiveGateStatus(s));
 }
 
 /** Delivered POs are locked — admin may view but not edit order or trip-linked data. */

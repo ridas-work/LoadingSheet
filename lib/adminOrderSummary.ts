@@ -1,3 +1,12 @@
+import { resolveCatalogCode, type ReportCatalogRow } from "@/lib/adminOperationsReports";
+import { GATE_STATUS_LABELS, normalizeGateStatus } from "@/lib/gateDelivery";
+import { buildOrderPoDetail, type OrderPoDetail } from "@/lib/orderPoDetail";
+import {
+  APPROVAL_STATUS_LABELS,
+  normalizeApprovalStatus,
+  type ApprovalStatus,
+} from "@/lib/orderApproval";
+
 export type SummaryColumn = {
   key: string;
   label: string;
@@ -15,6 +24,7 @@ export type SummaryRow = {
   poNumber: string;
   cells: Record<string, number>;
   rowTotal: number;
+  detail: OrderPoDetail;
 };
 
 export type AdminOrderSummary = {
@@ -23,197 +33,179 @@ export type AdminOrderSummary = {
   rows: SummaryRow[];
   columnTotals: Record<string, number>;
   grandTotal: number;
+  pendingApprovalCount: number;
 };
 
-type CatalogRow = {
-  code: string;
-  name: string;
-  aliases?: string[];
+export type SummaryCatalogRow = ReportCatalogRow & {
   summaryLabel?: string;
 };
 
-type OrderInput = {
-  orderId: string;
+export type SummaryOrderInput = {
+  _id: { toString(): string };
   poNumber: string;
   customerName: string;
   city?: string | null;
   deadlineDate?: Date | string | null;
-  gateDeliveryStatus?: string | null;
-  dispatchTripId?: unknown;
-  dispatch?: { vehicleNo?: string | null } | null;
   orderKind?: string | null;
+  items?: Array<{ productName?: string; boxes?: number; bottlesPerBox?: number }>;
   mixedSample?: {
     boxCount?: number;
-    contents?: Array<{ productName?: string; bottles?: number }>;
+    contents?: Array<{ productName?: string; bottles?: number; bottleSizeCode?: string }>;
   } | null;
-  items?: Array<{ productName?: string; boxes?: number }>;
   customCartons?: Array<{
     boxCount?: number;
-    contents?: Array<{ productName?: string; bottles?: number }>;
+    label?: string;
+    customBoxCode?: string;
+    contents?: Array<{ productName?: string; bottles?: number; bottleSizeCode?: string }>;
   }>;
+  subtractedItems?: Parameters<typeof buildOrderPoDetail>[0]["subtractedItems"];
+  dispatchTripId?: unknown;
+  dispatch?: { vehicleNo?: string | null };
+  gateDeliveryStatus?: string | null;
+  approvalStatus?: string | null;
+  discardedAt?: Date | string | null;
 };
 
-function resolveCatalogCode(productName: string, catalog: CatalogRow[]): string | null {
-  const key = productName.trim().toLowerCase();
-  if (!key) return null;
-
-  for (const p of catalog) {
-    if (p.name.trim().toLowerCase() === key) return p.code;
-    for (const alias of p.aliases ?? []) {
-      if (alias.trim().toLowerCase() === key) return p.code;
-    }
-  }
-
-  return null;
-}
-
-function columnLabel(p: CatalogRow): string {
-  const label = p.summaryLabel?.trim();
-  if (label) return label;
-  const name = p.name.trim();
-  return name.length > 24 ? `${name.slice(0, 22)}…` : name;
+function columnLabel(p: SummaryCatalogRow): string {
+  return p.summaryLabel?.trim() || p.name;
 }
 
 function formatDeadline(value: Date | string | null | undefined): string {
   if (!value) return "";
   const d = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(d.getTime())) return "";
-  const day = d.getDate();
-  const month = d.getMonth() + 1;
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 }
 
-function isBuiltyDone(order: OrderInput): boolean {
-  const tripId = order.dispatchTripId;
-  const hasTrip = tripId != null && String(tripId).length > 0;
+function isBuiltyDone(order: SummaryOrderInput): boolean {
   const vehicle = order.dispatch?.vehicleNo?.trim() ?? "";
-  return hasTrip && vehicle.length > 0;
+  return Boolean(order.dispatchTripId && vehicle);
 }
 
-function normalizeSummaryGateStatus(raw: string | null | undefined): string {
-  const s = (raw ?? "none").trim().toLowerCase();
-  if (s === "out_for_delivery" || s === "delivered" || s === "pending_redelivery") return s;
-  return "none";
+function statusLabelFor(order: SummaryOrderInput): string {
+  const approval = normalizeApprovalStatus(order.approvalStatus) as ApprovalStatus;
+  if (approval === "pending") return APPROVAL_STATUS_LABELS.pending;
+  if (approval === "rejected") return APPROVAL_STATUS_LABELS.rejected;
+  const gate = normalizeGateStatus(order.gateDeliveryStatus);
+  return GATE_STATUS_LABELS[gate];
 }
 
-const SUMMARY_STATUS_LABELS: Record<string, string> = {
-  none: "At factory",
-  out_for_delivery: "Out for delivery",
-  delivered: "Delivered",
-  pending_redelivery: "Pending redelivery",
-};
-
-function summaryStatusLabel(gateStatus: string, builtyDone: boolean): string {
-  if (gateStatus === "delivered") return SUMMARY_STATUS_LABELS.delivered;
-  if (gateStatus === "out_for_delivery") return SUMMARY_STATUS_LABELS.out_for_delivery;
-  if (gateStatus === "pending_redelivery") return SUMMARY_STATUS_LABELS.pending_redelivery;
-  if (builtyDone) return "Builty done";
-  return SUMMARY_STATUS_LABELS.none;
+function addCell(cells: Record<string, number>, code: string, qty: number) {
+  if (!code || qty <= 0) return;
+  cells[code] = (cells[code] ?? 0) + qty;
 }
 
-function summaryDeadlineDisplay(
-  order: OrderInput,
-  gateStatus: string,
-  builtyDone: boolean,
-): string {
-  if (gateStatus === "delivered") return "DELIVERED";
-  if (gateStatus === "out_for_delivery") return "OUT FOR DELIVERY";
-  if (gateStatus === "pending_redelivery") return "PENDING REDELIVERY";
-  if (builtyDone) return "BUILTY DONE";
-  return formatDeadline(order.deadlineDate ?? null);
-}
+function accumulateOrderCells(
+  order: SummaryOrderInput,
+  catalog: SummaryCatalogRow[],
+): Record<string, number> {
+  const cells: Record<string, number> = {};
+  const kind = order.orderKind ?? "standard";
 
-function isAdminActiveOrder(order: OrderInput): boolean {
-  const gate = normalizeSummaryGateStatus(order.gateDeliveryStatus);
-  return gate !== "delivered";
-}
-
-export function buildAdminOrderSummary(
-  orders: OrderInput[],
-  catalog: CatalogRow[],
-  options?: { pendingOnly?: boolean; reportDate?: Date },
-): AdminOrderSummary {
-  const columns: SummaryColumn[] = catalog.map((p) => ({
-    key: p.code,
-    label: columnLabel(p),
-  }));
-
-  const columnTotals: Record<string, number> = Object.fromEntries(columns.map((c) => [c.key, 0]));
-  const filtered = options?.pendingOnly ? orders.filter((o) => isAdminActiveOrder(o)) : orders;
-
-  const rows: SummaryRow[] = filtered.map((order, idx) => {
-    const cells: Record<string, number> = Object.fromEntries(columns.map((c) => [c.key, 0]));
-
-    if (order.orderKind === "mixed_sample" && order.mixedSample?.contents?.length) {
-      const boxCount =
-        typeof order.mixedSample.boxCount === "number" && order.mixedSample.boxCount >= 1
-          ? order.mixedSample.boxCount
-          : 1;
-      for (const item of order.mixedSample.contents) {
-        const bottles = typeof item.bottles === "number" ? item.bottles : 0;
-        if (bottles < 1) continue;
-        const code = resolveCatalogCode(item.productName ?? "", catalog);
-        if (!code || !(code in cells)) continue;
-        cells[code] += bottles * boxCount;
-      }
-    } else {
-      for (const item of order.items ?? []) {
-        const boxes = typeof item.boxes === "number" ? item.boxes : 0;
-        if (boxes < 1) continue;
-        const code = resolveCatalogCode(item.productName ?? "", catalog);
-        if (!code || !(code in cells)) continue;
-        cells[code] += boxes;
-      }
-      for (const carton of order.customCartons ?? []) {
-        const boxCount =
-          typeof carton.boxCount === "number" && carton.boxCount >= 1 ? carton.boxCount : 1;
-        for (const item of carton.contents ?? []) {
-          const bottles = typeof item.bottles === "number" ? item.bottles : 0;
-          if (bottles < 1) continue;
-          const code = resolveCatalogCode(item.productName ?? "", catalog);
-          if (!code || !(code in cells)) continue;
-          cells[code] += bottles * boxCount;
-        }
-      }
+  if (kind === "mixed_sample" && order.mixedSample?.contents?.length) {
+    const boxes = Math.max(0, Number(order.mixedSample.boxCount) || 0);
+    for (const c of order.mixedSample.contents) {
+      const name = c.productName?.trim() ?? "";
+      const bottles = Number(c.bottles) || 0;
+      if (!name || bottles <= 0) continue;
+      const code = resolveCatalogCode(name, catalog);
+      if (code) addCell(cells, code, bottles * boxes);
     }
+    return cells;
+  }
 
-    const rowTotal = Object.values(cells).reduce((sum, n) => sum + n, 0);
-    const builtyDone = isBuiltyDone(order);
-    const gateDeliveryStatus = normalizeSummaryGateStatus(order.gateDeliveryStatus);
+  for (const item of order.items ?? []) {
+    const name = item.productName?.trim() ?? "";
+    const boxes = Number(item.boxes) || 0;
+    if (!name || boxes <= 0) continue;
+    const code = resolveCatalogCode(name, catalog);
+    if (code) addCell(cells, code, boxes);
+  }
 
-    return {
-      sr: idx + 1,
-      orderId: order.orderId,
-      customerName: order.customerName,
-      city: order.city?.trim() ?? "",
-      deadlineDisplay: summaryDeadlineDisplay(order, gateDeliveryStatus, builtyDone),
-      builtyDone,
-      gateDeliveryStatus,
-      statusLabel: summaryStatusLabel(gateDeliveryStatus, builtyDone),
-      poNumber: order.poNumber,
-      cells,
-      rowTotal,
-    };
-  });
-
-  let grandTotal = 0;
-  for (const row of rows) {
-    grandTotal += row.rowTotal;
-    for (const col of columns) {
-      columnTotals[col.key] += row.cells[col.key] ?? 0;
+  for (const carton of order.customCartons ?? []) {
+    const boxes = Math.max(0, Number(carton.boxCount) || 0);
+    for (const c of carton.contents ?? []) {
+      const name = c.productName?.trim() ?? "";
+      const bottles = Number(c.bottles) || 0;
+      if (!name || bottles <= 0) continue;
+      const code = resolveCatalogCode(name, catalog);
+      if (code) addCell(cells, code, bottles * boxes);
     }
   }
 
-  const reportDate = options?.reportDate ?? new Date();
-  const rd = reportDate;
-  const reportDateStr = `${rd.getDate()}/${rd.getMonth() + 1}/${rd.getFullYear()}`;
+  return cells;
+}
+
+function rowTotal(cells: Record<string, number>): number {
+  return Object.values(cells).reduce((sum, n) => sum + n, 0);
+}
+
+export function buildAdminOrderSummary(
+  orders: SummaryOrderInput[],
+  catalog: SummaryCatalogRow[],
+  options?: { pendingOnly?: boolean },
+): AdminOrderSummary {
+  const pendingOnly = options?.pendingOnly !== false;
+  const columns: SummaryColumn[] = catalog
+    .map((p) => ({ key: p.code, label: columnLabel(p) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  const columnTotals: Record<string, number> = {};
+  for (const col of columns) columnTotals[col.key] = 0;
+
+  let pendingApprovalCount = 0;
+  const rows: SummaryRow[] = [];
+  let sr = 0;
+
+  for (const order of orders) {
+    if (order.discardedAt) continue;
+    if (normalizeApprovalStatus(order.approvalStatus) === "pending") {
+      pendingApprovalCount += 1;
+    }
+
+    const gate = normalizeGateStatus(order.gateDeliveryStatus);
+    if (pendingOnly && gate === "delivered") continue;
+
+    const cells = accumulateOrderCells(order, catalog);
+    const total = rowTotal(cells);
+    const builtyDone = isBuiltyDone(order);
+
+    for (const [code, qty] of Object.entries(cells)) {
+      columnTotals[code] = (columnTotals[code] ?? 0) + qty;
+    }
+
+    sr += 1;
+    rows.push({
+      sr,
+      orderId: order._id.toString(),
+      customerName: order.customerName,
+      city: order.city?.trim() ?? "",
+      deadlineDisplay: builtyDone ? "BUILTY DONE" : formatDeadline(order.deadlineDate),
+      builtyDone,
+      gateDeliveryStatus: gate,
+      statusLabel: statusLabelFor(order),
+      poNumber: order.poNumber,
+      cells,
+      rowTotal: total,
+      detail: buildOrderPoDetail({
+        orderKind: order.orderKind,
+        items: order.items,
+        mixedSample: order.mixedSample,
+        customCartons: order.customCartons,
+        subtractedItems: order.subtractedItems,
+      }),
+    });
+  }
+
+  const grandTotal = Object.values(columnTotals).reduce((sum, n) => sum + n, 0);
+  const now = new Date();
 
   return {
-    reportDate: reportDateStr,
+    reportDate: now.toLocaleDateString(),
     columns,
     rows,
     columnTotals,
     grandTotal,
+    pendingApprovalCount,
   };
 }

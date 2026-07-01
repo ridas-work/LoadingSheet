@@ -1,0 +1,18 @@
+[
+  { "canonical": "GO-1", "aliases": ["GO 1", "GO1"] },
+  { "canonical": "LT-100", "aliases": ["LT 100"] },
+  { "canonical": "LT-101", "aliases": ["LT 101"] },
+  { "canonical": "KSIL-50", "aliases": ["KSIL - 50", "K-SILK", "KSIL50"] },
+  { "canonical": "KSIL-51", "aliases": ["KSIL - 51", "INNOSILK K-51", "INNOSILK K 51"] },
+  { "canonical": "RAC-1", "aliases": ["RAC 1", "RAC1"] },
+  { "canonical": "SW-40", "aliases": ["SW 40", "SW40"] },
+  { "canonical": "HAND WASH", "aliases": ["Handwash", "HAND WASH JAR"] },
+  { "canonical": "RHINO 5LTR", "aliases": ["Rhino", "RHINO", "RHINO 5 LTR", "RHINO 500 ML"] },
+  { "canonical": "BRIGHTEN BOTTLE", "aliases": ["Brighten", "BRIGHTEN", "BRIGHTEN BOTTLE", "BRIGHTEN BOTTLES 3 LTR"] },
+  { "canonical": "FABRITO BOTTLE", "aliases": ["Fabrito", "FABRITO", "FABRITO BOTTLE"] },
+  { "canonical": "WASHOUT FLORAL", "aliases": ["Washout Floral Red", "WASHOUT FLORAL", "Washout Floral"] },
+  { "canonical": "WASHOUT LEMON", "aliases": ["Washout Lemon Yellow", "WASHOUT LEMON", "Washout Lemon"] },
+  { "canonical": "WASHOUT OCEAN", "aliases": ["Washout Ocean Blue", "WASHOUT OCEAN", "Washout Ocean"] },
+  { "canonical": "HAND SANITIZER", "aliases": ["Hand Sanitizer"] },
+  { "canonical": "LIQUID DETERGENT", "aliases": ["Liquid Detergent"] }
+]

@@ -1,3 +1,4 @@
+import { normalizeBatchNo } from "@/lib/batchVolume";
 import { ReadyBottleBatchLot } from "@/lib/models/ReadyBottleBatchLot";
 import {
   ReadyBottleMovement,
@@ -114,6 +115,140 @@ export async function applyReadyBottleDelta(args: ApplyDeltaArgs): Promise<strin
   return null;
 }
 
+function normalizeBundleSetId(bundleSetId?: string | null): string {
+  return bundleSetId?.trim() ?? "";
+}
+
+function lotLookupFilter(batchNo: string, productCode: string, bundleSetId?: string) {
+  const code = productCode.trim().toLowerCase();
+  const setId = normalizeBundleSetId(bundleSetId);
+  return { batchNo, productCode: code, bundleSetId: setId };
+}
+
+/** Adjust a batch-scoped ready lot without changing aggregate on-hand (used after filling_ready). */
+export async function applyReadyBatchLotDelta(args: {
+  batchNo: string;
+  productCode: string;
+  productName: string;
+  delta: number;
+  bundleSetId?: string;
+  batchProductName?: string;
+  nimraLinked?: boolean;
+  note?: string;
+  audit: ReadyBottleAudit;
+}): Promise<string | null> {
+  const batchNo = normalizeBatchNo(args.batchNo);
+  const code = args.productCode.trim().toLowerCase();
+  if (!batchNo) return "Batch number is required.";
+  if (!code) return "Product code is required.";
+  if (!Number.isInteger(args.delta) || args.delta === 0) return null;
+
+  const setId = normalizeBundleSetId(args.bundleSetId);
+  if (setId) {
+    const existing = await ReadyBottleBatchLot.findOne(lotLookupFilter(batchNo, code, setId)).lean();
+    const current = existing?.bottles ?? 0;
+    const next = current + args.delta;
+    if (next < 0) {
+      return `Insufficient ready batch lot for ${args.productName} (batch ${batchNo}): need ${Math.abs(args.delta)}, lot has ${current}`;
+    }
+
+    if (existing) {
+      await ReadyBottleBatchLot.findOneAndUpdate(lotLookupFilter(batchNo, code, setId), {
+        $set: {
+          productName: args.productName,
+          bottles: next,
+          nimraLinked: args.nimraLinked ?? existing.nimraLinked ?? false,
+          batchProductName: args.batchProductName ?? existing.batchProductName ?? "",
+          note: args.note ?? existing.note ?? "",
+          recordedByUserId: args.audit.userId,
+          recordedByName: args.audit.userName,
+        },
+      });
+      return null;
+    }
+
+    if (args.delta > 0) {
+      await ReadyBottleBatchLot.create({
+        batchNo,
+        productCode: code,
+        productName: args.productName,
+        bottles: args.delta,
+        nimraLinked: args.nimraLinked ?? false,
+        batchProductName: args.batchProductName ?? "",
+        note: args.note ?? "",
+        bundleSetId: setId,
+        recordedByUserId: args.audit.userId,
+        recordedByName: args.audit.userName,
+      });
+      return null;
+    }
+
+    return `No ready batch lot for ${args.productName} (batch ${batchNo})`;
+  }
+
+  let remaining = Math.abs(args.delta);
+  const lots = await ReadyBottleBatchLot.find({ batchNo, productCode: code })
+    .sort({ createdAt: 1, bundleSetId: 1 })
+    .lean();
+
+  if (args.delta < 0) {
+    for (const lot of lots) {
+      if (remaining <= 0) break;
+      const take = Math.min(remaining, lot.bottles);
+      if (take <= 0) continue;
+      const next = lot.bottles - take;
+      await ReadyBottleBatchLot.findOneAndUpdate(
+        { _id: lot._id },
+        {
+          $set: {
+            bottles: next,
+            recordedByUserId: args.audit.userId,
+            recordedByName: args.audit.userName,
+          },
+        },
+      );
+      remaining -= take;
+    }
+    if (remaining > 0) {
+      const onHand = lots.reduce((sum, lot) => sum + lot.bottles, 0);
+      return `Insufficient ready batch lot for ${args.productName} (batch ${batchNo}): need ${Math.abs(args.delta)}, lot has ${onHand}`;
+    }
+    return null;
+  }
+
+  const existing = lots.find((lot) => !normalizeBundleSetId(lot.bundleSetId)) ?? lots[0];
+  if (existing) {
+    await ReadyBottleBatchLot.findOneAndUpdate(
+      { _id: existing._id },
+      {
+        $set: {
+          productName: args.productName,
+          bottles: existing.bottles + args.delta,
+          nimraLinked: args.nimraLinked ?? existing.nimraLinked ?? false,
+          batchProductName: args.batchProductName ?? existing.batchProductName ?? "",
+          note: args.note ?? existing.note ?? "",
+          recordedByUserId: args.audit.userId,
+          recordedByName: args.audit.userName,
+        },
+      },
+    );
+    return null;
+  }
+
+  await ReadyBottleBatchLot.create({
+    batchNo,
+    productCode: code,
+    productName: args.productName,
+    bottles: args.delta,
+    nimraLinked: args.nimraLinked ?? false,
+    batchProductName: args.batchProductName ?? "",
+    note: args.note ?? "",
+    recordedByUserId: args.audit.userId,
+    recordedByName: args.audit.userName,
+  });
+  return null;
+}
+
 export async function addBatchLot(args: {
   batchNo: string;
   productCode: string;
@@ -122,6 +257,8 @@ export async function addBatchLot(args: {
   note?: string;
   nimraLinked?: boolean;
   batchProductName?: string;
+  bundleCode?: string;
+  bundleSetId?: string;
   audit: ReadyBottleAudit;
 }): Promise<string | null> {
   const batchNo = args.batchNo.trim();
@@ -132,24 +269,24 @@ export async function addBatchLot(args: {
     return "Bottles must be a whole number ≥ 1.";
   }
 
-  const existing = await ReadyBottleBatchLot.findOne({ batchNo, productCode: code }).lean();
+  const bundleSetId = normalizeBundleSetId(args.bundleSetId);
+  const existing = await ReadyBottleBatchLot.findOne(lotLookupFilter(batchNo, code, bundleSetId)).lean();
   if (existing) {
     const delta = args.bottles - existing.bottles;
     if (delta === 0) return null;
-    await ReadyBottleBatchLot.findOneAndUpdate(
-      { batchNo, productCode: code },
-      {
-        $set: {
-          productName: args.productName,
-          bottles: args.bottles,
-          nimraLinked: args.nimraLinked ?? existing.nimraLinked ?? false,
-          batchProductName: args.batchProductName ?? existing.batchProductName ?? "",
-          note: args.note ?? existing.note ?? "",
-          recordedByUserId: args.audit.userId,
-          recordedByName: args.audit.userName,
-        },
+    await ReadyBottleBatchLot.findOneAndUpdate(lotLookupFilter(batchNo, code, bundleSetId), {
+      $set: {
+        productName: args.productName,
+        bottles: args.bottles,
+        nimraLinked: args.nimraLinked ?? existing.nimraLinked ?? false,
+        batchProductName: args.batchProductName ?? existing.batchProductName ?? "",
+        note: args.note ?? existing.note ?? "",
+        bundleCode: args.bundleCode ?? existing.bundleCode ?? "",
+        bundleSetId,
+        recordedByUserId: args.audit.userId,
+        recordedByName: args.audit.userName,
       },
-    );
+    });
     return applyReadyBottleDelta({
       productCode: code,
       productName: args.productName,
@@ -169,6 +306,8 @@ export async function addBatchLot(args: {
     nimraLinked: args.nimraLinked ?? false,
     batchProductName: args.batchProductName ?? "",
     note: args.note ?? "",
+    bundleCode: args.bundleCode ?? "",
+    bundleSetId,
     recordedByUserId: args.audit.userId,
     recordedByName: args.audit.userName,
   });
@@ -194,6 +333,8 @@ export async function listBatchLots(): Promise<
     nimraLinked: boolean;
     batchProductName: string;
     note: string;
+    bundleCode: string;
+    bundleSetId: string;
     createdAt: string | null;
     updatedAt: string | null;
   }>
@@ -208,6 +349,8 @@ export async function listBatchLots(): Promise<
     nimraLinked: Boolean(l.nimraLinked),
     batchProductName: l.batchProductName ?? "",
     note: l.note ?? "",
+    bundleCode: l.bundleCode ?? "",
+    bundleSetId: l.bundleSetId ?? "",
     createdAt: l.createdAt ? new Date(l.createdAt).toISOString() : null,
     updatedAt: l.updatedAt ? new Date(l.updatedAt).toISOString() : null,
   }));

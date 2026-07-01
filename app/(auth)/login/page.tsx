@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getSession, signIn, signOut } from "next-auth/react";
 
 import { homePathForRole, roleFromSession } from "@/lib/roles";
+import { ui } from "@/lib/ui";
 
 export default function LoginPage() {
   const [ready, setReady] = useState(false);
@@ -43,66 +44,88 @@ export default function LoginPage() {
 
     const session = await getSession();
     const role = roleFromSession(session?.user as { role?: string });
-    window.location.href = role ? homePathForRole(role) : "/orders";
+    const sessionUsername = (session?.user as { username?: string })?.username;
+    window.location.href = role ? homePathForRole(role, sessionUsername) : "/orders";
   }
 
   if (!ready) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-zinc-50 px-4">
-        <p className="text-sm text-zinc-600">Loading…</p>
+      <div className="login-form-panel min-h-dvh">
+        <p className="text-sm text-slate-500">Loading…</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-zinc-50 px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold text-zinc-900">Sign in</h1>
-        <p className="mt-1 text-sm text-zinc-600">Authorized users only. No self-registration.</p>
+    <div className="login-shell">
+      <div className="login-brand-panel">
+        <div className="relative z-10 max-w-md">
+          <div className={`${ui.brandMark} mb-6 h-12 w-12 text-sm`}>LS</div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Loading Sheet</h1>
+          <p className="mt-3 text-base leading-relaxed text-brand-100/90">
+            PO entry, production batches, dispatch loading sheets, and packaging — one connected
+            workflow for Waleed Tech.
+          </p>
+          <ul className="mt-8 space-y-2 text-sm text-brand-100/75">
+            <li className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
+              Purchase orders &amp; loading sheets
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
+              Batch assignment &amp; ready stock
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
+              Packaging inventory &amp; gate delivery
+            </li>
+          </ul>
+        </div>
+      </div>
 
-        <form className="mt-6 space-y-4" onSubmit={onSubmit} autoComplete="off">
-          <div>
-            <label className="block text-sm font-medium text-zinc-800" htmlFor="username">
-              Username
-            </label>
-            <input
-              id="username"
-              name="username"
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
-              placeholder="e.g. nouman"
-            />
-          </div>
+      <div className="login-form-panel">
+        <div className="login-card">
+          <h2 className="text-xl font-bold tracking-tight text-slate-900">Welcome back</h2>
+          <p className="mt-1 text-sm text-slate-500">Sign in with your authorized account.</p>
 
-          <div>
-            <label className="block text-sm font-medium text-zinc-800" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
-            />
-          </div>
+          <form className="mt-6 space-y-4" onSubmit={onSubmit} autoComplete="off">
+            <div>
+              <label className={ui.label} htmlFor="username">
+                Username
+              </label>
+              <input
+                id="username"
+                name="username"
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className={`${ui.input} mt-1.5`}
+                placeholder="e.g. nouman"
+              />
+            </div>
 
-          {error ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
-          ) : null}
+            <div>
+              <label className={ui.label} htmlFor="password">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={`${ui.input} mt-1.5`}
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={!canSubmit || submitting}
-            className="w-full rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            {submitting ? "Signing in…" : "Sign in"}
-          </button>
-        </form>
+            {error ? <div className={ui.alertDanger}>{error}</div> : null}
+
+            <button type="submit" disabled={!canSubmit || submitting} className={ui.btnPrimaryFull}>
+              {submitting ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

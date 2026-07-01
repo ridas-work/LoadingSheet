@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import {
   DispatchTripOrderPicker,
@@ -15,7 +15,46 @@ type Props = {
   initialOrderIds: string[];
   orders: PickerOrder[];
   initialDispatch: DispatchFields;
+  vehicleOptions: string[];
+  driverOptions: string[];
 };
+
+function SelectField({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  const mergedOptions = useMemo(() => {
+    const set = new Set(options);
+    const trimmed = value.trim();
+    if (trimmed) set.add(trimmed);
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [options, value]);
+
+  return (
+    <label className="block text-sm">
+      <span className="font-medium text-zinc-700">{label}</span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900"
+      >
+        <option value="">Select…</option>
+        {mergedOptions.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 function Field({
   label,
@@ -39,7 +78,14 @@ function Field({
   );
 }
 
-export function DispatchTripForm({ tripId, initialOrderIds, orders, initialDispatch }: Props) {
+export function DispatchTripForm({
+  tripId,
+  initialOrderIds,
+  orders,
+  initialDispatch,
+  vehicleOptions,
+  driverOptions,
+}: Props) {
   const router = useRouter();
   const [orderIds, setOrderIds] = useState<string[]>(initialOrderIds);
   const [dispatch, setDispatch] = useState<DispatchFields>(initialDispatch);
@@ -111,16 +157,20 @@ export function DispatchTripForm({ tripId, initialOrderIds, orders, initialDispa
 
       <div>
         <h2 className="text-lg font-semibold text-zinc-900">Vehicle &amp; dispatch</h2>
-        <p className="mt-1 text-sm text-zinc-600">These fields sync to every selected PO&apos;s loading sheet.</p>
+        <p className="mt-1 text-sm text-zinc-600">
+          Pick vehicle and driver from the fleet list. These fields sync to every selected PO&apos;s loading sheet.
+        </p>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <Field
+          <SelectField
             label="Vehicle no"
             value={dispatch.vehicleNo}
+            options={vehicleOptions}
             onChange={(v) => setDispatch((d) => ({ ...d, vehicleNo: v }))}
           />
-          <Field
+          <SelectField
             label="Driver name"
             value={dispatch.driverName}
+            options={driverOptions}
             onChange={(v) => setDispatch((d) => ({ ...d, driverName: v }))}
           />
           <Field label="DC no" value={dispatch.dcNo} onChange={(v) => setDispatch((d) => ({ ...d, dcNo: v }))} />

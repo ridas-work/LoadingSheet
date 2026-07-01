@@ -5,15 +5,20 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { PrintCartonLabelsButton } from "@/components/PrintCartonLabelsButton";
+import {
+  augmentPoolWithReadyBatches,
+  batchPickerOptionsForComponent,
+  type ReadyLotLike,
+} from "@/lib/readyBatchPool";
 import { PrintSheetButton } from "@/components/PrintSheetButton";
 import { ReadyStockCheck } from "@/components/ReadyStockCheck";
 import { cartonLabelsFromSheetLines } from "@/lib/cartonLabels";
 import {
+  batchUsageKey,
   effectiveBatchDefsForOrder,
   formatLiters,
   normalizeBatchNo,
   poolToBatchDefs,
-  productsMatch,
   type ProductionBatchPoolItem,
 } from "@/lib/batchVolume";
 import {
@@ -21,18 +26,15 @@ import {
   resolveBundleParts,
   usageLitersByBatchFromSheetLines,
   validateSheetBatchAllocations,
+  componentBatchStateKey,
   type ComponentBatch,
   type PackingCatalogRow,
 } from "@/lib/bundleCatalog";
 import { isMixedSampleLine, resolveMixedSampleParts } from "@/lib/mixedSampleBox";
 import type { DeductionPacking, DeductionSheetLine } from "@/lib/packagingDeduction";
 import {
-  READY_SHELF_LABEL,
   allocateReadyStockToLines,
-  componentNeedsBatch,
-  computeSheetLineWeights,
   formatReadyAwareBatchDisplay,
-  lineNeedsBatch,
   validateReadyBatchRequirements,
 } from "@/lib/readyStockAllocation";
 import { type DispatchFields } from "@/lib/roles";
@@ -151,11 +153,6 @@ function FooterField({
   );
 }
 
-function weightCell(value: number | null | undefined): string {
-  if (value == null) return "";
-  return formatLiters(value);
-}
-
 export function LoadingSheetBatchEditor({
   orderId,
   poNumber,
@@ -191,8 +188,17 @@ export function LoadingSheetBatchEditor({
       const initial: Record<number, Record<string, string>> = {};
       for (const line of sheetLines) {
         const map: Record<string, string> = {};
-        for (const cb of line.componentBatches ?? []) {
-          map[cb.productName] = cb.batchNo ?? "";
+        if (lineHasComponentBatches(line, catalog)) {
+          const parts = resolveLineParts(line, catalog);
+          parts.forEach((part, index) => {
+            const key = componentBatchStateKey(parts, index);
+            const cb = line.componentBatches?.[index];
+            map[key] = cb?.batchNo ?? "";
+          });
+        } else {
+          for (const cb of line.componentBatches ?? []) {
+            map[cb.productName] = cb.batchNo ?? "";
+          }
         }
         initial[line.boxNo] = map;
       }
@@ -218,7 +224,6 @@ export function LoadingSheetBatchEditor({
   });
 
   useEffect(() => {
-    if (readyStockNeeds.length === 0) return;
     (async () => {
       const res = await fetch("/api/ready-bottle-stock", { credentials: "same-origin" });
       if (!res.ok) return;
@@ -238,7 +243,7 @@ export function LoadingSheetBatchEditor({
       setReadyStock(map);
       setReadyBatchLots(data.batchLots ?? []);
     })();
-  }, [readyStockNeeds.length]);
+  }, []);
 
   const catalogDeduction: DeductionPacking[] = useMemo(
     () =>
@@ -265,16 +270,30 @@ export function LoadingSheetBatchEditor({
   }, [catalogDeduction, readyBatchLots, readyStock, sheetLines]);
 
   const sheetUrl = `/orders/${orderId}/loading-sheet`;
-  const dispatchUrl = `${sheetUrl}?dispatch=1`;
 
   const usedElsewhereMap = useMemo(
-    () => new Map(Object.entries(usedLitersElsewhere).map(([k, v]) => [k.toLowerCase(), v])),
+    () => new Map(Object.entries(usedLitersElsewhere)),
     [usedLitersElsewhere],
   );
 
+  const augmentedProductionBatches = useMemo(
+    () =>
+      augmentPoolWithReadyBatches(
+        productionBatches,
+        readyBatchLots as ReadyLotLike[],
+        catalog,
+      ),
+    [catalog, productionBatches, readyBatchLots],
+  );
+
   const effectiveBatchDefs = useMemo(
-    () => effectiveBatchDefsForOrder(poolToBatchDefs(productionBatches), usedElsewhereMap),
-    [productionBatches, usedElsewhereMap],
+    () =>
+      effectiveBatchDefsForOrder(
+        poolToBatchDefs(augmentedProductionBatches),
+        usedElsewhereMap,
+        catalog,
+      ),
+    [augmentedProductionBatches, catalog, usedElsewhereMap],
   );
 
   const workingLines = useMemo(
@@ -289,9 +308,10 @@ export function LoadingSheetBatchEditor({
             lineKind: line.lineKind,
             mixedContents: line.mixedContents,
             batchNo: "",
-            componentBatches: parts.map((part) => ({
+            componentBatches: parts.map((part, index) => ({
               productName: part.productName,
-              batchNo: componentBatches[line.boxNo]?.[part.productName] ?? "",
+              batchNo:
+                componentBatches[line.boxNo]?.[componentBatchStateKey(parts, index)] ?? "",
             })),
           };
         }
@@ -312,11 +332,6 @@ export function LoadingSheetBatchEditor({
     [catalog, workingLines],
   );
 
-  const catalogWeights = useMemo(
-    () => computeSheetLineWeights(sheetLines, catalog),
-    [catalog, sheetLines],
-  );
-
   const validation = useMemo(() => {
     const batchResult = validateSheetBatchAllocations(workingLines, effectiveBatchDefs, catalog);
     if (!batchResult.ok) return batchResult;
@@ -327,8 +342,13 @@ export function LoadingSheetBatchEditor({
 
   const batchesForRow = useCallback(
     (productName: string) =>
-      productionBatches.filter((pb) => productsMatch(pb.productName, productName, catalog)),
-    [catalog, productionBatches],
+      batchPickerOptionsForComponent(
+        productName,
+        productionBatches,
+        readyBatchLots as ReadyLotLike[],
+        catalog,
+      ),
+    [catalog, productionBatches, readyBatchLots],
   );
 
   const canSaveDispatch = validation.ok && !saving;
@@ -373,9 +393,10 @@ export function LoadingSheetBatchEditor({
         const parts = resolveLineParts(line, catalog);
         return {
           boxNo: line.boxNo,
-          componentBatches: parts.map((part) => ({
+          componentBatches: parts.map((part, index) => ({
             productName: part.productName,
-            batchNo: componentBatches[line.boxNo]?.[part.productName] ?? "",
+            batchNo:
+              componentBatches[line.boxNo]?.[componentBatchStateKey(parts, index)] ?? "",
           })),
         };
       }
@@ -476,12 +497,17 @@ export function LoadingSheetBatchEditor({
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           {canEditDispatch && !dispatchEditMode && (!batchesLocked || !weightsVerified) ? (
-            <Link
-              href={dispatchUrl}
+            <button
+              type="button"
+              onClick={() => {
+                setSaved(false);
+                setError(null);
+                setDispatchEditMode(true);
+              }}
               className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
             >
               {batchesLocked ? "Enter carton weights" : "Edit dispatch"}
-            </Link>
+            </button>
           ) : null}
           {batchesLocked ? (
             <span className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
@@ -609,7 +635,6 @@ export function LoadingSheetBatchEditor({
                 <th className="border border-black px-1 py-2 font-semibold">PRODUCT NAME</th>
                 <th className="border border-black px-1 py-2 font-semibold">NO OF BOTTLES</th>
                 <th className="border border-black px-1 py-2 font-semibold">Batch No</th>
-                <th className="border border-black px-1 py-2 font-semibold">Weight (L)</th>
                 <th className="border border-black px-1 py-2 font-semibold">Carton wt (kg)</th>
                 <th className="border border-black px-1 py-2 font-semibold">PO NO</th>
                 <th className="border border-black px-1 py-2 font-semibold">Customer Co</th>
@@ -619,11 +644,11 @@ export function LoadingSheetBatchEditor({
               {sheetLines.map((row) => {
                 const multiBatch = lineHasComponentBatches(row, catalog);
                 const parts = multiBatch ? resolveLineParts(row, catalog) : [];
-                const rowNeedsBatch = lineNeedsBatch(row, readyByBox, catalog);
                 const lineSplit = readyByBox.get(row.boxNo);
-                const resolvedComponentBatches = parts.map((part) => ({
+                const resolvedComponentBatches = parts.map((part, index) => ({
                   productName: part.productName,
-                  batchNo: componentBatches[row.boxNo]?.[part.productName] ?? "",
+                  batchNo:
+                    componentBatches[row.boxNo]?.[componentBatchStateKey(parts, index)] ?? "",
                 }));
                 const batchValue = formatReadyAwareBatchDisplay(
                   {
@@ -636,8 +661,6 @@ export function LoadingSheetBatchEditor({
                   batches[row.boxNo] ?? row.batchNo ?? "",
                   resolvedComponentBatches,
                 );
-                const displayWeight =
-                  catalogWeights.get(row.boxNo) ?? row.weight ?? null;
                 const standardKg = lookupStandardCartonWeight(
                   row.productName,
                   row.bottlesPerBox,
@@ -683,79 +706,66 @@ export function LoadingSheetBatchEditor({
                     <td className="border border-black px-1 py-1 text-center">
                       {showBatchInputs ? (
                         <div className="space-y-1">
-                          {multiBatch && !rowNeedsBatch && lineSplit && lineSplit.bottlesFromReady > 0 ? (
-                            <span className="text-xs font-medium text-emerald-800 print:hidden">
-                              {lineSplit.readyBatchDisplay || READY_SHELF_LABEL}
-                            </span>
-                          ) : multiBatch ? (
-                            parts.map((part) => {
-                              const partNeedsBatch = componentNeedsBatch(
-                                row,
-                                part.productName,
-                                readyByBox,
-                                catalog,
-                              );
-                              const compSplit = lineSplit?.components?.find((c) =>
-                                productsMatch(c.productName, part.productName, catalog),
-                              );
+                          {multiBatch ? (
+                            parts.map((part, index) => {
+                              const stateKey = componentBatchStateKey(parts, index);
+                              const compSplit = lineSplit?.components?.[index];
                               const options = batchesForRow(part.productName);
-                              const value = componentBatches[row.boxNo]?.[part.productName] ?? "";
+                              const value = componentBatches[row.boxNo]?.[stateKey] ?? "";
                               return (
-                                <div key={part.productName} className="text-left">
+                                <div key={stateKey} className="text-left">
                                   <div className="text-[10px] font-medium text-zinc-600 print:hidden">
                                     {part.productName}
                                     {compSplit && compSplit.bottlesFromReady > 0 ? (
                                       <span className="text-emerald-700">
                                         {" "}
-                                        · {compSplit.bottlesFromReady} ready
+                                        · {compSplit.bottlesFromReady} ready on shelf
                                       </span>
                                     ) : null}
                                   </div>
-                                  {partNeedsBatch ? (
-                                    <select
-                                      value={value}
-                                      onChange={(e) => {
-                                        setSaved(false);
-                                        setError(null);
-                                        setComponentBatches((prev) => ({
-                                          ...prev,
-                                          [row.boxNo]: {
-                                            ...(prev[row.boxNo] ?? {}),
-                                            [part.productName]: e.target.value,
-                                          },
-                                        }));
-                                      }}
-                                      className="w-full min-w-[5rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
-                                    >
-                                      <option value="">— assign QC batch</option>
-                                      {options.map((pb) => {
-                                        const key = normalizeBatchNo(pb.batchNo).toLowerCase();
-                                        const elsewhere = usedElsewhereMap.get(key) ?? 0;
-                                        const onThisOrder = currentOrderUsedByBatch.get(key) ?? 0;
-                                        const remaining = Math.max(
-                                          0,
-                                          pb.totalLiters - elsewhere - onThisOrder,
-                                        );
-                                        return (
-                                          <option key={pb.batchNo} value={pb.batchNo}>
-                                            {pb.batchNo} ({formatLiters(remaining)} L left)
-                                          </option>
-                                        );
-                                      })}
-                                    </select>
-                                  ) : (
-                                    <span className="text-xs text-emerald-800 print:hidden">
-                                      {compSplit?.readyBatchDisplay || READY_SHELF_LABEL}
-                                    </span>
-                                  )}
+                                  <select
+                                    value={value}
+                                    onChange={(e) => {
+                                      setSaved(false);
+                                      setError(null);
+                                      setComponentBatches((prev) => ({
+                                        ...prev,
+                                        [row.boxNo]: {
+                                          ...(prev[row.boxNo] ?? {}),
+                                          [stateKey]: e.target.value,
+                                        },
+                                      }));
+                                    }}
+                                    className="w-full min-w-[5rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
+                                  >
+                                    <option value="">— assign batch</option>
+                                    {options.map((pb) => {
+                                      const key = batchUsageKey(pb.batchNo, part.productName, catalog);
+                                      const elsewhere = usedElsewhereMap.get(key) ?? 0;
+                                      const onThisOrder = currentOrderUsedByBatch.get(key) ?? 0;
+                                      const remaining = Math.max(
+                                        0,
+                                        pb.totalLiters - elsewhere - onThisOrder,
+                                      );
+                                      const label = pb.readyBottles
+                                        ? `${pb.batchNo} (${pb.readyBottles} ready${pb.fromReadyOnly ? "" : `, ${formatLiters(remaining)} L left`})`
+                                        : `${pb.batchNo} (${formatLiters(remaining)} L left)`;
+                                      return (
+                                        <option key={pb.batchNo} value={pb.batchNo}>
+                                          {label}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
                                 </div>
                               );
                             })
-                          ) : rowNeedsBatch ? (
+                          ) : (
                             <>
                               {lineSplit && lineSplit.bottlesFromReady > 0 ? (
                                 <p className="text-[10px] text-emerald-700 print:hidden">
-                                  {lineSplit.bottlesFromReady} from ready shelf on earlier cartons
+                                  {lineSplit.bottlesFromReady} ready on shelf for this product on
+                                  earlier cartons
                                 </p>
                               ) : null}
                               <select
@@ -767,33 +777,29 @@ export function LoadingSheetBatchEditor({
                                 }}
                                 className="w-full min-w-[5rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
                               >
-                                <option value="">— assign QC batch</option>
+                                <option value="">— assign batch</option>
                                 {batchesForRow(row.productName).map((pb) => {
-                                  const key = normalizeBatchNo(pb.batchNo).toLowerCase();
+                                  const key = batchUsageKey(pb.batchNo, row.productName, catalog);
                                   const elsewhere = usedElsewhereMap.get(key) ?? 0;
                                   const onThisOrder = currentOrderUsedByBatch.get(key) ?? 0;
                                   const remaining = Math.max(0, pb.totalLiters - elsewhere - onThisOrder);
+                                  const label = pb.readyBottles
+                                    ? `${pb.batchNo} (${pb.readyBottles} ready${pb.fromReadyOnly ? "" : `, ${formatLiters(remaining)} L left`})`
+                                    : `${pb.batchNo} (${formatLiters(remaining)} L left)`;
                                   return (
                                     <option key={pb.batchNo} value={pb.batchNo}>
-                                      {pb.batchNo} ({formatLiters(remaining)} L left)
+                                      {label}
                                     </option>
                                   );
                                 })}
                               </select>
                             </>
-                          ) : (
-                            <span className="text-xs font-medium text-emerald-800 print:hidden">
-                              {lineSplit?.readyBatchDisplay || READY_SHELF_LABEL}
-                            </span>
                           )}
                           <span className="hidden print:inline">{batchValue}</span>
                         </div>
                       ) : (
                         batchValue
                       )}
-                    </td>
-                    <td className="border border-black px-1 py-1 text-center">
-                      {weightCell(displayWeight)}
                     </td>
                     <td className="border border-black px-1 py-1 text-center">
                       {showWeightInputs ? (

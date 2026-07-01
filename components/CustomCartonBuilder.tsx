@@ -5,8 +5,8 @@ import {
   composeCustomLineProductName,
   inferBottleSizeCodeFromSavedLine,
   normalizeBottleSizeCode,
-  productBaseName,
 } from "@/lib/customBottleSizes";
+import { findPackingForLineName } from "@/lib/productPackingMatch";
 
 /** Minimal product shape for the custom-carton picker (matches `CatalogProduct` fields used here). */
 export type CustomCartonCatalogProduct = {
@@ -27,6 +27,8 @@ export type CartonContentRow = {
   bottles: string;
   /** Container size per line: catalog default, 5l-jar, 1l, etc. */
   bottleSizeCode: string;
+  /** Saved catalog code round-trip (fabrito-fabric-softener-pouch, etc.). */
+  packingCode?: string;
 };
 
 export type CustomCartonDraft = {
@@ -66,8 +68,10 @@ function findCatalogProduct(
 function findCatalogCodeForName(name: string, catalog: CustomCartonCatalogProduct[]): string | undefined {
   const key = name.trim().toLowerCase();
   if (!key) return undefined;
-  const m = catalog.find((p) => p.name.trim().toLowerCase() === key);
-  return m?.code;
+  const exact = catalog.find((p) => p.name.trim().toLowerCase() === key);
+  if (exact) return exact.code;
+  const hit = findPackingForLineName(name, catalog);
+  return hit?.code;
 }
 
 function catalogBaseForRow(
@@ -77,16 +81,21 @@ function catalogBaseForRow(
   if (!catalog?.length) return row.productName.trim() || undefined;
   if (row.productPick && row.productPick !== "__other__") {
     const p = findCatalogProduct(row.productPick, catalog);
-    if (p) return productBaseName(p.name, p.batchFamily);
+    if (p) return p.name.trim();
   }
-  if (row.productName.trim()) return productBaseName(row.productName);
+  if (row.productName.trim()) return row.productName.trim();
   return undefined;
 }
 
 export function draftsFromSavedCartons(
   cartons: Array<{
     boxCount: number;
-    contents: Array<{ productName: string; bottles: number; bottleSizeCode?: string }>;
+    contents: Array<{
+      productName: string;
+      bottles: number;
+      bottleSizeCode?: string;
+      packingCode?: string;
+    }>;
     label?: string;
     customBoxCode?: string;
   }>,
@@ -103,13 +112,19 @@ export function draftsFromSavedCartons(
         const productName = row.productName;
         let productPick: string | undefined;
         let catalogName: string | undefined;
+        const savedPackingCode = row.packingCode?.trim();
         if (catalog?.length) {
-          const code = findCatalogCodeForName(productName, catalog);
-          if (code) {
-            productPick = code;
-            catalogName = findCatalogProduct(code, catalog)?.name;
+          if (savedPackingCode && catalog.some((p) => p.code === savedPackingCode)) {
+            productPick = savedPackingCode;
+            catalogName = findCatalogProduct(savedPackingCode, catalog)?.name;
           } else {
-            productPick = productName.trim() ? "__other__" : "";
+            const code = findCatalogCodeForName(productName, catalog);
+            if (code) {
+              productPick = code;
+              catalogName = findCatalogProduct(code, catalog)?.name;
+            } else {
+              productPick = productName.trim() ? "__other__" : "";
+            }
           }
         }
         const bottleSizeCode = inferBottleSizeCodeFromSavedLine(
@@ -120,9 +135,10 @@ export function draftsFromSavedCartons(
         return {
           id: rid(),
           productPick,
-          productName,
+          productName: catalogName ?? productName,
           bottles: String(row.bottles),
           bottleSizeCode,
+          ...(savedPackingCode ? { packingCode: savedPackingCode } : {}),
         };
       }),
     };
@@ -134,15 +150,13 @@ export function resolvedCustomRowProductName(
   row: CartonContentRow,
   catalog?: CustomCartonCatalogProduct[],
 ): string {
-  let base = row.productName.trim();
+  let name = row.productName.trim();
   if (catalog?.length && row.productPick && row.productPick !== "__other__") {
     const p = findCatalogProduct(row.productPick, catalog);
-    if (p) base = productBaseName(p.name, p.batchFamily);
-  } else if (base) {
-    base = productBaseName(base);
+    if (p) name = p.name.trim();
   }
-  if (!base) return "";
-  return composeCustomLineProductName(base, row.bottleSizeCode || "catalog");
+  if (!name) return "";
+  return composeCustomLineProductName(name, row.bottleSizeCode || "catalog");
 }
 
 export function buildCustomCartonsPayload(
@@ -150,29 +164,47 @@ export function buildCustomCartonsPayload(
   catalog?: CustomCartonCatalogProduct[],
 ): Array<{
   boxCount: number;
-  contents: Array<{ productName: string; bottles: number; bottleSizeCode?: string }>;
+  contents: Array<{
+    productName: string;
+    bottles: number;
+    bottleSizeCode?: string;
+    packingCode?: string;
+  }>;
   label?: string;
   customBoxCode?: string;
 }> {
   const out: Array<{
     boxCount: number;
-    contents: Array<{ productName: string; bottles: number; bottleSizeCode?: string }>;
+    contents: Array<{
+      productName: string;
+      bottles: number;
+      bottleSizeCode?: string;
+      packingCode?: string;
+    }>;
     label?: string;
     customBoxCode?: string;
   }> = [];
   for (const c of drafts) {
     const boxCount = Number(c.boxCount);
     if (!Number.isInteger(boxCount) || boxCount < 1) continue;
-    const contents: Array<{ productName: string; bottles: number; bottleSizeCode?: string }> = [];
+    const contents: Array<{
+      productName: string;
+      bottles: number;
+      bottleSizeCode?: string;
+      packingCode?: string;
+    }> = [];
     for (const r of c.rows) {
       const pn = resolvedCustomRowProductName(r, catalog);
       const b = Number(r.bottles);
       if (!pn) continue;
       if (!Number.isInteger(b) || b < 1) continue;
       const sizeCode = normalizeBottleSizeCode(r.bottleSizeCode) || "catalog";
+      const packingCode =
+        r.productPick && r.productPick !== "__other__" ? r.productPick.trim().toLowerCase() : "";
       contents.push({
         productName: pn,
         bottles: b,
+        ...(packingCode ? { packingCode } : {}),
         ...(sizeCode && sizeCode !== "catalog" ? { bottleSizeCode: sizeCode } : {}),
       });
     }
@@ -368,6 +400,7 @@ export function CustomCartonBuilder({ cartons, onChange, disabled, errors, catal
                               updateRow(ci, row.id, {
                                 productPick: v,
                                 productName: p?.name ?? "",
+                                packingCode: v,
                               });
                             }
                           }}

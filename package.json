@@ -6,10 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "seed:users": "tsx scripts/seed-users.ts",
-    "seed:products": "tsx scripts/seed-product-packings.ts",
-    "seed:packaging": "tsx scripts/seed-packaging-items.ts"
+    "lint": "eslint"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

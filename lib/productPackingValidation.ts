@@ -32,14 +32,20 @@ export function parseProductPackingCreateBody(raw: unknown):
     return { ok: false, error: "Code must be a slug: lowercase letters, digits, and hyphens only" };
   }
 
-  const bpc =
-    typeof body.bottlesPerCarton === "number"
-      ? body.bottlesPerCarton
-      : typeof body.bottlesPerCarton === "string"
-        ? Number(body.bottlesPerCarton)
-        : NaN;
-  if (!Number.isInteger(bpc) || bpc < 1) {
-    return { ok: false, error: "Bottles per carton must be a whole number ≥ 1" };
+  const bpcRaw = body.bottlesPerCarton;
+  let bpc: number;
+  if (bpcRaw === undefined || bpcRaw === null || bpcRaw === "") {
+    bpc = 1;
+  } else {
+    bpc =
+      typeof bpcRaw === "number"
+        ? bpcRaw
+        : typeof bpcRaw === "string"
+          ? Number(bpcRaw)
+          : NaN;
+    if (!Number.isInteger(bpc) || bpc < 1) {
+      return { ok: false, error: "Bottles per carton must be a whole number ≥ 1 when provided" };
+    }
   }
 
   let litersPerBottle: number;

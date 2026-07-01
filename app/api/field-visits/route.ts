@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import {
   canAccessFieldVisits,
+  fieldVisitsMongoFilter,
+  isEmptyFieldVisitDraft,
   isFieldVisitRep,
   POINTS_LOST,
   POINTS_WON,
@@ -47,7 +49,7 @@ export async function GET(req: Request) {
     ? {}
     : isAdmin(role)
       ? {}
-      : { createdByUserId: new mongoose.Types.ObjectId(userId) };
+      : fieldVisitsMongoFilter(username);
 
   const tickets = await FieldVisitTicket.find(filter).sort({ updatedAt: -1 }).lean();
 
@@ -67,9 +69,9 @@ export async function GET(req: Request) {
     }
   }
 
-  const list = tickets.map((t) =>
-    serializeTicket(t as Parameters<typeof serializeTicket>[0]),
-  );
+  const list = tickets
+    .map((t) => serializeTicket(t as Parameters<typeof serializeTicket>[0]))
+    .filter((t) => scopeAll || isAdmin(role) || !isEmptyFieldVisitDraft(t));
 
   const followUpReminders = list.filter((t) => t.needsFollowUp).length;
 
@@ -80,6 +82,7 @@ export async function GET(req: Request) {
   });
 }
 
+/** Create an empty draft ticket — rep fills customer info on the detail page. */
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) {
@@ -93,52 +96,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
-  if (!body) {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const placeName = typeof body.placeName === "string" ? body.placeName.trim() : "";
-  const customerName = typeof body.customerName === "string" ? body.customerName.trim() : "";
-  const errors: Record<string, string> = {};
-  if (!placeName) errors.placeName = "Place / shop name is required.";
-  if (!customerName) errors.customerName = "Customer name is required.";
-  if (Object.keys(errors).length > 0) {
-    return NextResponse.json({ errors }, { status: 400 });
-  }
-
-  const sampleProducts: { productName: string; notes: string }[] = [];
-  if (Array.isArray(body.sampleProducts)) {
-    for (const row of body.sampleProducts) {
-      if (!row || typeof row !== "object") continue;
-      const pn = typeof (row as { productName?: unknown }).productName === "string"
-        ? (row as { productName: string }).productName.trim()
-        : "";
-      if (!pn) continue;
-      const notes =
-        typeof (row as { notes?: unknown }).notes === "string"
-          ? (row as { notes: string }).notes.trim()
-          : "";
-      sampleProducts.push({ productName: pn, notes });
-    }
-  }
-
   await connectToDatabase();
 
   const created = await FieldVisitTicket.create({
-    placeName,
-    customerName,
-    city: typeof body.city === "string" ? body.city.trim() : "",
-    contactPhone: typeof body.contactPhone === "string" ? body.contactPhone.trim() : "",
-    contactPerson: typeof body.contactPerson === "string" ? body.contactPerson.trim() : "",
-    notes: typeof body.notes === "string" ? body.notes.trim() : "",
-    sampleProducts,
-    status: "sample_requested",
-    sampleRequestedAt: new Date(),
+    placeName: "",
+    customerName: "",
+    status: "active",
+    sampleMode: "none",
+    visitLogs: [],
     createdByUserId: new mongoose.Types.ObjectId(userId),
     createdByName: name,
     createdByUsername: username.toLowerCase(),
   });
 
-  return NextResponse.json({ ticket: serializeTicket(created) }, { status: 201 });
+  return NextResponse.json(
+    { id: created._id.toString(), ticket: serializeTicket(created) },
+    { status: 201 },
+  );
 }

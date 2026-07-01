@@ -2,18 +2,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import mongoose from "mongoose";
 
+import { ProductionBatchCloseForm } from "@/components/ProductionBatchCloseForm";
 import { auth } from "@/lib/auth";
 import { formatLiters } from "@/lib/batchVolume";
 import { connectToDatabase } from "@/lib/db";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
+import { isBatchClosed } from "@/lib/productionBatchClose";
+import { normalizeQcOutcome } from "@/lib/productionBatchQc";
 import {
   loadBatchUsageContext,
   statusLabel,
-  usageForBatchNo,
+  usageForProductionBatch,
   type ProductionBatchStatus,
 } from "@/lib/productionBatchStatus";
 import { isViscosityApplicableBatchFamily } from "@/lib/viscosityBatchFamily";
-import { roleFromSession } from "@/lib/roles";
+import { adminCanViewOperations, canEditProductionBatches, roleFromSession } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -48,7 +51,10 @@ export default async function ProductionBatchDetailPage(props: PageProps) {
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
-  if (!role || (role !== "batch_editor" && role !== "dispatch_editor")) {
+  if (
+    !role ||
+    !(role === "batch_editor" || role === "dispatch_editor" || adminCanViewOperations(role))
+  ) {
     notFound();
   }
 
@@ -56,26 +62,46 @@ export default async function ProductionBatchDetailPage(props: PageProps) {
   const batch = await ProductionBatch.findById(id).lean();
   if (!batch) notFound();
 
-  const { usedMap } = await loadBatchUsageContext();
-  const usage = usageForBatchNo(batch.batchNo, batch.totalLiters, usedMap);
-  const label = statusLabel(usage.status, usage.remainingLiters);
+  const closed = isBatchClosed(batch);
+  const { usedMap, catalog } = await loadBatchUsageContext();
+  const usage = usageForProductionBatch(batch, usedMap, catalog);
+  const label = closed
+    ? "Closed"
+    : statusLabel(usage.status, usage.remainingLiters);
 
-  const isBatchEditor = role === "batch_editor";
+  const isBatchEditor = canEditProductionBatches(role);
+  const qcApproved = normalizeQcOutcome(batch.qcOutcome) === "approved";
+  const canClose = isBatchEditor && !closed && qcApproved;
+
+  const displayUsed = closed
+    ? formatLiters(batch.closureUsedLitersSnapshot ?? usage.usedLiters)
+    : formatLiters(usage.usedLiters);
+  const displayRemaining = closed
+    ? formatLiters(batch.closureRemainingLitersSnapshot ?? 0)
+    : formatLiters(usage.remainingLiters);
 
   return (
     <div className="space-y-6">
       <div>
-        <Link href="/production/batches" className="text-sm font-medium text-zinc-700 underline">
-          ← Back to batches
+        <Link href={closed ? "/production/batches/closed" : "/production/batches"} className="text-sm font-medium text-zinc-700 underline">
+          ← Back to {closed ? "closed batches" : "batches"}
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Batch {batch.batchNo}</h1>
-        <p className="mt-1 text-sm text-zinc-600">Full record as entered at registration — for audit and feedback checks.</p>
+        <p className="mt-1 text-sm text-zinc-600">
+          {closed
+            ? "Closed batch — read-only archive."
+            : "Full record as entered at registration — for audit and feedback checks."}
+        </p>
         <div className="mt-2">
-          <StatusBadge status={usage.status} label={label} />
+          <StatusBadge
+            status={closed ? "empty" : usage.status}
+            label={label}
+          />
         </div>
-        {usage.locked ? (
+        {!closed && usage.locked ? (
           <p className="mt-2 text-sm text-amber-800">
-            This batch is locked because it has been assigned on loading sheets. QC data cannot be changed.
+            This batch is on loading sheets. QC data is locked — use{" "}
+            <strong>Correct batch number</strong> to fix a wrong batch no.
           </p>
         ) : null}
       </div>
@@ -84,9 +110,10 @@ export default async function ProductionBatchDetailPage(props: PageProps) {
         <dl>
           <DetailRow label="Batch number" value={batch.batchNo} />
           <DetailRow label="Product" value={batch.productName} />
+          <DetailRow label="Purpose" value={batch.productionPurpose === "sample" ? "Sample" : "Regular"} />
           <DetailRow label="Date" value={new Date(batch.preparedAt).toLocaleDateString()} />
-          <DetailRow label="Used on POs" value={`${formatLiters(usage.usedLiters)} L`} />
-          <DetailRow label="Remaining pool" value={`${formatLiters(usage.remainingLiters)} L`} />
+          <DetailRow label="Used on POs / filling" value={`${displayUsed} L`} />
+          <DetailRow label="Remaining pool (at close)" value={`${displayRemaining} L`} />
           <DetailRow label="pH" value={batch.ph ?? ""} />
           <DetailRow label="Solids" value={batch.solids ?? ""} />
           <DetailRow label="Appearance" value={batch.appearance ?? ""} />
@@ -106,12 +133,54 @@ export default async function ProductionBatchDetailPage(props: PageProps) {
         </dl>
       </div>
 
-      {isBatchEditor && !usage.locked ? (
+      {closed ? (
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+          <h2 className="text-lg font-semibold text-zinc-900">Closure record</h2>
+          <dl className="mt-3 space-y-2 text-sm">
+            <div>
+              <dt className="font-medium text-zinc-600">Waste recorded</dt>
+              <dd className="text-zinc-900">{formatLiters(batch.closureWasteLiters ?? 0)} L</dd>
+            </div>
+            {batch.closureWasteNote?.trim() ? (
+              <div>
+                <dt className="font-medium text-zinc-600">Note</dt>
+                <dd className="text-zinc-900">{batch.closureWasteNote}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt className="font-medium text-zinc-600">Closed by</dt>
+              <dd className="text-zinc-900">
+                {batch.closedByName?.trim() || "—"}
+                {batch.closedAt ? ` · ${new Date(batch.closedAt).toLocaleString()}` : ""}
+              </dd>
+            </div>
+          </dl>
+        </div>
+      ) : null}
+
+      {canClose ? (
+        <ProductionBatchCloseForm
+          batchId={id}
+          batchNo={batch.batchNo}
+          remainingLiters={usage.remainingLiters}
+          usedLiters={usage.usedLiters}
+        />
+      ) : null}
+
+      {!closed && isBatchEditor && !usage.locked ? (
         <Link
           href={`/production/batches/${id}/edit`}
           className="inline-block rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white"
         >
           Edit batch
+        </Link>
+      ) : null}
+      {!closed && isBatchEditor && usage.locked ? (
+        <Link
+          href={`/production/batches/${id}/edit`}
+          className="inline-block rounded-lg bg-amber-800 px-4 py-2 text-sm font-medium text-white"
+        >
+          Correct batch number
         </Link>
       ) : null}
     </div>

@@ -12,13 +12,16 @@ const ReadyBottleBatchLotSchema = new mongoose.Schema(
     /** Snapshot of Nimra batch product name when linked. */
     batchProductName: { type: String, required: false, default: "", trim: true },
     note: { type: String, required: false, default: "", trim: true },
+    /** When saved as part of a multi-product bundle (e.g. brighten + fabrito). */
+    bundleCode: { type: String, required: false, default: "", trim: true, lowercase: true },
+    bundleSetId: { type: String, required: false, default: "", trim: true },
     recordedByUserId: { type: String, required: false, default: null },
     recordedByName: { type: String, required: false, default: "", trim: true },
   },
   { timestamps: { createdAt: true, updatedAt: true } },
 );
 
-ReadyBottleBatchLotSchema.index({ batchNo: 1, productCode: 1 }, { unique: true });
+ReadyBottleBatchLotSchema.index({ batchNo: 1, productCode: 1, bundleSetId: 1 }, { unique: true });
 
 export type ReadyBottleBatchLotDoc = InferSchemaType<typeof ReadyBottleBatchLotSchema> & {
   _id: mongoose.Types.ObjectId;

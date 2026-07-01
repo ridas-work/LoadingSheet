@@ -1,0 +1,167 @@
+[
+  {
+    "productCode": "rhino-250ml",
+    "displayName": "Rhino 250 ml",
+    "tasks": [
+      { "taskCode": "lid", "label": "Lid", "packagingItemCode": "rhino-lids" },
+      { "taskCode": "cap", "label": "Cap", "packagingItemCode": "rhino-caps" },
+      { "taskCode": "bottle", "label": "250 ml bottle", "packagingItemCode": "bottle-rhino-250ml" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "rhino-stickers-250ml" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "rhino-stickers-250ml" },
+      { "taskCode": "string", "label": "String", "packagingItemCode": "rhino-string" },
+      { "taskCode": "sticker-rs-199", "label": "Rs. 199 sticker", "packagingItemCode": "sticker-rs-199" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "rhino-boxes-250ml" },
+      { "taskCode": "filling", "label": "Filling bottles" }
+    ]
+  },
+  {
+    "productCode": "rhino-500ml",
+    "displayName": "Rhino 500 ml",
+    "tasks": [
+      { "taskCode": "lid", "label": "Lid", "packagingItemCode": "rhino-lids" },
+      { "taskCode": "cap", "label": "Cap", "packagingItemCode": "rhino-caps" },
+      { "taskCode": "bottle", "label": "500 ml bottle", "packagingItemCode": "bottle-rhino-500ml" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "rhino-stickers-500ml-front" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "rhino-stickers-500ml-back" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "rhino-boxes-500ml" },
+      { "taskCode": "partition-big", "label": "Large partition (×4 per carton)", "packagingItemCode": "rhino-partition-500ml-big" },
+      { "taskCode": "partition-small", "label": "Small partition (×5 per carton)", "packagingItemCode": "rhino-partition-500ml-small" },
+      { "taskCode": "filling", "label": "Filling bottles" },
+      { "taskCode": "barcoding", "label": "Barcoding" },
+      { "taskCode": "packing", "label": "Packing cartons" }
+    ]
+  },
+  {
+    "productCode": "rhino-750ml",
+    "displayName": "Rhino 750 ml",
+    "tasks": [
+      { "taskCode": "lid", "label": "Lid", "packagingItemCode": "rhino-lids" },
+      { "taskCode": "cap", "label": "Cap", "packagingItemCode": "rhino-caps" },
+      { "taskCode": "bottle", "label": "750 ml bottle", "packagingItemCode": "bottle-rhino-750ml" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "rhino-stickers-750ml-front" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "rhino-stickers-750ml-back" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "rhino-boxes-750ml" },
+      { "taskCode": "partition-big", "label": "Large partition (×1 per carton)", "packagingItemCode": "rhino-partition-750ml-big" },
+      { "taskCode": "partition-small", "label": "Small partition (×4 per carton)", "packagingItemCode": "rhino-partition-750ml-small" },
+      { "taskCode": "filling", "label": "Filling bottles" },
+      { "taskCode": "packing", "label": "Packing cartons" }
+    ]
+  },
+  {
+    "productCode": "brighten-liquid-laundry-detergent",
+    "displayName": "Brighten 1 L",
+    "tasks": [
+      { "taskCode": "lid", "label": "Lid", "packagingItemCode": "brighten-fabrito-lids" },
+      { "taskCode": "cap", "label": "Cap", "packagingItemCode": "brighten-cap" },
+      { "taskCode": "bottle", "label": "1 L bottle", "packagingItemCode": "brighten-bottles-1ltr" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "brighten-stickers-1ltr-front" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "brighten-stickers-1ltr-back" },
+      { "taskCode": "baby-sticker", "label": "Baby sticker", "packagingItemCode": "baby-stickers-brighten" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "brighten-fabrito-boxes" },
+      { "taskCode": "partition-big", "label": "Large partition", "packagingItemCode": "brighten-fabrito-big-partition" },
+      { "taskCode": "partition-small", "label": "Small partitions (×4)", "packagingItemCode": "brighten-fabrito-small-partition" },
+      { "taskCode": "filling", "label": "Filling bottles" }
+    ]
+  },
+  {
+    "productCode": "fabrito-fabric-softener",
+    "displayName": "Fabrito 1 L",
+    "tasks": [
+      { "taskCode": "lid", "label": "Lid", "packagingItemCode": "brighten-fabrito-lids" },
+      { "taskCode": "cap", "label": "Cap", "packagingItemCode": "fabrito-caps" },
+      { "taskCode": "bottle", "label": "1 L bottle", "packagingItemCode": "fabrito-bottles" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "fabrito-front-stickers" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "fabrito-back-stickers" },
+      { "taskCode": "baby-sticker", "label": "Baby sticker", "packagingItemCode": "baby-stickers-fabrito" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "brighten-fabrito-boxes" },
+      { "taskCode": "partition-big", "label": "Large partition", "packagingItemCode": "brighten-fabrito-big-partition" },
+      { "taskCode": "partition-small", "label": "Small partitions (×4)", "packagingItemCode": "brighten-fabrito-small-partition" },
+      { "taskCode": "filling", "label": "Filling bottles" }
+    ]
+  },
+  {
+    "productCode": "power-wash",
+    "displayName": "Power Wash",
+    "tasks": [
+      { "taskCode": "flip-tip", "label": "Flip tip", "packagingItemCode": "power-wash-flip-tip" },
+      { "taskCode": "bottle", "label": "Bottle", "packagingItemCode": "power-wash-bottles" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "power-wash-stickers-front" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "power-wash-stickers-back" },
+      { "taskCode": "ph-sticker", "label": "pH neutral sticker", "packagingItemCode": "ph-stickers-power-wash" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "power-wash-degreaser-boxes" },
+      { "taskCode": "partition-big", "label": "Large partition", "packagingItemCode": "r-pw-degreaser-big-partition" },
+      { "taskCode": "partition-small", "label": "Small partitions (×4)", "packagingItemCode": "r-pw-degreaser-small-partition" },
+      { "taskCode": "filling", "label": "Filling bottles" }
+    ]
+  },
+  {
+    "productCode": "degrease-spray",
+    "displayName": "Degrease Spray",
+    "tasks": [
+      { "taskCode": "spray", "label": "Spray pump", "packagingItemCode": "degreaser-pumps-750ml" },
+      { "taskCode": "bottle", "label": "Degrease bottle", "packagingItemCode": "degreaser-bottles-750ml" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "degreaser-stickers-front" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "degreaser-stickers-back" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "power-wash-degreaser-boxes" },
+      { "taskCode": "partition-big", "label": "Large partition", "packagingItemCode": "r-pw-degreaser-big-partition" },
+      { "taskCode": "partition-small", "label": "Small partitions (×4)", "packagingItemCode": "r-pw-degreaser-small-partition" },
+      { "taskCode": "filling", "label": "Filling bottles" }
+    ]
+  },
+  {
+    "productCode": "glim",
+    "displayName": "Glim",
+    "tasks": [
+      { "taskCode": "spray", "label": "Spray", "packagingItemCode": "glim-spray" },
+      { "taskCode": "bottle", "label": "Bottle", "packagingItemCode": "glim-bottle" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "glim-stickers-front" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "glim-stickers-back" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "power-wash-degreaser-boxes" },
+      { "taskCode": "partition-big", "label": "Large partition", "packagingItemCode": "r-pw-degreaser-big-partition" },
+      { "taskCode": "partition-small", "label": "Small partitions (×4)", "packagingItemCode": "r-pw-degreaser-small-partition" },
+      { "taskCode": "filling", "label": "Filling bottles" }
+    ]
+  },
+  {
+    "productCode": "titan-500g",
+    "displayName": "Titan 500 g",
+    "tasks": [
+      { "taskCode": "cap", "label": "Cap", "packagingItemCode": "titan-caps-print-area" },
+      { "taskCode": "jar", "label": "500 g jar", "packagingItemCode": "titan-pink-jar" },
+      { "taskCode": "spoon", "label": "Spoon", "packagingItemCode": "titan-spoons" },
+      { "taskCode": "label", "label": "Label", "packagingItemCode": "titan-pink-labels" },
+      { "taskCode": "string", "label": "String", "packagingItemCode": "titan-string" },
+      { "taskCode": "sticker-rs-899", "label": "Rs. 899 sticker", "packagingItemCode": "sticker-rs-899" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "titan-box-500g" },
+      { "taskCode": "filling", "label": "Filling jars" }
+    ]
+  },
+  {
+    "productCode": "titan-1250g",
+    "displayName": "Titan 1.25 kg",
+    "tasks": [
+      { "taskCode": "cap", "label": "Cap", "packagingItemCode": "titan-caps-1000g" },
+      { "taskCode": "jar", "label": "1.25 kg jar", "packagingItemCode": "titan-jar-1000g" },
+      { "taskCode": "spoon", "label": "Spoon", "packagingItemCode": "titan-spoons-1000g" },
+      { "taskCode": "label", "label": "Label", "packagingItemCode": "titan-stickers-1000g" },
+      { "taskCode": "sticker-25pct", "label": "25% extra sticker", "packagingItemCode": "sticker-25pct-extra" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "titan-box-1250g" },
+      { "taskCode": "filling", "label": "Filling jars" }
+    ]
+  },
+  {
+    "productCode": "washout",
+    "displayName": "Washout",
+    "tasks": [
+      { "taskCode": "seal", "label": "Seal", "packagingItemCode": "wash-out-seal" },
+      { "taskCode": "cap", "label": "Cap", "packagingItemCode": "wash-out-caps" },
+      { "taskCode": "bottle", "label": "Washout bottle", "packagingItemCode": "wash-out-bottles" },
+      { "taskCode": "label-floral", "label": "Label floral", "packagingItemCode": "wash-out-label-floral" },
+      { "taskCode": "label-ocean", "label": "Label ocean", "packagingItemCode": "wash-out-label-ocean" },
+      { "taskCode": "label-lemon", "label": "Label lemon", "packagingItemCode": "wash-out-label-lemon" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "wash-out-boxes" },
+      { "taskCode": "partition-big", "label": "Large partition", "packagingItemCode": "wash-out-partition" },
+      { "taskCode": "filling", "label": "Filling bottles" }
+    ]
+  }
+]

@@ -3,13 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ui } from "@/lib/ui";
+
 export function AddProductModal() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [batchFamily, setBatchFamily] = useState("");
-  const [bottlesPerCarton, setBottlesPerCarton] = useState("12");
+  const [bottlesPerCarton, setBottlesPerCarton] = useState("");
   const [litersPerBottle, setLitersPerBottle] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,7 +21,7 @@ export function AddProductModal() {
     setCode("");
     setName("");
     setBatchFamily("");
-    setBottlesPerCarton("12");
+    setBottlesPerCarton("");
     setLitersPerBottle("");
     setError(null);
     setSuccess(null);
@@ -39,10 +41,11 @@ export function AddProductModal() {
       const payload: Record<string, unknown> = {
         code: code.trim(),
         name: name.trim(),
-        bottlesPerCarton: Number(bottlesPerCarton),
       };
       const bf = batchFamily.trim();
       if (bf) payload.batchFamily = bf;
+      const bpc = bottlesPerCarton.trim();
+      if (bpc) payload.bottlesPerCarton = Number(bpc);
       const lp = litersPerBottle.trim();
       if (lp) payload.litersPerBottle = Number(lp);
 
@@ -74,7 +77,7 @@ export function AddProductModal() {
           resetForm();
           setOpen(true);
         }}
-        className="rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 shadow-sm hover:bg-zinc-50"
+        className={ui.btnSecondary}
       >
         Add product
       </button>
@@ -83,24 +86,21 @@ export function AddProductModal() {
         <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
           <button
             type="button"
-            className="absolute inset-0 bg-zinc-900/40"
+            className="absolute inset-0 bg-brand-950/50 backdrop-blur-[2px]"
             aria-label="Close dialog"
             onClick={() => !submitting && close()}
           />
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="relative z-10 w-full max-w-md rounded-xl border border-zinc-200 bg-white p-6 shadow-lg"
-          >
-            <h2 className="text-lg font-semibold text-zinc-900">Add catalog product</h2>
-            <p className="mt-1 text-sm text-zinc-600">
-              New packings appear for PO team after they refresh or open a new order. Liters per bottle can be left
-              blank to infer from the name (e.g. 500ml → 0.5 L).
+          <div role="dialog" aria-modal="true" className={`${ui.card} relative z-10 w-full max-w-md p-6 shadow-lg`}>
+            <h2 className="text-lg font-bold text-slate-900">Add catalog product</h2>
+            <p className={`${ui.pageDesc} mt-1`}>
+              New packings appear for PO team after they refresh or open a new order. Bottles per carton and liters per
+              bottle are optional — leave blank to use defaults (1 bottle/carton; size inferred from the name, e.g.
+              500ml → 0.5 L).
             </p>
 
             <form onSubmit={onSubmit} className="mt-4 space-y-3">
               <div>
-                <label className="block text-sm font-medium text-zinc-800" htmlFor="add-product-code">
+                <label className={ui.label} htmlFor="add-product-code">
                   Code (slug)
                 </label>
                 <input
@@ -110,11 +110,11 @@ export function AddProductModal() {
                   required
                   autoComplete="off"
                   placeholder="e.g. my-product-500ml"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  className={`${ui.input} mt-1.5`}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-800" htmlFor="add-product-name">
+                <label className={ui.label} htmlFor="add-product-name">
                   Display name
                 </label>
                 <input
@@ -124,11 +124,11 @@ export function AddProductModal() {
                   required
                   autoComplete="off"
                   placeholder="e.g. My Product 500ml"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  className={`${ui.input} mt-1.5`}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-800" htmlFor="add-product-family">
+                <label className={ui.label} htmlFor="add-product-family">
                   Batch family (optional)
                 </label>
                 <input
@@ -137,12 +137,12 @@ export function AddProductModal() {
                   onChange={(e) => setBatchFamily(e.target.value)}
                   autoComplete="off"
                   placeholder="Defaults to display name if empty"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  className={`${ui.input} mt-1.5`}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-800" htmlFor="add-product-bpc">
-                  Bottles per carton
+                <label className={ui.label} htmlFor="add-product-bpc">
+                  Bottles per carton (optional)
                 </label>
                 <input
                   id="add-product-bpc"
@@ -151,12 +151,12 @@ export function AddProductModal() {
                   step={1}
                   value={bottlesPerCarton}
                   onChange={(e) => setBottlesPerCarton(e.target.value)}
-                  required
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  placeholder="Defaults to 1 if empty"
+                  className={`${ui.input} mt-1.5`}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-zinc-800" htmlFor="add-product-lpb">
+                <label className={ui.label} htmlFor="add-product-lpb">
                   Liters per bottle (optional)
                 </label>
                 <input
@@ -167,27 +167,23 @@ export function AddProductModal() {
                   value={litersPerBottle}
                   onChange={(e) => setLitersPerBottle(e.target.value)}
                   placeholder="Infer from name if empty"
-                  className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
+                  className={`${ui.input} mt-1.5`}
                 />
               </div>
 
-              {error ? <p className="text-sm text-red-600">{error}</p> : null}
-              {success ? <p className="text-sm text-green-700">{success}</p> : null}
+              {error ? <div className={ui.alertDanger}>{error}</div> : null}
+              {success ? <div className={ui.alertSuccess}>{success}</div> : null}
 
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => close()}
                   disabled={submitting}
-                  className="rounded-lg px-3 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+                  className={`${ui.btnGhost} text-slate-700`}
                 >
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                >
+                <button type="submit" disabled={submitting} className={ui.btnPrimary}>
                   {submitting ? "Saving…" : "Save product"}
                 </button>
               </div>

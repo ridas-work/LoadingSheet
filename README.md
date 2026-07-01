@@ -12,6 +12,23 @@ Authorized PO Entry (Phase 1)
 1. Copy `.env.example` to `.env.local`
 2. Fill in `MONGODB_URI`, `NEXTAUTH_SECRET`, and `NEXTAUTH_URL`
 
+### MongoDB (production VPS)
+
+The live app uses **local MongoDB** on the Hostinger VPS (not MongoDB Atlas). Access control is enabled.
+
+| Setting | Value |
+|---------|--------|
+| Host | `127.0.0.1:27017` (SSH into server first) |
+| Database | `loadingsheet` |
+| Username | `loadingsheet_app` |
+| Password | See `MONGODB_URI` in `.env.local` on the server |
+
+**Connect via SSH + mongosh:**
+
+```bash
+mongosh "mongodb://loadingsheet_app:YOUR_PASSWORD@127.0.0.1:27017/loadingsheet?authSource=loadingsheet"
+```
+
 ### Run the dev server
 
 ```bash
@@ -32,22 +49,24 @@ Sign in at `/login`. Accounts are created only via seed (no signup).
 | Javeria | `javeria` | `Javeria-Order-02`  |
 | Aslam   | `aslam`   | `Aslam-Order-03`    |
 | Ibtisam | `ibtisam` | `Ibtisam-Order-04`  |
-| Nimra   | `nimra`   | `Nimra-Batch-01`    | Production — batch numbers only |
+| Esha    | `esha`    | `Nimra-Batch-01`    | Production — batch numbers only (`nimra` also works) |
 | Rashid  | `rashid`  | `Rashid-Dispatch-01`| Dispatch — vehicle, driver, DC, signatures |
 | Haider  | `haider`  | `Haider-Packaging-01` | Packaging inventory — stock counts and packaging materials |
+| Ramazan | `ramazan` | `Ramazan-Chemicals-01` | Chemical raw materials — stock on hand and re-order requests to Waleed |
 | Zaman   | `zaman`   | `Zaman-Guard-01`    | Gate — mark orders out for delivery, delivered, or pending redelivery |
 | Waleed Intisar | `waleed` | `Waleed-Admin-01` | Admin — oversight (read-only): summary, orders, batches, dispatch |
 
 ### Workflow
 
-1. **Nouman & Javeria** (field reps) use **`/field-visits`** to track customer visits: **request sample** → **deliver sample** (date + first reaction) → **2-week follow-up reminder** (record customer comments) → **conclude visit** → create **PO** (+10 points) or **mark lost** (−5 points). Aslam and Ibtisam use `/new-order` only.
+1. **Nouman & Javeria** (field reps) use **`/field-visits`** to track customer visits: **request sample** (with bottle qty per product) → Waleed approves at **`/admin/approvals`** → **deliver sample** (date + first reaction; **outgoing** deliveries deduct from Esha’s **sample production pool**) → **2-week follow-up reminder** (record customer comments) → **conclude visit** → create **PO** (+10 points) or **mark lost** (−5 points). Aslam and Ibtisam use `/new-order` only.
 2. **PO team** creates orders at `/new-order`. Enter **bottle counts** per product; **cartons are calculated** automatically (e.g. 30 bottles Rhino 500ml = 1 carton). Use **Add custom carton** when the count is not a full carton or for several products in one box — pick **outer box size** (5L jar, 1L, 500ml, 250ml, or 100ml custom box; Haider tracks these separately from standard product cartons). Include **city** and **deadline** for the management report.
-3. **Nimra** registers **prepared batches** at `/production/batches` with **batch number, product, date, pH, solids, appearance, provider, HCL, quantity** (stored for audit). **Viscosity** is optional for **Rhino, Brighten, Power Wash, and Hand Sanitizer** batches. Use **Add product** on the same page to register a **new catalog packing** (code, name, bottles per carton, optional batch family and liters per bottle); PO team then sees it when they open or refresh **New order**. One batch per **family** covers related packings: **Brighten** (bottle + pouch), **Fabrito** (bottle + pouch), **Power Wash** (bottle + pouch), **Rhino** (all sizes), **Hand Sanitizer**, **Titan**, **Degrease Spray**, and each **Washout** scent separately (Floral / Lemon / Ocean). **Combo bundles** (e.g. Power Wash + Degrease) use **two batch picks per carton** on the loading sheet — one from each component family. **Total liters** sets the dispatch pool size.
-4. **Rashid** lands on **`/dispatch/trips`**: create a **vehicle trip** with one or more POs, enter vehicle/driver/footer once (synced to every linked sheet). Per PO, use **Assign batches** on the trip page or **Edit dispatch** on the loading sheet for batch rows only when the order is on a trip. Before the truck leaves, Rashid **weighs each carton** and enters **Carton wt (kg)** on the loading sheet — must match the factory standard list within **±8%** or save is blocked. On **`/orders`**, only **active factory** POs appear — once Zaman marks **Out for delivery** or **Delivered**, the PO drops off Rashid’s list (open **Dispatch trips** for history). **`/dispatch/filling`** — daily filling log plus **ready bottle stock**: add **pre-filled** stock by **batch label + product + bottles** (batch **does not** need to be in Nimra — use for old batches when liquid is gone; shows **Legacy** vs **In Nimra**). For **active Nimra batches**, use **Ready to deliver** on the daily grid instead of dummy 0-liter Nimra batches. **Physical remaining** stays in liters. Movements: **`/dispatch/ready-stock/movements`**.
+3. **Esha** registers **prepared batches** at `/production/batches` with **batch number, product, date, pH, solids, appearance, provider, HCL, quantity** (stored for audit). Choose **Regular production** (for customer PO loading sheets) or **Sample production** (field visit samples only — separate pool, not assignable on POs). Filter the list with **All / Regular / Sample** tabs. **Viscosity** is optional for **Rhino, Brighten, Power Wash, and Hand Sanitizer** batches. Use **Add product** on the same page to register a **new catalog packing** (code, name, bottles per carton, optional batch family and liters per bottle); PO team then sees it when they open or refresh **New order**. One batch per **family** covers related packings: **Brighten** (bottle + pouch), **Fabrito** (bottle + pouch), **Power Wash** (bottle + pouch), **Rhino** (all sizes), **Hand Sanitizer**, **Titan**, **Degrease Spray**, and each **Washout** scent separately (Floral / Lemon / Ocean). **Combo bundles** (e.g. Power Wash + Degrease) use **two batch picks per carton** on the loading sheet — one from each component family. **Total liters** sets the dispatch pool size.
+4. **Rashid** lands on **`/dispatch/trips`**: create a **vehicle trip** with one or more POs, enter vehicle/driver/footer once (synced to every linked sheet). Per PO, use **Assign batches** on the trip page or **Edit dispatch** on the loading sheet for batch rows only when the order is on a trip. Before the truck leaves, Rashid **weighs each carton** and enters **Carton wt (kg)** on the loading sheet — must match the factory standard list within **±8%** or save is blocked. On **`/orders`**, only **active factory** POs appear — once Zaman marks **Out for delivery** or **Delivered**, the PO drops off Rashid’s list (open **Dispatch trips** for history). **`/dispatch/daily-plan`** — Waleed saves the **morning plan**; Rashid records **end-of-day status**; shortfall **carries forward** to the next day. **`/dispatch/filling`** — daily filling log plus **ready bottle stock**: add **pre-filled** stock by **batch label + product + bottles** (batch **does not** need to be in Nimra — use for old batches when liquid is gone; shows **Legacy** vs **In Nimra**). For **active Nimra batches**, use **Ready to deliver** on the daily grid instead of dummy 0-liter Nimra batches. **Physical remaining** stays in liters. Movements: **`/dispatch/ready-stock/movements`**.
 5. **Haider** lands on **`/dispatch/inventory`** and maintains the packaging ledger: **Purchased** qty and **Rejected/Damage** per SKU. **Balance = Purchased − Rejected − UIP** (Used in Production). UIP is system-managed — **Rashid** adds bottles/caps when he logs filled bottles; **Zaman** adds order packaging (bottles, stickers, cartons) when he marks a PO **Delivered**. See **Recent stock movements** on the inventory page.
 6. **Zaman** at **`/gate/orders`**: only orders that are **ready to go** appear — on a **dispatch trip** with **vehicle, driver, and DC** filled by Rashid, and **carton weights verified** (±8% vs standard list). Zaman marks **Out for delivery** when the vehicle leaves the gate; **Delivered** when the customer has received the goods — this deducts **ready bottle stock** (finished product on the production floor) and **packaging UIP** together; **Pending redelivery** restores ready bottles if the load returns. Loading sheets show ready stock vs PO needs before delivery.
 7. **Anyone** can **View loading sheet** and print.
 8. **Waleed Intisar** signs in at `/admin` for the **pending orders** grid. He can browse **Orders** and use **Edit order** to correct PO details or product quantities when a customer changes an order or material has an issue — only the boss can edit; PO team creates orders but cannot change them after submit. Other oversight (**Production batches**, **Dispatch trips**, **Packaging inventory**, **Daily filling**, **Field visits** rep scores) is read-only.
+9. **Waleed — Rashid daily plan** at **`/admin/rashid-daily-plan`**: **morning plan only** — date, helpers, product tasks, targets, end-of-day duty assignments. **Rashid** at **`/dispatch/daily-plan`** records **status achieved** at end of day (read-only targets until then). Carry math: `effective = target + carry-in from yesterday`; `carry-forward = effective − status` (e.g. target 1000, status 700 → **300** rolls to the next day when Rashid closes the day). Employee roster: `data/production-employees.json`.
 
 ### Batch volume (liters)
 

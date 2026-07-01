@@ -1,13 +1,28 @@
 import { connectToDatabase } from "@/lib/db";
+import {
+  resolveCustomBoxBatchProduct,
+  type NimraBatchKind,
+} from "@/lib/nimraBatchProductLists";
 import { ProductPacking } from "@/lib/models/ProductPacking";
+import { isRhinoBatchFamily } from "@/lib/viscosityBatchFamily";
 
 export function trimQcField(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+export { parseTotalLitersFromQuantity } from "@/lib/parseBatchQuantityLiters";
+
+export type ProductionPurpose = "regular" | "sample";
+
+export function parseProductionPurpose(v: unknown): ProductionPurpose {
+  return v === "sample" ? "sample" : "regular";
+}
+
 export function serializeProductionBatch(b: {
   _id: { toString(): string };
   batchNo: string;
+  batchKind?: string | null;
+  productionPurpose?: string | null;
   productName: string;
   totalLiters: number;
   preparedAt: Date;
@@ -18,18 +33,33 @@ export function serializeProductionBatch(b: {
   hcl?: string | null;
   viscosity?: string | null;
   quantity?: string | null;
+  drum?: string | null;
+  customer?: string | null;
   notes?: string | null;
+  qcOutcome?: string | null;
+  qcComment?: string | null;
+  qcStatusAt?: Date | null;
+  qcStatusByName?: string | null;
   createdByName?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
+  closedAt?: Date | null;
+  closedByName?: string | null;
+  closureWasteLiters?: number | null;
+  closureWasteNote?: string | null;
+  closureUsedLitersSnapshot?: number | null;
+  closureRemainingLitersSnapshot?: number | null;
   usedLiters?: number;
   remainingLiters?: number;
+  remainingSampleLiters?: number;
   status?: string;
   locked?: boolean;
 }) {
   return {
     id: b._id.toString(),
     batchNo: b.batchNo,
+    batchKind: b.batchKind === "custom_box" ? "custom_box" : "standard",
+    productionPurpose: b.productionPurpose === "sample" ? "sample" : "regular",
     productName: b.productName,
     totalLiters: b.totalLiters,
     preparedAt: b.preparedAt,
@@ -40,8 +70,20 @@ export function serializeProductionBatch(b: {
     hcl: b.hcl ?? "",
     viscosity: b.viscosity ?? "",
     quantity: b.quantity ?? "",
+    drum: b.drum ?? "",
+    customer: b.customer ?? "",
     notes: b.notes ?? "",
+    qcOutcome: b.qcOutcome === "rejected" || b.qcOutcome === "discarded" ? b.qcOutcome : "approved",
+    qcComment: b.qcComment ?? "",
+    qcStatusAt: b.qcStatusAt,
+    qcStatusByName: b.qcStatusByName ?? "",
     createdByName: b.createdByName ?? "",
+    closedAt: b.closedAt ?? null,
+    closedByName: b.closedByName ?? "",
+    closureWasteLiters: b.closureWasteLiters ?? null,
+    closureWasteNote: b.closureWasteNote ?? "",
+    closureUsedLitersSnapshot: b.closureUsedLitersSnapshot ?? null,
+    closureRemainingLitersSnapshot: b.closureRemainingLitersSnapshot ?? null,
     createdAt: b.createdAt,
     updatedAt: b.updatedAt,
     ...(b.usedLiters !== undefined
@@ -52,7 +94,22 @@ export function serializeProductionBatch(b: {
           locked: b.locked,
         }
       : {}),
+    ...(b.remainingSampleLiters !== undefined ? { remainingSampleLiters: b.remainingSampleLiters } : {}),
   };
+}
+
+export function parseBatchKind(v: unknown): NimraBatchKind {
+  return v === "custom_box" ? "custom_box" : "standard";
+}
+
+export async function resolveBatchProduct(
+  productInput: string,
+  batchKind: NimraBatchKind,
+): Promise<string | null> {
+  if (batchKind === "custom_box") {
+    return resolveCustomBoxBatchProduct(productInput);
+  }
+  return resolveBatchFamily(productInput);
 }
 
 export async function resolveBatchFamily(productInput: string): Promise<string | null> {
@@ -70,15 +127,25 @@ export async function resolveBatchFamily(productInput: string): Promise<string |
   return family || hit.name;
 }
 
-export function parseQcBody(body: Record<string, unknown>, requireAll: boolean) {
+export function parseQcBody(
+  body: Record<string, unknown>,
+  requireAll: boolean,
+  options?: { productFamily?: string; batchKind?: NimraBatchKind },
+) {
+  const batchKind = options?.batchKind ?? "standard";
+  const productFamily = options?.productFamily?.trim() ?? "";
+  const rhino = batchKind === "standard" && isRhinoBatchFamily(productFamily);
+
   const fields = {
     ph: trimQcField(body.ph),
     solids: trimQcField(body.solids),
     appearance: trimQcField(body.appearance),
     provider: trimQcField(body.provider),
-    hcl: trimQcField(body.hcl),
-    viscosity: trimQcField(body.viscosity),
+    hcl: rhino ? trimQcField(body.hcl) : "",
+    viscosity: batchKind === "standard" ? trimQcField(body.viscosity) : "",
     quantity: trimQcField(body.quantity),
+    drum: batchKind === "custom_box" ? trimQcField(body.drum) : "",
+    customer: batchKind === "custom_box" ? trimQcField(body.customer) : "",
   };
 
   if (!requireAll) return { ok: true as const, fields };
@@ -88,7 +155,11 @@ export function parseQcBody(body: Record<string, unknown>, requireAll: boolean) 
   if (!fields.solids) missing.push("solids");
   if (!fields.appearance) missing.push("appearance");
   if (!fields.provider) missing.push("provider");
-  if (!fields.hcl) missing.push("HCL");
+  if (batchKind === "custom_box") {
+    if (!fields.drum) missing.push("drum");
+  } else if (rhino && !fields.hcl) {
+    missing.push("HCL");
+  }
   if (!fields.quantity) missing.push("quantity");
 
   if (missing.length > 0) {

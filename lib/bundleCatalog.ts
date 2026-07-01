@@ -1,4 +1,6 @@
 import {
+  batchDefKey,
+  batchUsageKey,
   inferLitersPerBottleFromName,
   normalizeBatchNo,
   productsMatch,
@@ -6,6 +8,7 @@ import {
   type CatalogProduct,
 } from "@/lib/batchVolume";
 import { isMixedSampleLine, resolveMixedSampleParts } from "@/lib/mixedSampleBox";
+import { findPackingForLineName } from "@/lib/productPackingMatch";
 
 export type BundleComponentRef = {
   code: string;
@@ -69,9 +72,7 @@ export function catalogByName(catalog: PackingCatalogRow[]): Map<string, Packing
 }
 
 export function findPackingByName(productName: string, catalog: PackingCatalogRow[]): PackingCatalogRow | null {
-  const key = productName.trim().toLowerCase();
-  if (!key) return null;
-  return catalogByName(catalog).get(key) ?? null;
+  return findPackingForLineName(productName, catalog) as PackingCatalogRow | null;
 }
 
 export function isBundleProduct(productName: string, catalog: PackingCatalogRow[]): boolean {
@@ -102,13 +103,43 @@ export function resolveBundleParts(
   return parts;
 }
 
+/** UI state key for a component row; disambiguates duplicate product names (e.g. two Rhino lines). */
+export function componentBatchStateKey(
+  parts: Array<{ productName: string }>,
+  index: number,
+): string {
+  const name = parts[index]?.productName ?? "";
+  const dup = parts.filter((p) => p.productName === name).length > 1;
+  return dup ? `${name}#${index}` : name;
+}
+
+export function resolveComponentBatchAtIndex(
+  line: SheetLineLike,
+  parts: Array<{ productName: string }>,
+  index: number,
+  catalog: PackingCatalogRow[],
+): ComponentBatch | undefined {
+  const byIndex = line.componentBatches?.[index];
+  if (byIndex?.batchNo?.trim()) return byIndex;
+  const part = parts[index];
+  if (!part) return byIndex;
+  const sameNameCount = parts.filter(
+    (p) => p.productName.trim() === part.productName.trim(),
+  ).length;
+  if (sameNameCount === 1) {
+    return (
+      line.componentBatches?.find((c) => c.productName.trim() === part.productName.trim()) ??
+      line.componentBatches?.find((c) => productsMatch(c.productName, part.productName, catalog))
+    );
+  }
+  return byIndex;
+}
+
 export function formatBatchDisplay(line: SheetLineLike, catalog: PackingCatalogRow[]): string {
   if (lineUsesComponentBatches(line, catalog)) {
     const parts = resolveComponentParts(line, catalog);
-    const labels = parts.map((part) => {
-      const hit =
-        line.componentBatches?.find((c) => c.productName.trim() === part.productName.trim()) ??
-        line.componentBatches?.find((c) => productsMatch(c.productName, part.productName, catalog));
+    const labels = parts.map((part, index) => {
+      const hit = resolveComponentBatchAtIndex(line, parts, index, catalog);
       return normalizeBatchNo(hit?.batchNo ?? "");
     });
     return labels.filter(Boolean).join(" / ");
@@ -120,10 +151,9 @@ export function lineBatchComplete(line: SheetLineLike, catalog: PackingCatalogRo
   if (lineUsesComponentBatches(line, catalog)) {
     const parts = resolveComponentParts(line, catalog);
     if (parts.length === 0) return false;
-    return parts.every((part) => {
-      const hit =
-        line.componentBatches?.find((c) => c.productName.trim() === part.productName.trim()) ??
-        line.componentBatches?.find((c) => productsMatch(c.productName, part.productName, catalog));
+    return parts.every((part, index) => {
+      if ((part.bottlesPerUnit ?? 0) <= 0) return true;
+      const hit = resolveComponentBatchAtIndex(line, parts, index, catalog);
       return Boolean(hit?.batchNo?.trim());
     });
   }
@@ -138,10 +168,9 @@ export function lineBatchAllocations(
     const parts = resolveComponentParts(line, catalog);
     const allocations: BatchLiterAllocation[] = [];
 
-    for (const part of parts) {
-      const hit =
-        line.componentBatches?.find((c) => c.productName.trim() === part.productName.trim()) ??
-        line.componentBatches?.find((c) => productsMatch(c.productName, part.productName, catalog));
+    for (let index = 0; index < parts.length; index++) {
+      const part = parts[index];
+      const hit = resolveComponentBatchAtIndex(line, parts, index, catalog);
       const batchNo = normalizeBatchNo(hit?.batchNo ?? "");
       if (!batchNo) continue;
       const liters = isMixedSampleLine(line)
@@ -185,12 +214,12 @@ export type ValidateAllocationsResult =
 
 export function validateSheetBatchAllocations(
   lines: SheetLineLike[],
-  batchDefs: Array<{ batchNo: string; totalLiters: number }>,
+  batchDefs: Array<{ batchNo: string; totalLiters: number; productName?: string }>,
   catalog: PackingCatalogRow[],
 ): ValidateAllocationsResult {
   const weights = new Map<number, number | null>();
   const defByBatch = new Map(
-    batchDefs.map((d) => [normalizeBatchNo(d.batchNo).toLowerCase(), d.totalLiters]),
+    batchDefs.map((d) => [batchDefKey(d, catalog), d.totalLiters]),
   );
   const usedByBatch = new Map<string, number>();
   const displayBatchNo = new Map<string, string>();
@@ -205,7 +234,7 @@ export function validateSheetBatchAllocations(
     weights.set(line.boxNo, roundLiters(allocations.reduce((sum, a) => sum + a.liters, 0)));
 
     for (const alloc of allocations) {
-      const key = alloc.batchNo.toLowerCase();
+      const key = batchUsageKey(alloc.batchNo, alloc.productName, catalog);
       displayBatchNo.set(key, alloc.batchNo);
 
       if (!defByBatch.has(key)) {
@@ -244,7 +273,7 @@ export function accumulateBatchUsageFromSheetLines(
 
     for (const line of order.sheetLines ?? []) {
       for (const alloc of lineBatchAllocations(line, catalog)) {
-        const key = alloc.batchNo.toLowerCase();
+        const key = batchUsageKey(alloc.batchNo, alloc.productName, catalog);
         used.set(key, roundLiters((used.get(key) ?? 0) + alloc.liters));
       }
     }
@@ -260,7 +289,7 @@ export function usageLitersByBatchFromSheetLines(
   const used = new Map<string, number>();
   for (const line of lines) {
     for (const alloc of lineBatchAllocations(line, catalog)) {
-      const key = alloc.batchNo.toLowerCase();
+      const key = batchUsageKey(alloc.batchNo, alloc.productName, catalog);
       used.set(key, roundLiters((used.get(key) ?? 0) + alloc.liters));
     }
   }

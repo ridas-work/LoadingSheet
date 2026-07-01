@@ -1,4 +1,8 @@
-import { applyReadyBottleDelta, previewDeltas } from "@/lib/readyBottleLedger";
+import {
+  applyReadyBatchLotDelta,
+  applyReadyBottleDelta,
+  previewDeltas,
+} from "@/lib/readyBottleLedger";
 
 type AppliedLine = { productCode: string; readyBottlesApplied: number };
 type PackingLine = { productCode: string; productName: string; readyToDeliverBottles: number };
@@ -54,42 +58,51 @@ export async function syncReadyBottleLedgerFromFilling(args: {
   previousPackingLines: PackingLine[];
   newPackingLines: PackingLine[];
   batchNo: string;
+  batchProductName: string;
+  nimraLinked?: boolean;
   entryDate: string;
   audit: { userId: string; userName: string };
 }): Promise<{ error: string | null; applied: AppliedLine[] }> {
   const deltas = computeReadyLedgerDeltas(args);
+  const applied = args.newPackingLines.map((l) => ({
+    productCode: l.productCode.trim().toLowerCase(),
+    readyBottlesApplied: l.readyToDeliverBottles,
+  }));
+
   if (deltas.length === 0) {
-    return {
-      error: null,
-      applied: args.newPackingLines.map((l) => ({
-        productCode: l.productCode.trim().toLowerCase(),
-        readyBottlesApplied: l.readyToDeliverBottles,
-      })),
-    };
+    return { error: null, applied };
   }
 
   const previewError = await previewDeltas(deltas);
   if (previewError) return { error: previewError, applied: args.previousApplied };
 
+  const lotNote = `Batch ${args.batchNo} ready bottles ${args.entryDate}`;
+
   for (const d of deltas) {
-    const err = await applyReadyBottleDelta({
+    const stockErr = await applyReadyBottleDelta({
       productCode: d.productCode,
       productName: d.productName,
       delta: d.delta,
       reason: "filling_ready",
-      note: `Batch ${args.batchNo} ready bottles ${args.entryDate}`,
+      note: lotNote,
       batchNo: args.batchNo,
       entryDate: args.entryDate,
       audit: args.audit,
     });
-    if (err) return { error: err, applied: args.previousApplied };
+    if (stockErr) return { error: stockErr, applied: args.previousApplied };
+
+    const lotErr = await applyReadyBatchLotDelta({
+      batchNo: args.batchNo,
+      productCode: d.productCode,
+      productName: d.productName,
+      delta: d.delta,
+      batchProductName: args.batchProductName,
+      nimraLinked: args.nimraLinked ?? true,
+      note: lotNote,
+      audit: args.audit,
+    });
+    if (lotErr) return { error: lotErr, applied: args.previousApplied };
   }
 
-  return {
-    error: null,
-    applied: args.newPackingLines.map((l) => ({
-      productCode: l.productCode.trim().toLowerCase(),
-      readyBottlesApplied: l.readyToDeliverBottles,
-    })),
-  };
+  return { error: null, applied };
 }

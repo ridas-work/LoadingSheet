@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 
 import { LoadingSheetBatchEditor, type LoadingSheetLine } from "@/components/LoadingSheetBatchEditor";
 import { auth } from "@/lib/auth";
-import { accumulateBatchUsageFromOrders, type CatalogProduct } from "@/lib/batchVolume";
+import { accumulateBatchUsageFromSheetLines } from "@/lib/bundleCatalog";
 import { buildSheetLines, type OrderItemInput, type SheetLine } from "@/lib/buildSheetLines";
 import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
@@ -14,6 +14,7 @@ import { bottlesPerProductFromSheetLines } from "@/lib/bottlesFromSheetLines";
 import { isBatchAssignmentLocked, readyAllocationForOrder } from "@/lib/orderBatchStatus";
 import { getReadyStockMap, listBatchLots } from "@/lib/readyBottleLedger";
 import type { DeductionPacking, DeductionSheetLine } from "@/lib/packagingDeduction";
+import { regularProductionBatchMongoFilter } from "@/lib/sampleProductionStock";
 import { roleFromSession, EMPTY_DISPATCH, type DispatchFields } from "@/lib/roles";
 
 type PageProps = {
@@ -87,7 +88,7 @@ export default async function LoadingSheetPage(props: PageProps) {
   const [order, allOrders, poolDocs, catalogDocs] = await Promise.all([
     Order.findById(id).lean(),
     Order.find({}).select({ sheetLines: 1 }).lean(),
-    ProductionBatch.find({}).sort({ preparedAt: -1 }).lean(),
+    ProductionBatch.find(regularProductionBatchMongoFilter()).sort({ preparedAt: -1 }).lean(),
     ProductPacking.find({ active: true })
       .select({ code: 1, name: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1, bundleComponents: 1 })
       .lean(),
@@ -126,20 +127,13 @@ export default async function LoadingSheetPage(props: PageProps) {
     dispatchParam === "1" &&
     (!batchesLocked || !weightsVerifiedEarly);
 
-  const catalogForUsage: CatalogProduct[] = catalog.map((p) => ({
-    name: p.name,
-    litersPerBottle: p.litersPerBottle,
-    aliases: p.aliases,
-    batchFamily: p.batchFamily,
-  }));
-
   const productionBatches = poolDocs.map((p) => ({
     batchNo: p.batchNo,
     productName: p.productName,
     totalLiters: p.totalLiters,
   }));
 
-  const usedMap = accumulateBatchUsageFromOrders(allOrders, catalogForUsage, id);
+  const usedMap = accumulateBatchUsageFromSheetLines(allOrders, catalog, id);
   const usedLitersElsewhere: Record<string, number> = {};
   for (const [key, liters] of usedMap) {
     usedLitersElsewhere[key] = liters;

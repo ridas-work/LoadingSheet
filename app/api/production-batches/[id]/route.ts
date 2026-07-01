@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 
-import { auth } from "@/lib/auth";
 import { normalizeBatchNo } from "@/lib/batchVolume";
+import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
+import { isBatchClosed } from "@/lib/productionBatchClose";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
-import { parseQcBody, resolveBatchFamily, trimQcField } from "@/lib/productionBatchApi";
+import { parseQcBody, parseProductionPurpose, resolveBatchFamily, trimQcField } from "@/lib/productionBatchApi";
+import { renameProductionBatchNo, patchTouchesLockedFields } from "@/lib/renameProductionBatchNo";
 import {
   isProductionBatchLocked,
   loadBatchUsageContext,
@@ -30,8 +32,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { usedMap } = await loadBatchUsageContext();
-  const usage = usageForBatchNo(batch.batchNo, batch.totalLiters, usedMap);
+  const { usedMap, catalog } = await loadBatchUsageContext();
+  const usage = usageForBatchNo(batch.batchNo, batch.totalLiters, usedMap, batch.productName, catalog);
 
   return NextResponse.json({
     id: batch._id.toString(),
@@ -79,15 +81,56 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { usedMap } = await loadBatchUsageContext();
-  const usedLiters = usedMap.get(normalizeBatchNo(batch.batchNo).toLowerCase()) ?? 0;
-  if (isProductionBatchLocked(usedLiters)) {
-    return NextResponse.json(
-      {
-        error: `Batch "${batch.batchNo}" is locked — already assigned on loading sheets (${usedLiters} L in use).`,
-      },
-      { status: 403 },
+  if (isBatchClosed(batch)) {
+    return NextResponse.json({ error: "Batch is closed and cannot be edited." }, { status: 403 });
+  }
+
+  const { usedMap, catalog } = await loadBatchUsageContext();
+  const usage = usageForBatchNo(batch.batchNo, batch.totalLiters, usedMap, batch.productName, catalog);
+  const locked = isProductionBatchLocked(usage.usedLiters);
+  const requestedBatchNo =
+    typeof body.batchNo === "string" ? normalizeBatchNo(body.batchNo) : batch.batchNo;
+  const renaming =
+    typeof body.batchNo === "string" &&
+    normalizeBatchNo(body.batchNo).toLowerCase() !== normalizeBatchNo(batch.batchNo).toLowerCase();
+
+  if (locked) {
+    if (!renaming) {
+      return NextResponse.json(
+        {
+          error: `Batch "${batch.batchNo}" is locked — already assigned on loading sheets (${usage.usedLiters} L in use). Open Edit to correct the batch number only.`,
+        },
+        { status: 403 },
+      );
+    }
+    if (patchTouchesLockedFields(body)) {
+      return NextResponse.json(
+        { error: "While this batch is in use, only the batch number can be changed." },
+        { status: 400 },
+      );
+    }
+    const renamed = await renameProductionBatchNo(
+      batch._id.toString(),
+      batch.batchNo,
+      batch.productName,
+      requestedBatchNo,
     );
+    if (!renamed.ok) {
+      return NextResponse.json({ error: renamed.error }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, batchNo: renamed.newBatchNo });
+  }
+
+  if (renaming) {
+    const renamed = await renameProductionBatchNo(
+      batch._id.toString(),
+      batch.batchNo,
+      batch.productName,
+      requestedBatchNo,
+    );
+    if (!renamed.ok) {
+      return NextResponse.json({ error: renamed.error }, { status: 400 });
+    }
   }
 
   if (body.productName !== undefined) {
@@ -126,6 +169,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     batch.preparedAt = new Date(body.preparedAt);
   }
 
+  if (body.productionPurpose !== undefined) {
+    batch.productionPurpose = parseProductionPurpose(body.productionPurpose);
+  }
+
   await batch.save();
   return NextResponse.json({ ok: true });
 }
@@ -150,13 +197,13 @@ export async function DELETE(_req: Request, ctx: { params: Promise<{ id: string 
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const { usedMap } = await loadBatchUsageContext();
-  const usedLiters = usedMap.get(normalizeBatchNo(batch.batchNo).toLowerCase()) ?? 0;
+  const { usedMap, catalog } = await loadBatchUsageContext();
+  const usage = usageForBatchNo(batch.batchNo, batch.totalLiters, usedMap, batch.productName, catalog);
 
-  if (usedLiters > 0) {
+  if (usage.usedLiters > 0) {
     return NextResponse.json(
       {
-        error: `Cannot delete: batch "${batch.batchNo}" is already assigned on loading sheets (${usedLiters} L in use).`,
+        error: `Cannot delete: batch "${batch.batchNo}" is already assigned on loading sheets (${usage.usedLiters} L in use).`,
       },
       { status: 400 },
     );

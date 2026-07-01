@@ -1,0 +1,1682 @@
+[
+  {
+    "code": "8200",
+    "name": "8200",
+    "unit": "kg",
+    "sortOrder": 1
+  },
+  {
+    "code": "s-89a",
+    "name": "S 89A",
+    "unit": "kg",
+    "sortOrder": 2
+  },
+  {
+    "code": "s-82",
+    "name": "S 82",
+    "unit": "kg",
+    "sortOrder": 3
+  },
+  {
+    "code": "smb",
+    "name": "SMB",
+    "unit": "kg",
+    "sortOrder": 4
+  },
+  {
+    "code": "sb",
+    "name": "SB",
+    "unit": "kg",
+    "sortOrder": 5
+  },
+  {
+    "code": "20-ph",
+    "name": "20 PH",
+    "unit": "kg",
+    "sortOrder": 6
+  },
+  {
+    "code": "lss",
+    "name": "LSS",
+    "unit": "kg",
+    "sortOrder": 7
+  },
+  {
+    "code": "cal",
+    "name": "CAL",
+    "unit": "kg",
+    "sortOrder": 8
+  },
+  {
+    "code": "stpp",
+    "name": "STPP",
+    "unit": "kg",
+    "sortOrder": 9
+  },
+  {
+    "code": "bdg",
+    "name": "BDG",
+    "unit": "kg",
+    "sortOrder": 10
+  },
+  {
+    "code": "t-et",
+    "name": "T-ET",
+    "unit": "kg",
+    "sortOrder": 11
+  },
+  {
+    "code": "ag-5",
+    "name": "AG 5",
+    "unit": "kg",
+    "sortOrder": 12
+  },
+  {
+    "code": "pqt",
+    "name": "PQT",
+    "unit": "kg",
+    "sortOrder": 13
+  },
+  {
+    "code": "lx-05",
+    "name": "LX 05",
+    "unit": "kg",
+    "sortOrder": 14
+  },
+  {
+    "code": "lx-08",
+    "name": "LX 08",
+    "unit": "kg",
+    "sortOrder": 15
+  },
+  {
+    "code": "lx-014",
+    "name": "LX 014",
+    "unit": "kg",
+    "sortOrder": 16
+  },
+  {
+    "code": "t-te-1",
+    "name": "T- TE 1",
+    "unit": "kg",
+    "sortOrder": 17
+  },
+  {
+    "code": "t-sn",
+    "name": "T – SN",
+    "unit": "kg",
+    "sortOrder": 18
+  },
+  {
+    "code": "t-te",
+    "name": "T - TE",
+    "unit": "kg",
+    "sortOrder": 19
+  },
+  {
+    "code": "t-sx",
+    "name": "T-SX",
+    "unit": "kg",
+    "sortOrder": 20
+  },
+  {
+    "code": "t-fe",
+    "name": "T-FE",
+    "unit": "kg",
+    "sortOrder": 21
+  },
+  {
+    "code": "t-et-2",
+    "name": "T-ET",
+    "unit": "kg",
+    "sortOrder": 22
+  },
+  {
+    "code": "psa",
+    "name": "PSA",
+    "unit": "kg",
+    "sortOrder": 23
+  },
+  {
+    "code": "np-04",
+    "name": "NP 04",
+    "unit": "kg",
+    "sortOrder": 24
+  },
+  {
+    "code": "b-99",
+    "name": "B 99",
+    "unit": "kg",
+    "sortOrder": 25
+  },
+  {
+    "code": "wc-88",
+    "name": "WC 88",
+    "unit": "kg",
+    "sortOrder": 26
+  },
+  {
+    "code": "pr-88",
+    "name": "PR 88",
+    "unit": "kg",
+    "sortOrder": 27
+  },
+  {
+    "code": "cbt",
+    "name": "CBT",
+    "unit": "kg",
+    "sortOrder": 28
+  },
+  {
+    "code": "30sl",
+    "name": "30SL",
+    "unit": "kg",
+    "sortOrder": 29
+  },
+  {
+    "code": "gl-1",
+    "name": "GL 1",
+    "unit": "kg",
+    "sortOrder": 30
+  },
+  {
+    "code": "bg",
+    "name": "BG",
+    "unit": "kg",
+    "sortOrder": 31
+  },
+  {
+    "code": "ba",
+    "name": "BA",
+    "unit": "kg",
+    "sortOrder": 32
+  },
+  {
+    "code": "sda",
+    "name": "SDA",
+    "unit": "kg",
+    "sortOrder": 33
+  },
+  {
+    "code": "sdm",
+    "name": "SDM",
+    "unit": "kg",
+    "sortOrder": 34
+  },
+  {
+    "code": "bzc",
+    "name": "BZC",
+    "unit": "kg",
+    "sortOrder": 35
+  },
+  {
+    "code": "ipa",
+    "name": "IPA",
+    "unit": "kg",
+    "sortOrder": 36
+  },
+  {
+    "code": "203-wt",
+    "name": "203 WT",
+    "unit": "kg",
+    "sortOrder": 37
+  },
+  {
+    "code": "0013-wt",
+    "name": "0013 WT",
+    "unit": "kg",
+    "sortOrder": 38
+  },
+  {
+    "code": "018-wt",
+    "name": "018 WT",
+    "unit": "kg",
+    "sortOrder": 39
+  },
+  {
+    "code": "wt-082",
+    "name": "WT 082",
+    "unit": "kg",
+    "sortOrder": 40
+  },
+  {
+    "code": "001-cn",
+    "name": "001 CN",
+    "unit": "kg",
+    "sortOrder": 41
+  },
+  {
+    "code": "002-cn",
+    "name": "002 CN",
+    "unit": "kg",
+    "sortOrder": 42
+  },
+  {
+    "code": "09-n",
+    "name": "09 N",
+    "unit": "kg",
+    "sortOrder": 43
+  },
+  {
+    "code": "innoflake-v-bf",
+    "name": "INNOFLAKE V – BF",
+    "unit": "kg",
+    "sortOrder": 44
+  },
+  {
+    "code": "inno-flake-tr",
+    "name": "INNO FLAKE TR",
+    "unit": "kg",
+    "sortOrder": 45
+  },
+  {
+    "code": "inno-flake-cf",
+    "name": "INNO FLAKE CF",
+    "unit": "kg",
+    "sortOrder": 46
+  },
+  {
+    "code": "inno-flake-df",
+    "name": "INNO FLAKE DF",
+    "unit": "kg",
+    "sortOrder": 47
+  },
+  {
+    "code": "inno-soft-pex",
+    "name": "INNO SOFT PEX",
+    "unit": "kg",
+    "sortOrder": 48
+  },
+  {
+    "code": "inno-b-fb",
+    "name": "Inno B-FB",
+    "unit": "kg",
+    "sortOrder": 49
+  },
+  {
+    "code": "inno-b-f9",
+    "name": "Inno B – F9",
+    "unit": "kg",
+    "sortOrder": 50
+  },
+  {
+    "code": "inno-flake-3d",
+    "name": "Inno Flake 3D",
+    "unit": "kg",
+    "sortOrder": 51
+  },
+  {
+    "code": "inno-flake-ex",
+    "name": "Inno Flake EX",
+    "unit": "kg",
+    "sortOrder": 52
+  },
+  {
+    "code": "inno-flake-ee",
+    "name": "Inno Flake EE",
+    "unit": "kg",
+    "sortOrder": 53
+  },
+  {
+    "code": "inno-flake-es",
+    "name": "Inno Flake ES",
+    "unit": "kg",
+    "sortOrder": 54
+  },
+  {
+    "code": "innosoft-820",
+    "name": "Innosoft 820",
+    "unit": "kg",
+    "sortOrder": 55
+  },
+  {
+    "code": "innosoft-80",
+    "name": "Innosoft 80",
+    "unit": "kg",
+    "sortOrder": 56
+  },
+  {
+    "code": "innosoft-sp-86",
+    "name": "Innosoft SP 86",
+    "unit": "kg",
+    "sortOrder": 57
+  },
+  {
+    "code": "inno-q-88",
+    "name": "Inno Q 88",
+    "unit": "kg",
+    "sortOrder": 58
+  },
+  {
+    "code": "inno-sq-260-hard-water-stable",
+    "name": "Inno SQ 260 (hard water stable)",
+    "unit": "kg",
+    "sortOrder": 59
+  },
+  {
+    "code": "inno-s-400",
+    "name": "Inno S 400",
+    "unit": "kg",
+    "sortOrder": 60
+  },
+  {
+    "code": "inno-q-960",
+    "name": "Inno Q 960",
+    "unit": "kg",
+    "sortOrder": 61
+  },
+  {
+    "code": "rep-6",
+    "name": "REP 6",
+    "unit": "kg",
+    "sortOrder": 62
+  },
+  {
+    "code": "g-60",
+    "name": "G 60",
+    "unit": "kg",
+    "sortOrder": 63
+  },
+  {
+    "code": "g-04",
+    "name": "G 04",
+    "unit": "kg",
+    "sortOrder": 64
+  },
+  {
+    "code": "st-100",
+    "name": "ST- 100",
+    "unit": "kg",
+    "sortOrder": 65
+  },
+  {
+    "code": "p-h-p",
+    "name": "P-H-P",
+    "unit": "kg",
+    "sortOrder": 66
+  },
+  {
+    "code": "oac",
+    "name": "OAC",
+    "unit": "kg",
+    "sortOrder": 67
+  },
+  {
+    "code": "pbh",
+    "name": "PBH",
+    "unit": "kg",
+    "sortOrder": 68
+  },
+  {
+    "code": "c-a",
+    "name": "C.A",
+    "unit": "kg",
+    "sortOrder": 69
+  },
+  {
+    "code": "pg-13",
+    "name": "PG 13",
+    "unit": "kg",
+    "sortOrder": 70
+  },
+  {
+    "code": "pg-17",
+    "name": "PG 17",
+    "unit": "kg",
+    "sortOrder": 71
+  },
+  {
+    "code": "pg-1",
+    "name": "PG 1",
+    "unit": "kg",
+    "sortOrder": 72
+  },
+  {
+    "code": "inno-pa-15",
+    "name": "INNO PA 15",
+    "unit": "kg",
+    "sortOrder": 73
+  },
+  {
+    "code": "inno-ma-100",
+    "name": "INNO MA 100",
+    "unit": "kg",
+    "sortOrder": 74
+  },
+  {
+    "code": "tx-146",
+    "name": "TX 146",
+    "unit": "kg",
+    "sortOrder": 75
+  },
+  {
+    "code": "mph",
+    "name": "MPH",
+    "unit": "kg",
+    "sortOrder": 76
+  },
+  {
+    "code": "rtfc",
+    "name": "RTFC",
+    "unit": "kg",
+    "sortOrder": 77
+  },
+  {
+    "code": "lss-2",
+    "name": "LSS",
+    "unit": "kg",
+    "sortOrder": 78
+  },
+  {
+    "code": "t33",
+    "name": "T33",
+    "unit": "kg",
+    "sortOrder": 79
+  },
+  {
+    "code": "slp",
+    "name": "SLP",
+    "unit": "kg",
+    "sortOrder": 80
+  },
+  {
+    "code": "cda",
+    "name": "CDA",
+    "unit": "kg",
+    "sortOrder": 81
+  },
+  {
+    "code": "lsse",
+    "name": "LSSE",
+    "unit": "kg",
+    "sortOrder": 82
+  },
+  {
+    "code": "age",
+    "name": "AGE",
+    "unit": "kg",
+    "sortOrder": 83
+  },
+  {
+    "code": "pmx",
+    "name": "PMX",
+    "unit": "kg",
+    "sortOrder": 84
+  },
+  {
+    "code": "snp",
+    "name": "SNP",
+    "unit": "kg",
+    "sortOrder": 85
+  },
+  {
+    "code": "cbd",
+    "name": "CBD",
+    "unit": "kg",
+    "sortOrder": 86
+  },
+  {
+    "code": "c-m-s",
+    "name": "C.M.S",
+    "unit": "kg",
+    "sortOrder": 87
+  },
+  {
+    "code": "b-o",
+    "name": "B.O",
+    "unit": "kg",
+    "sortOrder": 88
+  },
+  {
+    "code": "g-s-1",
+    "name": "G.S 1",
+    "unit": "kg",
+    "sortOrder": 89
+  },
+  {
+    "code": "teag",
+    "name": "TEAG",
+    "unit": "kg",
+    "sortOrder": 90
+  },
+  {
+    "code": "opol-40",
+    "name": "OPOL - 40",
+    "unit": "kg",
+    "sortOrder": 91
+  },
+  {
+    "code": "opol-40-cp",
+    "name": "OPOL – 40 CP",
+    "unit": "kg",
+    "sortOrder": 92
+  },
+  {
+    "code": "mcs-at",
+    "name": "MCS AT",
+    "unit": "kg",
+    "sortOrder": 93
+  },
+  {
+    "code": "wnn",
+    "name": "WNN",
+    "unit": "kg",
+    "sortOrder": 94
+  },
+  {
+    "code": "wt-56",
+    "name": "WT – 56",
+    "unit": "kg",
+    "sortOrder": 95
+  },
+  {
+    "code": "wt-86-n",
+    "name": "WT – 86 N",
+    "unit": "kg",
+    "sortOrder": 96
+  },
+  {
+    "code": "wt-81-n",
+    "name": "WT – 81 N",
+    "unit": "kg",
+    "sortOrder": 97
+  },
+  {
+    "code": "wt-805",
+    "name": "WT – 805",
+    "unit": "kg",
+    "sortOrder": 98
+  },
+  {
+    "code": "wt-50-n",
+    "name": "WT – 50 N",
+    "unit": "kg",
+    "sortOrder": 99
+  },
+  {
+    "code": "wt-101",
+    "name": "WT- 101",
+    "unit": "kg",
+    "sortOrder": 100
+  },
+  {
+    "code": "wt-111-n",
+    "name": "WT- 111 N",
+    "unit": "kg",
+    "sortOrder": 101
+  },
+  {
+    "code": "wt-311-n",
+    "name": "WT – 311 N",
+    "unit": "kg",
+    "sortOrder": 102
+  },
+  {
+    "code": "hs-311",
+    "name": "HS 311",
+    "unit": "kg",
+    "sortOrder": 103
+  },
+  {
+    "code": "hs-31",
+    "name": "HS 31",
+    "unit": "kg",
+    "sortOrder": 104
+  },
+  {
+    "code": "hf-87",
+    "name": "HF – 87",
+    "unit": "kg",
+    "sortOrder": 105
+  },
+  {
+    "code": "wt-58",
+    "name": "WT – 58",
+    "unit": "kg",
+    "sortOrder": 106
+  },
+  {
+    "code": "wt-89-n",
+    "name": "WT - 89 N",
+    "unit": "kg",
+    "sortOrder": 107
+  },
+  {
+    "code": "wt-a-66",
+    "name": "WT A 66",
+    "unit": "kg",
+    "sortOrder": 108
+  },
+  {
+    "code": "wt-c-67",
+    "name": "WT C 67",
+    "unit": "kg",
+    "sortOrder": 109
+  },
+  {
+    "code": "wt-c-68",
+    "name": "WT C 68",
+    "unit": "kg",
+    "sortOrder": 110
+  },
+  {
+    "code": "hs-705-a",
+    "name": "HS 705 A",
+    "unit": "kg",
+    "sortOrder": 111
+  },
+  {
+    "code": "hs-76-n",
+    "name": "HS 76 N",
+    "unit": "kg",
+    "sortOrder": 112
+  },
+  {
+    "code": "hs-76-a",
+    "name": "HS 76 A",
+    "unit": "kg",
+    "sortOrder": 113
+  },
+  {
+    "code": "lmp",
+    "name": "LMP",
+    "unit": "kg",
+    "sortOrder": 114
+  },
+  {
+    "code": "dpkc",
+    "name": "DPKC",
+    "unit": "kg",
+    "sortOrder": 115
+  },
+  {
+    "code": "t-b",
+    "name": "T.B",
+    "unit": "kg",
+    "sortOrder": 116
+  },
+  {
+    "code": "p-m-1",
+    "name": "P.M 1",
+    "unit": "kg",
+    "sortOrder": 117
+  },
+  {
+    "code": "p-p-2",
+    "name": "P.P 2",
+    "unit": "kg",
+    "sortOrder": 118
+  },
+  {
+    "code": "m-l-8",
+    "name": "M.L 8",
+    "unit": "kg",
+    "sortOrder": 119
+  },
+  {
+    "code": "chemical-b",
+    "name": "Chemical B",
+    "unit": "kg",
+    "sortOrder": 120
+  },
+  {
+    "code": "m-i-s",
+    "name": "M I S",
+    "unit": "kg",
+    "sortOrder": 121
+  },
+  {
+    "code": "m-i-f",
+    "name": "M I F",
+    "unit": "kg",
+    "sortOrder": 122
+  },
+  {
+    "code": "tsn-1",
+    "name": "TSN 1",
+    "unit": "kg",
+    "sortOrder": 123
+  },
+  {
+    "code": "wt-10",
+    "name": "WT 10",
+    "unit": "kg",
+    "sortOrder": 124
+  },
+  {
+    "code": "wt-80",
+    "name": "WT 80",
+    "unit": "kg",
+    "sortOrder": 125
+  },
+  {
+    "code": "wt-oil",
+    "name": "WT oil",
+    "unit": "kg",
+    "sortOrder": 126
+  },
+  {
+    "code": "kad",
+    "name": "KAD",
+    "unit": "kg",
+    "sortOrder": 127
+  },
+  {
+    "code": "aar",
+    "name": "AAR",
+    "unit": "kg",
+    "sortOrder": 128
+  },
+  {
+    "code": "tbh",
+    "name": "TBH",
+    "unit": "kg",
+    "sortOrder": 129
+  },
+  {
+    "code": "cmx",
+    "name": "CMX",
+    "unit": "kg",
+    "sortOrder": 130
+  },
+  {
+    "code": "xa",
+    "name": "XA",
+    "unit": "kg",
+    "sortOrder": 131
+  },
+  {
+    "code": "tex-p",
+    "name": "TEX – P",
+    "unit": "kg",
+    "sortOrder": 132
+  },
+  {
+    "code": "col",
+    "name": "COL",
+    "unit": "kg",
+    "sortOrder": 133
+  },
+  {
+    "code": "wr-42",
+    "name": "WR 42",
+    "unit": "kg",
+    "sortOrder": 134
+  },
+  {
+    "code": "lacid",
+    "name": "LACID",
+    "unit": "kg",
+    "sortOrder": 135
+  },
+  {
+    "code": "cdt-imported",
+    "name": "CDT (imported)",
+    "unit": "kg",
+    "sortOrder": 136
+  },
+  {
+    "code": "cdt-local",
+    "name": "CDT (Local)",
+    "unit": "kg",
+    "sortOrder": 137
+  },
+  {
+    "code": "ptn",
+    "name": "PTN",
+    "unit": "kg",
+    "sortOrder": 138
+  },
+  {
+    "code": "cac",
+    "name": "CAC",
+    "unit": "kg",
+    "sortOrder": 139
+  },
+  {
+    "code": "gts",
+    "name": "GTS",
+    "unit": "kg",
+    "sortOrder": 140
+  },
+  {
+    "code": "thr",
+    "name": "THR",
+    "unit": "kg",
+    "sortOrder": 141
+  },
+  {
+    "code": "gps",
+    "name": "GPS",
+    "unit": "kg",
+    "sortOrder": 142
+  },
+  {
+    "code": "st",
+    "name": "ST",
+    "unit": "kg",
+    "sortOrder": 143
+  },
+  {
+    "code": "aeo",
+    "name": "AEO",
+    "unit": "kg",
+    "sortOrder": 144
+  },
+  {
+    "code": "xgm",
+    "name": "XGM",
+    "unit": "kg",
+    "sortOrder": 145
+  },
+  {
+    "code": "at",
+    "name": "AT",
+    "unit": "kg",
+    "sortOrder": 146
+  },
+  {
+    "code": "pol",
+    "name": "POL",
+    "unit": "kg",
+    "sortOrder": 147
+  },
+  {
+    "code": "cto",
+    "name": "CTO",
+    "unit": "kg",
+    "sortOrder": 148
+  },
+  {
+    "code": "chl",
+    "name": "CHL",
+    "unit": "kg",
+    "sortOrder": 149
+  },
+  {
+    "code": "phl",
+    "name": "PHL",
+    "unit": "kg",
+    "sortOrder": 150
+  },
+  {
+    "code": "ndss",
+    "name": "NDSS",
+    "unit": "kg",
+    "sortOrder": 151
+  },
+  {
+    "code": "xaw-f",
+    "name": "XAW F",
+    "unit": "kg",
+    "sortOrder": 152
+  },
+  {
+    "code": "wt-6-gen",
+    "name": "WT 6 GEN",
+    "unit": "kg",
+    "sortOrder": 153
+  },
+  {
+    "code": "pc-10",
+    "name": "PC 10",
+    "unit": "kg",
+    "sortOrder": 154
+  },
+  {
+    "code": "caco-1-kg",
+    "name": "CACO 1 KG",
+    "unit": "kg",
+    "sortOrder": 155
+  },
+  {
+    "code": "stpp-2",
+    "name": "STPP",
+    "unit": "kg",
+    "sortOrder": 156
+  },
+  {
+    "code": "d-p",
+    "name": "D.P",
+    "unit": "kg",
+    "sortOrder": 157
+  },
+  {
+    "code": "k-a-300",
+    "name": "K.A 300",
+    "unit": "kg",
+    "sortOrder": 158
+  },
+  {
+    "code": "innosoft-bio-dt",
+    "name": "Innosoft bio DT",
+    "unit": "kg",
+    "sortOrder": 159
+  },
+  {
+    "code": "bpo",
+    "name": "BPO",
+    "unit": "kg",
+    "sortOrder": 160
+  },
+  {
+    "code": "ccc",
+    "name": "CCC",
+    "unit": "kg",
+    "sortOrder": 161
+  },
+  {
+    "code": "kps-akbari",
+    "name": "KPS (Akbari)",
+    "unit": "kg",
+    "sortOrder": 162
+  },
+  {
+    "code": "s-s-1",
+    "name": "S.S 1",
+    "unit": "kg",
+    "sortOrder": 163
+  },
+  {
+    "code": "tlo",
+    "name": "TLO",
+    "unit": "kg",
+    "sortOrder": 164
+  },
+  {
+    "code": "plm",
+    "name": "PLM",
+    "unit": "kg",
+    "sortOrder": 165
+  },
+  {
+    "code": "cac-c",
+    "name": "CAC- C",
+    "unit": "kg",
+    "sortOrder": 166
+  },
+  {
+    "code": "cac-f",
+    "name": "CAC – F",
+    "unit": "kg",
+    "sortOrder": 167
+  },
+  {
+    "code": "ak-67",
+    "name": "AK 67",
+    "unit": "kg",
+    "sortOrder": 168
+  },
+  {
+    "code": "spb",
+    "name": "SPB",
+    "unit": "kg",
+    "sortOrder": 169
+  },
+  {
+    "code": "wcmc",
+    "name": "WCMC",
+    "unit": "kg",
+    "sortOrder": 170
+  },
+  {
+    "code": "wcst",
+    "name": "WCST",
+    "unit": "kg",
+    "sortOrder": 171
+  },
+  {
+    "code": "spb-2",
+    "name": "SPB",
+    "unit": "kg",
+    "sortOrder": 172
+  },
+  {
+    "code": "ssi",
+    "name": "SSI",
+    "unit": "kg",
+    "sortOrder": 173
+  },
+  {
+    "code": "sbc",
+    "name": "SBC",
+    "unit": "kg",
+    "sortOrder": 174
+  },
+  {
+    "code": "wctb-wcddd",
+    "name": "WCTB WCDDD",
+    "unit": "kg",
+    "sortOrder": 175
+  },
+  {
+    "code": "pam",
+    "name": "PAM",
+    "unit": "kg",
+    "sortOrder": 176
+  },
+  {
+    "code": "o-r-1",
+    "name": "O.R.1",
+    "unit": "kg",
+    "sortOrder": 177
+  },
+  {
+    "code": "c-b-o",
+    "name": "C.B.O",
+    "unit": "kg",
+    "sortOrder": 178
+  },
+  {
+    "code": "wc-4500",
+    "name": "WC 4500.",
+    "unit": "kg",
+    "sortOrder": 179
+  },
+  {
+    "code": "q-u-e",
+    "name": "Q.U.E",
+    "unit": "kg",
+    "sortOrder": 180
+  },
+  {
+    "code": "p-n-y",
+    "name": "P.N.Y",
+    "unit": "kg",
+    "sortOrder": 181
+  },
+  {
+    "code": "sbha",
+    "name": "SBHA",
+    "unit": "kg",
+    "sortOrder": 182
+  },
+  {
+    "code": "18112",
+    "name": "18112",
+    "unit": "kg",
+    "sortOrder": 183
+  },
+  {
+    "code": "kay",
+    "name": "KAY",
+    "unit": "kg",
+    "sortOrder": 184
+  },
+  {
+    "code": "a-gel",
+    "name": "A.GEL",
+    "unit": "kg",
+    "sortOrder": 185
+  },
+  {
+    "code": "s-h-l",
+    "name": "S.H.L",
+    "unit": "kg",
+    "sortOrder": 186
+  },
+  {
+    "code": "a-p-s",
+    "name": "A.P.S",
+    "unit": "kg",
+    "sortOrder": 187
+  },
+  {
+    "code": "l-g-10",
+    "name": "L.G 10",
+    "unit": "kg",
+    "sortOrder": 188
+  },
+  {
+    "code": "a-a-r",
+    "name": "A.A.R",
+    "unit": "kg",
+    "sortOrder": 189
+  },
+  {
+    "code": "pg",
+    "name": "PG",
+    "unit": "kg",
+    "sortOrder": 190
+  },
+  {
+    "code": "r-o-l",
+    "name": "R.O.L",
+    "unit": "kg",
+    "sortOrder": 191
+  },
+  {
+    "code": "c-o-l",
+    "name": "C.O.L",
+    "unit": "kg",
+    "sortOrder": 192
+  },
+  {
+    "code": "o-o-l",
+    "name": "O.O.L",
+    "unit": "kg",
+    "sortOrder": 193
+  },
+  {
+    "code": "rtl",
+    "name": "RTL",
+    "unit": "kg",
+    "sortOrder": 194
+  },
+  {
+    "code": "cte",
+    "name": "CTE",
+    "unit": "kg",
+    "sortOrder": 195
+  },
+  {
+    "code": "otb",
+    "name": "OTB",
+    "unit": "kg",
+    "sortOrder": 196
+  },
+  {
+    "code": "chl-2",
+    "name": "CHL – 2",
+    "unit": "kg",
+    "sortOrder": 197
+  },
+  {
+    "code": "b-61-n",
+    "name": "B 61-N",
+    "unit": "kg",
+    "sortOrder": 198
+  },
+  {
+    "code": "mp-80",
+    "name": "MP 80",
+    "unit": "kg",
+    "sortOrder": 199
+  },
+  {
+    "code": "pl-1",
+    "name": "PL 1",
+    "unit": "kg",
+    "sortOrder": 200
+  },
+  {
+    "code": "xl-1",
+    "name": "XL 1",
+    "unit": "kg",
+    "sortOrder": 201
+  },
+  {
+    "code": "p-9",
+    "name": "P-9",
+    "unit": "kg",
+    "sortOrder": 202
+  },
+  {
+    "code": "jjl",
+    "name": "JJL",
+    "unit": "kg",
+    "sortOrder": 203
+  },
+  {
+    "code": "ae-5",
+    "name": "AE 5",
+    "unit": "kg",
+    "sortOrder": 204
+  },
+  {
+    "code": "hqn",
+    "name": "HQN",
+    "unit": "kg",
+    "sortOrder": 205
+  },
+  {
+    "code": "shl",
+    "name": "SHL",
+    "unit": "kg",
+    "sortOrder": 206
+  },
+  {
+    "code": "cac-2",
+    "name": "CAC",
+    "unit": "kg",
+    "sortOrder": 207
+  },
+  {
+    "code": "b6",
+    "name": "B6",
+    "unit": "kg",
+    "sortOrder": 208
+  },
+  {
+    "code": "wd-20",
+    "name": "WD 20",
+    "unit": "kg",
+    "sortOrder": 209
+  },
+  {
+    "code": "af-10",
+    "name": "AF 10",
+    "unit": "kg",
+    "sortOrder": 210
+  },
+  {
+    "code": "ppf",
+    "name": "PPF",
+    "unit": "kg",
+    "sortOrder": 211
+  },
+  {
+    "code": "gts-2",
+    "name": "GTS 2",
+    "unit": "kg",
+    "sortOrder": 212
+  },
+  {
+    "code": "sr-az",
+    "name": "SR AZ",
+    "unit": "kg",
+    "sortOrder": 213
+  },
+  {
+    "code": "se-39",
+    "name": "SE 39",
+    "unit": "kg",
+    "sortOrder": 214
+  },
+  {
+    "code": "at-31",
+    "name": "AT 31",
+    "unit": "kg",
+    "sortOrder": 215
+  },
+  {
+    "code": "at-2",
+    "name": "AT",
+    "unit": "kg",
+    "sortOrder": 216
+  },
+  {
+    "code": "xcs",
+    "name": "XCS",
+    "unit": "kg",
+    "sortOrder": 217
+  },
+  {
+    "code": "bt-6",
+    "name": "BT 6",
+    "unit": "kg",
+    "sortOrder": 218
+  },
+  {
+    "code": "x05",
+    "name": "X05",
+    "unit": "kg",
+    "sortOrder": 219
+  },
+  {
+    "code": "bx07",
+    "name": "BX07",
+    "unit": "kg",
+    "sortOrder": 220
+  },
+  {
+    "code": "bt-8",
+    "name": "BT 8",
+    "unit": "kg",
+    "sortOrder": 221
+  },
+  {
+    "code": "p-26",
+    "name": "P 26",
+    "unit": "kg",
+    "sortOrder": 222
+  },
+  {
+    "code": "vit-c",
+    "name": "VIT – C",
+    "unit": "kg",
+    "sortOrder": 223
+  },
+  {
+    "code": "hs-nt",
+    "name": "HS NT",
+    "unit": "kg",
+    "sortOrder": 224
+  },
+  {
+    "code": "hs-6",
+    "name": "HS 6",
+    "unit": "kg",
+    "sortOrder": 225
+  },
+  {
+    "code": "sms",
+    "name": "SMS",
+    "unit": "kg",
+    "sortOrder": 226
+  },
+  {
+    "code": "sts",
+    "name": "STS",
+    "unit": "kg",
+    "sortOrder": 227
+  },
+  {
+    "code": "sppg-h",
+    "name": "SPPG h",
+    "unit": "kg",
+    "sortOrder": 228
+  },
+  {
+    "code": "mms",
+    "name": "MMS",
+    "unit": "kg",
+    "sortOrder": 229
+  },
+  {
+    "code": "rt-1",
+    "name": "RT 1",
+    "unit": "kg",
+    "sortOrder": 230
+  },
+  {
+    "code": "rt-12",
+    "name": "RT 12",
+    "unit": "kg",
+    "sortOrder": 231
+  },
+  {
+    "code": "et-18",
+    "name": "ET 18",
+    "unit": "kg",
+    "sortOrder": 232
+  },
+  {
+    "code": "et-15",
+    "name": "ET 15",
+    "unit": "kg",
+    "sortOrder": 233
+  },
+  {
+    "code": "b-19-x",
+    "name": "B 19 X",
+    "unit": "kg",
+    "sortOrder": 234
+  },
+  {
+    "code": "mmc",
+    "name": "MMC",
+    "unit": "kg",
+    "sortOrder": 235
+  },
+  {
+    "code": "et-13",
+    "name": "ET 13",
+    "unit": "kg",
+    "sortOrder": 236
+  },
+  {
+    "code": "wcbm",
+    "name": "WCBM",
+    "unit": "kg",
+    "sortOrder": 237
+  },
+  {
+    "code": "wcbb",
+    "name": "WCBB",
+    "unit": "kg",
+    "sortOrder": 238
+  },
+  {
+    "code": "utmt",
+    "name": "UTMT",
+    "unit": "kg",
+    "sortOrder": 239
+  },
+  {
+    "code": "3lpm",
+    "name": "3LPM",
+    "unit": "kg",
+    "sortOrder": 240
+  },
+  {
+    "code": "tti",
+    "name": "TTI",
+    "unit": "kg",
+    "sortOrder": 241
+  },
+  {
+    "code": "p-l",
+    "name": "P-L",
+    "unit": "kg",
+    "sortOrder": 242
+  },
+  {
+    "code": "pth",
+    "name": "PTH",
+    "unit": "kg",
+    "sortOrder": 243
+  },
+  {
+    "code": "nle",
+    "name": "NLE",
+    "unit": "kg",
+    "sortOrder": 244
+  },
+  {
+    "code": "glr",
+    "name": "GLR",
+    "unit": "kg",
+    "sortOrder": 245
+  },
+  {
+    "code": "sbt-1",
+    "name": "SBT 1",
+    "unit": "kg",
+    "sortOrder": 246
+  },
+  {
+    "code": "c-oil",
+    "name": "C OIL",
+    "unit": "kg",
+    "sortOrder": 247
+  },
+  {
+    "code": "dmc-2",
+    "name": "DMC 2",
+    "unit": "kg",
+    "sortOrder": 248
+  },
+  {
+    "code": "zo-1",
+    "name": "ZO 1",
+    "unit": "kg",
+    "sortOrder": 249
+  },
+  {
+    "code": "g-30",
+    "name": "G 30",
+    "unit": "kg",
+    "sortOrder": 250
+  },
+  {
+    "code": "pqt-3",
+    "name": "PQT-3",
+    "unit": "kg",
+    "sortOrder": 251
+  },
+  {
+    "code": "ktn",
+    "name": "KTN",
+    "unit": "kg",
+    "sortOrder": 252
+  },
+  {
+    "code": "scb",
+    "name": "SCB",
+    "unit": "kg",
+    "sortOrder": 253
+  },
+  {
+    "code": "m-75",
+    "name": "M 75",
+    "unit": "kg",
+    "sortOrder": 254
+  },
+  {
+    "code": "pgd",
+    "name": "PGD",
+    "unit": "kg",
+    "sortOrder": 255
+  },
+  {
+    "code": "fps-85",
+    "name": "FPS 85",
+    "unit": "kg",
+    "sortOrder": 256
+  },
+  {
+    "code": "wmc-1",
+    "name": "WMC 1",
+    "unit": "kg",
+    "sortOrder": 257
+  },
+  {
+    "code": "cct-caprylic-triglyceride",
+    "name": "CCT ( Caprylic Triglyceride )",
+    "unit": "kg",
+    "sortOrder": 258
+  },
+  {
+    "code": "cdl",
+    "name": "CDL",
+    "unit": "kg",
+    "sortOrder": 259
+  },
+  {
+    "code": "gp-4",
+    "name": "GP 4",
+    "unit": "kg",
+    "sortOrder": 260
+  },
+  {
+    "code": "lln",
+    "name": "LLN",
+    "unit": "kg",
+    "sortOrder": 261
+  },
+  {
+    "code": "pk-30",
+    "name": "PK 30",
+    "unit": "kg",
+    "sortOrder": 262
+  },
+  {
+    "code": "myd",
+    "name": "MYD",
+    "unit": "kg",
+    "sortOrder": 263
+  },
+  {
+    "code": "ptd",
+    "name": "PTD",
+    "unit": "kg",
+    "sortOrder": 264
+  },
+  {
+    "code": "6l",
+    "name": "6L",
+    "unit": "kg",
+    "sortOrder": 265
+  },
+  {
+    "code": "l2",
+    "name": "L2",
+    "unit": "kg",
+    "sortOrder": 266
+  },
+  {
+    "code": "ppg",
+    "name": "PPG",
+    "unit": "kg",
+    "sortOrder": 267
+  },
+  {
+    "code": "lx-07",
+    "name": "LX 07",
+    "unit": "kg",
+    "sortOrder": 268
+  },
+  {
+    "code": "xxx-70",
+    "name": "XXX 70",
+    "unit": "kg",
+    "sortOrder": 269
+  },
+  {
+    "code": "xxx-50",
+    "name": "XXX 50",
+    "unit": "kg",
+    "sortOrder": 270
+  },
+  {
+    "code": "tea",
+    "name": "TEA",
+    "unit": "kg",
+    "sortOrder": 271
+  },
+  {
+    "code": "amp",
+    "name": "AMP",
+    "unit": "kg",
+    "sortOrder": 272
+  },
+  {
+    "code": "smx",
+    "name": "SMX",
+    "unit": "kg",
+    "sortOrder": 273
+  },
+  {
+    "code": "nno",
+    "name": "NNO",
+    "unit": "kg",
+    "sortOrder": 274
+  },
+  {
+    "code": "s-87",
+    "name": "S 87",
+    "unit": "kg",
+    "sortOrder": 275
+  },
+  {
+    "code": "s-70",
+    "name": "S 70",
+    "unit": "kg",
+    "sortOrder": 276
+  },
+  {
+    "code": "s-80",
+    "name": "S 80",
+    "unit": "kg",
+    "sortOrder": 277
+  },
+  {
+    "code": "s-81",
+    "name": "S 81",
+    "unit": "kg",
+    "sortOrder": 278
+  },
+  {
+    "code": "s-86",
+    "name": "S 86",
+    "unit": "kg",
+    "sortOrder": 279
+  },
+  {
+    "code": "s-7-0",
+    "name": "S 7-0",
+    "unit": "kg",
+    "sortOrder": 280
+  }
+]

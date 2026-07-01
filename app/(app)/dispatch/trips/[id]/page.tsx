@@ -6,16 +6,18 @@ import { DispatchTripForm } from "@/components/DispatchTripForm";
 import type { PickerOrder } from "@/components/DispatchTripOrderPicker";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
+import { loadDispatchFleetOptions } from "@/lib/dispatchFleetOptions";
 import {
   GATE_STATUS_LABELS,
   isRashidActiveGateStatus,
+  isTripActiveForPlanner,
   normalizeGateStatus,
   rashidActiveOrdersMongoFilter,
 } from "@/lib/gateDelivery";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
 import { batchProgress } from "@/lib/orderBatchStatus";
-import { canEditDispatch, EMPTY_DISPATCH, homePathForRole, roleFromSession, type DispatchFields } from "@/lib/roles";
+import { canAssignDispatchBatches, canEditDispatchTrip, EMPTY_DISPATCH, homePathForRole, isDispatchTripPlanner, roleFromSession, type DispatchFields } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -53,22 +55,35 @@ export default async function DispatchTripDetailPage(props: PageProps) {
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
+  const username = (session?.user as { username?: string })?.username;
   if (role && role !== "dispatch_editor" && role !== "admin") {
     redirect(homePathForRole(role));
   }
-  const canEdit = canEditDispatch(role);
+  const canEditTrip = canEditDispatchTrip(role, username);
+  const canAssignBatches = canAssignDispatchBatches(role, username);
+  const hideCompletedTrips = isDispatchTripPlanner(role, username) && role !== "admin";
 
   await connectToDatabase();
   const trip = await DispatchTrip.findById(id).lean();
   if (!trip) notFound();
 
   const tripOrderIds = trip.orderIds ?? [];
+
+  if (hideCompletedTrips && tripOrderIds.length > 0) {
+    const gateRows = await Order.find({ _id: { $in: tripOrderIds } })
+      .select({ gateDeliveryStatus: 1 })
+      .lean();
+    const statuses = gateRows.map((o) => normalizeGateStatus(o.gateDeliveryStatus));
+    if (!isTripActiveForPlanner(statuses)) {
+      redirect("/dispatch/trips");
+    }
+  }
   const pickerQuery =
     tripOrderIds.length > 0
       ? { $or: [rashidActiveOrdersMongoFilter(), { _id: { $in: tripOrderIds } }] }
       : rashidActiveOrdersMongoFilter();
 
-  const [orderDocs, linkedOrders] = await Promise.all([
+  const [orderDocs, linkedOrders, fleetOptions] = await Promise.all([
     Order.find(pickerQuery)
       .sort({ createdAt: -1 })
       .select({ poNumber: 1, customerName: 1, dispatchTripId: 1 })
@@ -76,6 +91,7 @@ export default async function DispatchTripDetailPage(props: PageProps) {
     Order.find({ _id: { $in: tripOrderIds } })
       .select({ poNumber: 1, customerName: 1, sheetLines: 1, gateDeliveryStatus: 1 })
       .lean(),
+    loadDispatchFleetOptions(),
   ]);
 
   const orders: PickerOrder[] = orderDocs.map((o) => ({
@@ -105,7 +121,7 @@ export default async function DispatchTripDetailPage(props: PageProps) {
         <p className="mt-1 text-sm text-zinc-600">
           Vehicle {trip.vehicleNo?.trim() || "—"} · {initialOrderIds.length} PO
           {initialOrderIds.length !== 1 ? "s" : ""}
-          {!canEdit ? " · Read-only" : ""}
+          {!canEditTrip ? " · Read-only" : ""}
         </p>
       </div>
 
@@ -137,14 +153,14 @@ export default async function DispatchTripDetailPage(props: PageProps) {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {canEdit && rashidActive && !complete ? (
+                    {canAssignBatches && rashidActive && !complete ? (
                       <Link
                         href={`/orders/${oid}/loading-sheet?dispatch=1`}
                         className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white"
                       >
                         Assign batches
                       </Link>
-                    ) : canEdit && rashidActive && complete ? (
+                    ) : canAssignBatches && rashidActive && complete ? (
                       <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
                         Batches assigned
                       </span>
@@ -167,12 +183,14 @@ export default async function DispatchTripDetailPage(props: PageProps) {
         </div>
       ) : null}
 
-      {canEdit ? (
+      {canEditTrip ? (
         <DispatchTripForm
           tripId={id}
           initialOrderIds={initialOrderIds}
           orders={orders}
           initialDispatch={initialDispatch}
+          vehicleOptions={fleetOptions.vehicles}
+          driverOptions={fleetOptions.drivers}
         />
       ) : (
         <ReadOnlyDispatchSummary dispatch={initialDispatch} />

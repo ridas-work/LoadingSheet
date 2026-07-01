@@ -1,20 +1,35 @@
 import { OrdersListWithTrips } from "@/components/OrdersListWithTrips";
+import { PageHeader } from "@/components/PageHeader";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { normalizeGateStatus, rashidActiveOrdersMongoFilter } from "@/lib/gateDelivery";
 import { Order } from "@/lib/models/Order";
-import { canEditOrders, isAdmin, roleFromSession } from "@/lib/roles";
+import { tripPlannerOrdersMongoFilter } from "@/lib/orderApproval";
+import { notDiscardedOrdersMongoFilter } from "@/lib/orderDiscard";
+import {
+  canEditOrders,
+  isAdmin,
+  isDispatchTripPlanner,
+  roleFromSession,
+} from "@/lib/roles";
 
 export default async function OrdersPage() {
   await connectToDatabase();
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
+  const username = (session?.user as { username?: string })?.username;
   const isDispatchEditor = role === "dispatch_editor";
+  const isTripPlanner = isDispatchTripPlanner(role, username);
   const showEnteredBy = isAdmin(role);
-  const editOrders = canEditOrders(role);
+  const editOrders = canEditOrders(role, username);
 
-  const query = isDispatchEditor ? rashidActiveOrdersMongoFilter() : {};
+  const query = isTripPlanner
+    ? tripPlannerOrdersMongoFilter()
+    : isDispatchEditor
+      ? rashidActiveOrdersMongoFilter()
+      : notDiscardedOrdersMongoFilter();
+
   const orders = await Order.find(query)
     .sort({ createdAt: -1 })
     .select(
@@ -47,19 +62,19 @@ export default async function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Orders</h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Open the loading sheet for any order.
-          {isDispatchEditor
-            ? " Active factory orders only — out for delivery and delivered POs are hidden. Select multiple POs to create a vehicle trip."
-            : ""}
-          {showEnteredBy ? " All POs including delivered — see status and who entered each PO." : ""}
-        </p>
-      </div>
+      <PageHeader
+        title="Orders"
+        description={
+          isTripPlanner
+            ? "Approved factory orders ready for trip planning. Select multiple POs to create a vehicle trip."
+            : isDispatchEditor
+              ? "Active factory orders only — out for delivery and delivered POs are hidden. Select multiple POs to create a vehicle trip."
+              : "Open the loading sheet for any order."
+        }
+      />
 
       {rows.length === 0 ? (
-        <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
+        <p className="empty-state">
           {isDispatchEditor
             ? "No active orders at the factory. POs that are out for delivery or delivered are hidden — open Dispatch trips for trip history."
             : "No orders yet."}
@@ -70,7 +85,7 @@ export default async function OrdersPage() {
           isDispatchEditor={isDispatchEditor}
           showEnteredBy={showEnteredBy}
           canEditOrders={editOrders}
-          showGateStatus={showEnteredBy}
+          showGateStatus={showEnteredBy || role === "po_creator"}
         />
       )}
     </div>
