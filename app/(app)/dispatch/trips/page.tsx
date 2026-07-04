@@ -8,7 +8,7 @@ import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
 import {
   canCreateDispatchTrips,
-  canEditDispatch,
+  canEditDispatchTrip,
   homePathForRole,
   isDispatchBatchOperator,
   isDispatchTripPlanner,
@@ -24,7 +24,7 @@ export default async function DispatchTripsPage() {
   if (role && role !== "dispatch_editor" && role !== "admin") {
     redirect(homePathForRole(role));
   }
-  const canEdit = canEditDispatch(role, username);
+  const canEditTrip = canEditDispatchTrip(role, username);
   const canCreate = canCreateDispatchTrips(role, username);
   const hideCompletedTrips = isDispatchTripPlanner(role, username) && role !== "admin";
   const rashidView = isDispatchBatchOperator(role, username) && role !== "admin";
@@ -72,7 +72,7 @@ export default async function DispatchTripsPage() {
         <div>
           <h1 className="text-2xl font-semibold text-zinc-900">Dispatch trips</h1>
           <p className="mt-1 text-sm text-zinc-600">
-            {canEdit
+            {canEditTrip
               ? "Group multiple POs on one vehicle. Enter vehicle and driver once; assign batches per PO on each loading sheet."
               : rashidView
                 ? "Pending batch-assignment trips only — delivered/out-for-delivery and fully assigned trips are hidden."

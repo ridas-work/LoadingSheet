@@ -7,6 +7,7 @@ import { Order } from "@/lib/models/Order";
 import { tripPlannerOrdersMongoFilter } from "@/lib/orderApproval";
 import { notDiscardedOrdersMongoFilter } from "@/lib/orderDiscard";
 import {
+  canAssignDispatchBatches,
   canEditOrders,
   isAdmin,
   isDispatchTripPlanner,
@@ -21,6 +22,7 @@ export default async function OrdersPage() {
   const username = (session?.user as { username?: string })?.username;
   const isDispatchEditor = role === "dispatch_editor";
   const isTripPlanner = isDispatchTripPlanner(role, username);
+  const canAssignBatches = canAssignDispatchBatches(role, username);
   const showEnteredBy = isAdmin(role);
   const editOrders = canEditOrders(role, username);
 
@@ -67,8 +69,8 @@ export default async function OrdersPage() {
         description={
           isTripPlanner
             ? "Approved factory orders ready for trip planning. Select multiple POs to create a vehicle trip."
-            : isDispatchEditor
-              ? "Active factory orders only — out for delivery and delivered POs are hidden. Select multiple POs to create a vehicle trip."
+            : canAssignBatches
+              ? "Active factory orders only — out for delivery and delivered POs are hidden. Open loading sheets to assign batches."
               : "Open the loading sheet for any order."
         }
       />
@@ -82,7 +84,8 @@ export default async function OrdersPage() {
       ) : (
         <OrdersListWithTrips
           orders={rows}
-          isDispatchEditor={isDispatchEditor}
+          canPlanTrips={isTripPlanner}
+          canAssignBatches={canAssignBatches}
           showEnteredBy={showEnteredBy}
           canEditOrders={editOrders}
           showGateStatus={showEnteredBy || role === "po_creator"}

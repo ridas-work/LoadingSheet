@@ -25,7 +25,8 @@ type OrderRow = {
 
 type Props = {
   orders: OrderRow[];
-  isDispatchEditor: boolean;
+  canPlanTrips?: boolean;
+  canAssignBatches?: boolean;
   showEnteredBy?: boolean;
   canEditOrders?: boolean;
   /** Admin oversight — show gate delivery status on every row. */
@@ -34,7 +35,8 @@ type Props = {
 
 export function OrdersListWithTrips({
   orders,
-  isDispatchEditor,
+  canPlanTrips = false,
+  canAssignBatches = false,
   showEnteredBy = false,
   canEditOrders = false,
   showGateStatus = false,
@@ -50,7 +52,7 @@ export function OrdersListWithTrips({
 
   return (
     <div className="space-y-4">
-      {isDispatchEditor && orders.length > 0 ? (
+      {canPlanTrips && orders.length > 0 ? (
         <div className="flex flex-wrap items-center gap-2">
           {createTripHref ? (
             <Link
@@ -72,7 +74,7 @@ export function OrdersListWithTrips({
           const checked = selected.includes(o.id);
           const rashidActive = isRashidActiveGateStatus(o.gateDeliveryStatus);
           const gateStatus = o.gateDeliveryStatus ?? "none";
-          const showAssignBatches = isDispatchEditor && rashidActive && !batchesLocked;
+          const showAssignBatches = canAssignBatches && rashidActive && !batchesLocked;
           const showEditOrder =
             canEditOrders && !isOrderLockedAfterDelivery(gateStatus);
 
@@ -80,7 +82,7 @@ export function OrdersListWithTrips({
             <li key={o.id} className="px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 flex-1 items-start gap-3">
-                  {isDispatchEditor ? (
+                  {canPlanTrips ? (
                     <input
                       type="checkbox"
                       className="mt-1"
@@ -106,7 +108,7 @@ export function OrdersListWithTrips({
                         </Link>
                       </p>
                     ) : null}
-                    {(showGateStatus || (!rashidActive && isDispatchEditor)) ? (
+                    {(showGateStatus || (!rashidActive && canAssignBatches)) ? (
                       <p
                         className={`mt-1 text-xs font-medium ${
                           gateStatus === "delivered"
@@ -143,7 +145,7 @@ export function OrdersListWithTrips({
                     >
                       Assign batches
                     </Link>
-                  ) : isDispatchEditor && rashidActive && batchesLocked ? (
+                  ) : canAssignBatches && rashidActive && batchesLocked ? (
                     <span className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
                       Batches assigned
                     </span>
