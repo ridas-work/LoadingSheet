@@ -12,7 +12,7 @@ import {
 import { connectToDatabase } from "@/lib/db";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
-import { roleFromSession } from "@/lib/roles";
+import { canDiscardDispatchTrip, canEditDispatchTrip, roleFromSession } from "@/lib/roles";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -62,11 +62,13 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (roleFromSession(session.user as { role?: string }) !== "dispatch_editor") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = session.user as { role?: string; username?: string; id?: string; name?: string | null };
+  const role = roleFromSession(user);
+  if (!canEditDispatchTrip(role, user.username)) {
+    return NextResponse.json({ error: "Only Ali can edit dispatch trips." }, { status: 403 });
   }
 
-  const userId = (session.user as { id?: string }).id;
+  const userId = user.id;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -110,7 +112,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   });
   await trip.save();
 
-  await syncTripDispatchToOrders(trip, { userId, userName: session.user.name ?? "" });
+  await syncTripDispatchToOrders(trip, { userId, userName: user.name ?? "" });
 
   return NextResponse.json({ ok: true });
 }
@@ -120,8 +122,10 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (roleFromSession(session.user as { role?: string }) !== "dispatch_editor") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = session.user as { role?: string; username?: string };
+  const role = roleFromSession(user);
+  if (!canDiscardDispatchTrip(role, user.username)) {
+    return NextResponse.json({ error: "Only Ali can discard dispatch trips." }, { status: 403 });
   }
 
   const { id } = await ctx.params;

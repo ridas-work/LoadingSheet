@@ -10,7 +10,7 @@ import {
 import { connectToDatabase } from "@/lib/db";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
-import { roleFromSession } from "@/lib/roles";
+import { canCreateDispatchTrips, roleFromSession } from "@/lib/roles";
 
 export async function GET() {
   const session = await auth();
@@ -54,11 +54,13 @@ export async function POST(req: Request) {
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (roleFromSession(session.user as { role?: string }) !== "dispatch_editor") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const user = session.user as { role?: string; username?: string; id?: string; name?: string | null };
+  const role = roleFromSession(user);
+  if (!canCreateDispatchTrips(role, user.username)) {
+    return NextResponse.json({ error: "Only Ali can create dispatch trips." }, { status: 403 });
   }
 
-  const userId = (session.user as { id?: string }).id;
+  const userId = user.id;
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -82,10 +84,10 @@ export async function POST(req: Request) {
     orderIds,
     dispatchedAt: new Date(),
     createdByUserId: userId,
-    createdByName: session.user.name ?? "",
+    createdByName: user.name ?? "",
   });
 
-  await syncTripDispatchToOrders(trip, { userId, userName: session.user.name ?? "" });
+  await syncTripDispatchToOrders(trip, { userId, userName: user.name ?? "" });
 
   return NextResponse.json({ id: trip._id.toString() }, { status: 201 });
 }
