@@ -2,6 +2,17 @@ import mongoose, { type InferSchemaType } from "mongoose";
 
 const STATUSES = ["pending", "approved", "ordered", "rejected"] as const;
 
+const ChemicalMaterialRequestAccessorySchema = new mongoose.Schema(
+  {
+    itemCode: { type: String, required: true, trim: true, lowercase: true },
+    itemName: { type: String, required: true, trim: true },
+    quantityRequested: { type: Number, required: true, min: 0.001 },
+    unit: { type: String, required: true, default: "pcs", trim: true },
+    onHandAtRequest: { type: Number, required: true, default: 0, min: 0 },
+  },
+  { _id: false },
+);
+
 const ChemicalMaterialRequestSchema = new mongoose.Schema(
   {
     materialCode: { type: String, required: true, trim: true, lowercase: true },
@@ -9,6 +20,11 @@ const ChemicalMaterialRequestSchema = new mongoose.Schema(
     quantityRequested: { type: Number, required: true, min: 0.001 },
     unit: { type: String, required: true, default: "kg", trim: true },
     onHandAtRequest: { type: Number, required: true, default: 0, min: 0 },
+    accessories: {
+      type: [ChemicalMaterialRequestAccessorySchema],
+      required: false,
+      default: [],
+    },
     status: { type: String, required: true, enum: STATUSES, default: "pending" },
     note: { type: String, required: false, default: "", trim: true },
     adminNote: { type: String, required: false, default: "", trim: true },
