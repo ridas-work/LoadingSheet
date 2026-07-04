@@ -87,8 +87,18 @@ export function isRashidDispatchUser(role: AppRole | null, username?: string | n
   return role === "dispatch_editor" && !isDispatchTripPlanner(role, username);
 }
 
-export function canCreateDispatchTrips(role: AppRole | null, username?: string | null): boolean {
+/** PO team and Ali — not Rashid, Ramazan, or packaging. */
+export function canViewOrdersList(role: AppRole | null, username?: string | null): boolean {
+  if (role === "chemicals_editor" || role === "packaging_editor" || role === "batch_editor") {
+    return false;
+  }
+  if (role === "admin" || role === "po_creator") return true;
   return isDispatchTripPlanner(role, username);
+}
+
+export function canCreateDispatchTrips(role: AppRole | null, username?: string | null): boolean {
+  if (role !== "dispatch_editor") return false;
+  return (username?.toLowerCase().trim() ?? "") === DISPATCH_TRIP_PLANNER_USERNAME;
 }
 
 /** Ali (trip planner), Rashid, or admin — edit vehicle/driver and PO list on a dispatch trip. */
@@ -141,14 +151,14 @@ export function canViewChemicalMaterials(role: AppRole | null): boolean {
   return role === "chemicals_editor" || role === "batch_editor" || role === "admin";
 }
 
-/** Waleed admin only — manual stock refill / adjust. */
+/** Ramazan or Waleed admin — set stock on hand and add catalog materials. */
 export function canEditChemicalStock(role: AppRole | null): boolean {
-  return role === "admin";
+  return role === "chemicals_editor" || role === "admin";
 }
 
-/** Esha or Waleed — record QC intake on incoming chemicals. */
+/** Esha only — record QC intake on incoming chemicals. */
 export function canRecordChemicalIntake(role: AppRole | null): boolean {
-  return role === "batch_editor" || role === "admin";
+  return role === "batch_editor";
 }
 
 export function canRequestChemicalMaterials(role: AppRole | null): boolean {

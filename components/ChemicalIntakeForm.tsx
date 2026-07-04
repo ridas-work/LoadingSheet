@@ -23,6 +23,7 @@ export function ChemicalIntakeForm({ onSaved }: { onSaved?: () => void }) {
   const [ph, setPh] = useState("");
   const [solids, setSolids] = useState("");
   const [provider, setProvider] = useState("");
+  const [lotNo, setLotNo] = useState("");
   const [receivedAt, setReceivedAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -102,6 +103,7 @@ export function ChemicalIntakeForm({ onSaved }: { onSaved?: () => void }) {
           ph: ph.trim(),
           solids: solids.trim(),
           provider: provider.trim(),
+          lotNo: lotNo.trim(),
           receivedAt,
         }),
       });
@@ -130,6 +132,7 @@ export function ChemicalIntakeForm({ onSaved }: { onSaved?: () => void }) {
       setPh("");
       setSolids("");
       setProvider("");
+      setLotNo("");
       setSelectedCode("");
       setNewName("");
       setSearch("");
@@ -328,6 +331,17 @@ export function ChemicalIntakeForm({ onSaved }: { onSaved?: () => void }) {
             className={`${ui.input} mt-1`}
           />
         </div>
+        <div>
+          <label className={ui.label} htmlFor="chem-lot">
+            Lot no.
+          </label>
+          <input
+            id="chem-lot"
+            value={lotNo}
+            onChange={(e) => setLotNo(e.target.value)}
+            className={`${ui.input} mt-1`}
+          />
+        </div>
       </div>
 
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
@@ -376,6 +390,7 @@ export function ChemicalIntakeHistory() {
           <tr className="bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
             <th className="border-b px-3 py-2">Date</th>
             <th className="border-b px-3 py-2">Material</th>
+            <th className="border-b px-3 py-2">Lot no.</th>
             <th className="border-b px-3 py-2 text-right">Qty</th>
             <th className="border-b px-3 py-2">QC</th>
             <th className="border-b px-3 py-2">By</th>
@@ -388,6 +403,7 @@ export function ChemicalIntakeHistory() {
                 {i.receivedAt ? new Date(i.receivedAt).toLocaleDateString() : "—"}
               </td>
               <td className="px-3 py-2 font-medium">{i.materialName}</td>
+              <td className="px-3 py-2 text-zinc-600">{i.lotNo || "—"}</td>
               <td className="px-3 py-2 text-right tabular-nums">
                 {fmt(i.quantity)} {i.unit}
               </td>

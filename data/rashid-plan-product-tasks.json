@@ -7,7 +7,7 @@
       { "taskCode": "cap", "label": "Cap", "packagingItemCode": "rhino-caps" },
       { "taskCode": "bottle", "label": "250 ml bottle", "packagingItemCode": "bottle-rhino-250ml" },
       { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "rhino-stickers-250ml" },
-      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "rhino-stickers-250ml" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "rhino-stickers-250-ml-back" },
       { "taskCode": "string", "label": "String", "packagingItemCode": "rhino-string" },
       { "taskCode": "sticker-rs-199", "label": "Rs. 199 sticker", "packagingItemCode": "sticker-rs-199" },
       { "taskCode": "box", "label": "Box", "packagingItemCode": "rhino-boxes-250ml" },
@@ -160,7 +160,8 @@
       { "taskCode": "label-ocean", "label": "Label ocean", "packagingItemCode": "wash-out-label-ocean" },
       { "taskCode": "label-lemon", "label": "Label lemon", "packagingItemCode": "wash-out-label-lemon" },
       { "taskCode": "box", "label": "Box", "packagingItemCode": "wash-out-boxes" },
-      { "taskCode": "partition-big", "label": "Large partition", "packagingItemCode": "wash-out-partition" },
+      { "taskCode": "partition-big", "label": "Large partition", "packagingItemCode": "wash-out-big-partition" },
+      { "taskCode": "partition-small", "label": "Small partition", "packagingItemCode": "wash-out-small-partition" },
       { "taskCode": "filling", "label": "Filling bottles" }
     ]
   }

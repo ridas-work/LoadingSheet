@@ -63,6 +63,7 @@ export type SerializedChemicalIntake = {
   ph: string;
   solids: string;
   provider: string;
+  lotNo: string;
   receivedAt: string | null;
   recordedByName: string;
   createdAt: string | null;
@@ -120,6 +121,7 @@ export function serializeChemicalIntake(
     ph: String(d.ph ?? ""),
     solids: String(d.solids ?? ""),
     provider: String(d.provider ?? ""),
+    lotNo: String(d.lotNo ?? ""),
     receivedAt: d.receivedAt ? new Date(d.receivedAt).toISOString() : null,
     recordedByName: String(d.recordedByName ?? ""),
     createdAt: d.createdAt ? new Date(d.createdAt).toISOString() : null,

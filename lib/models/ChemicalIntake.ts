@@ -14,6 +14,7 @@ const ChemicalIntakeSchema = new mongoose.Schema(
     ph: { type: String, required: false, default: "", trim: true },
     solids: { type: String, required: false, default: "", trim: true },
     provider: { type: String, required: false, default: "", trim: true },
+    lotNo: { type: String, required: false, default: "", trim: true },
     receivedAt: { type: Date, required: true, default: () => new Date() },
     recordedByUserId: { type: String, required: false, default: "" },
     recordedByName: { type: String, required: true, trim: true },

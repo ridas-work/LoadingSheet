@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { ChemicalIntakeHistory } from "@/components/ChemicalIntakeForm";
 import { ChemicalMaterialsPortal } from "@/components/ChemicalMaterialsPortal";
 import { auth } from "@/lib/auth";
 import {
@@ -28,7 +29,7 @@ export default async function ChemicalInventoryPage() {
         <h1 className={ui.pageTitle}>Chemical raw materials</h1>
         <p className={ui.pageDesc}>
           {ramazan
-            ? "View stock on hand and request materials for re-order. Stock is updated by Esha after QC intake."
+            ? "Add materials to the catalog, update stock quantities, and request re-orders when needed."
             : admin
               ? "View catalog, adjust stock when needed, and review material requests."
               : "View chemical raw materials stock (read-only)."}
@@ -36,9 +37,16 @@ export default async function ChemicalInventoryPage() {
       </header>
       <ChemicalMaterialsPortal
         readOnly={!ramazan && !admin}
-        stockEditable={admin}
+        stockEditable={ramazan || admin}
         canRequest={ramazan}
+        canAddMaterial={ramazan || admin}
       />
+      {ramazan ? (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-zinc-900">Recent intakes</h2>
+          <ChemicalIntakeHistory />
+        </div>
+      ) : null}
     </div>
   );
 }

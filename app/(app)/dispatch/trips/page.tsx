@@ -3,13 +3,14 @@ import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
-import { isTripActiveForPlanner, normalizeGateStatus } from "@/lib/gateDelivery";
+import { isRashidActiveGateStatus, isTripActiveForPlanner, normalizeGateStatus } from "@/lib/gateDelivery";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
 import {
   canCreateDispatchTrips,
   canEditDispatch,
   homePathForRole,
+  isDispatchBatchOperator,
   isDispatchTripPlanner,
   roleFromSession,
 } from "@/lib/roles";
@@ -26,28 +27,44 @@ export default async function DispatchTripsPage() {
   const canEdit = canEditDispatch(role, username);
   const canCreate = canCreateDispatchTrips(role, username);
   const hideCompletedTrips = isDispatchTripPlanner(role, username) && role !== "admin";
+  const rashidView = isDispatchBatchOperator(role, username) && role !== "admin";
 
   const allTrips = await DispatchTrip.find({}).sort({ updatedAt: -1 }).lean();
   const allOrderIds = allTrips.flatMap((t) => t.orderIds ?? []);
   const orders =
     allOrderIds.length > 0
       ? await Order.find({ _id: { $in: allOrderIds } })
-          .select({ poNumber: 1, gateDeliveryStatus: 1 })
+          .select({ poNumber: 1, gateDeliveryStatus: 1, sheetLines: 1 })
           .lean()
       : [];
   const poById = new Map(orders.map((o) => [o._id.toString(), o.poNumber]));
-  const gateStatusByOrderId = new Map(
-    orders.map((o) => [o._id.toString(), normalizeGateStatus(o.gateDeliveryStatus)]),
+  const orderMetaById = new Map(
+    orders.map((o) => {
+      const lines = (o as { sheetLines?: Array<{ batchNo?: string }> }).sheetLines ?? [];
+      const total = lines.length;
+      const filled = lines.filter((l) => typeof l.batchNo === "string" && l.batchNo.trim().length > 0).length;
+      return [
+        o._id.toString(),
+        {
+          gateStatus: normalizeGateStatus(o.gateDeliveryStatus),
+          complete: total > 0 && filled === total,
+        },
+      ];
+    }),
   );
 
-  const trips = hideCompletedTrips
-    ? allTrips.filter((t) => {
-        const statuses = (t.orderIds ?? []).map((oid) =>
-          gateStatusByOrderId.get(oid.toString()),
-        ).filter((s): s is NonNullable<typeof s> => s !== undefined);
-        return isTripActiveForPlanner(statuses);
-      })
-    : allTrips;
+  const trips = allTrips.filter((t) => {
+    const meta = (t.orderIds ?? [])
+      .map((oid) => orderMetaById.get(oid.toString()))
+      .filter((m): m is NonNullable<typeof m> => m !== undefined);
+    if (hideCompletedTrips) {
+      return isTripActiveForPlanner(meta.map((m) => m.gateStatus));
+    }
+    if (rashidView) {
+      return meta.some((m) => isRashidActiveGateStatus(m.gateStatus) && !m.complete);
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -57,6 +74,8 @@ export default async function DispatchTripsPage() {
           <p className="mt-1 text-sm text-zinc-600">
             {canEdit
               ? "Group multiple POs on one vehicle. Enter vehicle and driver once; assign batches per PO on each loading sheet."
+              : rashidView
+                ? "Pending batch-assignment trips only — delivered/out-for-delivery and fully assigned trips are hidden."
               : hideCompletedTrips
                 ? "Active vehicle trips only — trips where every PO is out for delivery or delivered are hidden."
                 : "View vehicle trips and linked POs (read-only)."}
@@ -76,6 +95,8 @@ export default async function DispatchTripsPage() {
         <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
           {hideCompletedTrips
             ? "No active trips. Delivered and out-for-delivery trips are hidden — create a new trip from Orders when POs are ready."
+            : rashidView
+              ? "No pending trips. Trips with delivered/out-for-delivery POs or fully assigned batches are hidden."
             : "No trips yet. Create one to dispatch several POs on the same truck."}
         </p>
       ) : (

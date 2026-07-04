@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import { serializeChemicalMaterial, serializeChemicalRequest } from "@/lib/chemicalMaterials";
+import { canEditChemicalStock, serializeChemicalMaterial } from "@/lib/chemicalMaterials";
 import { adminAdjustStock } from "@/lib/chemicalStock";
 import { connectToDatabase } from "@/lib/db";
 import { ChemicalRawMaterial } from "@/lib/models/ChemicalRawMaterial";
@@ -15,7 +15,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const role = roleFromSession(session.user as { role?: string });
-  if (role !== "admin") {
+  if (!canEditChemicalStock(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -40,7 +40,7 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   }
 
   const userId = (session.user as { id?: string })?.id ?? "";
-  const userName = session.user.name ?? "Admin";
+  const userName = session.user.name ?? "User";
 
   const doc = await adminAdjustStock({
     materialCode,

@@ -5,8 +5,8 @@ import { AppNavLink } from "@/components/AppNavLink";
 import { auth } from "@/lib/auth";
 import {
   canAccessFieldVisits,
-  canRecordChemicalIntake,
   canViewAdminSummary,
+  canViewOrdersList,
   homePathForRole,
   isAdmin,
   isDispatchBatchOperator,
@@ -41,7 +41,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const fieldVisits = canAccessFieldVisits(role, username);
   const tripPlanner = isDispatchTripPlanner(role, username);
   const batchOperator = isDispatchBatchOperator(role, username);
-  const chemicalIntake = canRecordChemicalIntake(role);
   const wideLayout =
     admin ||
     summaryViewer ||
@@ -70,7 +69,6 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   <AppNavLink href="/admin/chemical-requests" label="Chemical requests" />
                   <AppNavLink href="/orders" label="Orders" />
                   <AppNavLink href="/production/batches" label="Batches" />
-                  <AppNavLink href="/production/chemical-intake" label="Chemical intake" />
                   <AppNavLink href="/dispatch/trips" label="Trips" />
                   <AppNavLink href="/dispatch/inventory" label="Packaging" />
                   <AppNavLink href="/dispatch/filling" label="Filling" />
@@ -90,11 +88,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   <AppNavLink href="/admin/delivery-summary" label="Delivered" />
                 </>
               ) : null}
-              {role !== "batch_editor" &&
-              role !== "gate_guard" &&
-              role !== "packaging_editor" &&
-              !admin &&
-              !(role === "dispatch_editor" && batchOperator) ? (
+              {canViewOrdersList(role, username) && !admin ? (
                 <AppNavLink href="/orders" label="Orders" />
               ) : null}
               {role === "batch_editor" ? (

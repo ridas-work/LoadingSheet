@@ -6,7 +6,7 @@ import { addIntakeToStock, resolveOrCreateMaterial } from "@/lib/chemicalStock";
 import { connectToDatabase } from "@/lib/db";
 import { ChemicalIntake } from "@/lib/models/ChemicalIntake";
 import { parseQcOutcomeBody } from "@/lib/productionBatchQc";
-import { canRecordChemicalIntake, roleFromSession } from "@/lib/roles";
+import { canRecordChemicalIntake, canViewChemicalMaterials, roleFromSession } from "@/lib/roles";
 
 export async function GET() {
   const session = await auth();
@@ -14,7 +14,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const role = roleFromSession(session.user as { role?: string });
-  if (!canRecordChemicalIntake(role)) {
+  if (!canViewChemicalMaterials(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -51,6 +51,7 @@ export async function POST(req: Request) {
   const ph = typeof body.ph === "string" ? body.ph.trim() : "";
   const solids = typeof body.solids === "string" ? body.solids.trim() : "";
   const provider = typeof body.provider === "string" ? body.provider.trim() : "";
+  const lotNo = typeof body.lotNo === "string" ? body.lotNo.trim() : "";
 
   if (!materialName && !materialCode) {
     return NextResponse.json({ error: "Material name or code is required." }, { status: 400 });
@@ -91,6 +92,7 @@ export async function POST(req: Request) {
     ph,
     solids,
     provider,
+    lotNo,
     receivedAt,
     recordedByUserId: userId,
     recordedByName: userName,

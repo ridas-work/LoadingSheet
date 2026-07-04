@@ -7,9 +7,11 @@ import { ui } from "@/lib/ui";
 
 type Props = {
   readOnly?: boolean;
-  /** Ramazan: request only, no stock edit. Admin: adjust stock. */
+  /** Ramazan / admin: edit stock on hand. */
   stockEditable?: boolean;
   canRequest?: boolean;
+  /** Ramazan / admin: add new catalog materials. */
+  canAddMaterial?: boolean;
 };
 
 function fmt(n: number) {
@@ -20,6 +22,7 @@ export function ChemicalMaterialsPortal({
   readOnly = false,
   stockEditable = false,
   canRequest = false,
+  canAddMaterial = false,
 }: Props) {
   const [materials, setMaterials] = useState<SerializedChemicalMaterial[]>([]);
   const [requests, setRequests] = useState<SerializedChemicalRequest[]>([]);
@@ -32,6 +35,12 @@ export function ChemicalMaterialsPortal({
   const [requestNote, setRequestNote] = useState("");
   const [requestError, setRequestError] = useState("");
   const [requestSaving, setRequestSaving] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addUnit, setAddUnit] = useState("kg");
+  const [addOnHand, setAddOnHand] = useState("");
+  const [addError, setAddError] = useState("");
+  const [addSaving, setAddSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,6 +103,36 @@ export function ChemicalMaterialsPortal({
     }
   }
 
+  async function submitAddMaterial(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canAddMaterial) return;
+    setAddSaving(true);
+    setAddError("");
+    try {
+      const res = await fetch("/api/chemical-materials", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: addName.trim(),
+          unit: addUnit.trim() || "kg",
+          onHand: addOnHand.trim() === "" ? 0 : Number(addOnHand),
+        }),
+      });
+      const data = (await res.json()) as { error?: string };
+      if (!res.ok) {
+        setAddError(data.error ?? "Could not add material.");
+        return;
+      }
+      setAddOpen(false);
+      setAddName("");
+      setAddUnit("kg");
+      setAddOnHand("");
+      await load();
+    } finally {
+      setAddSaving(false);
+    }
+  }
+
   async function submitRequest(e: React.FormEvent) {
     e.preventDefault();
     if (!requestModal) return;
@@ -140,6 +179,21 @@ export function ChemicalMaterialsPortal({
         <span className="text-sm text-zinc-500">
           {filtered.length} of {materials.length} materials
         </span>
+        {canAddMaterial ? (
+          <button
+            type="button"
+            onClick={() => {
+              setAddOpen(true);
+              setAddName("");
+              setAddUnit("kg");
+              setAddOnHand("");
+              setAddError("");
+            }}
+            className={ui.btnPrimary}
+          >
+            Add material
+          </button>
+        ) : null}
       </div>
 
       <div className={`${ui.card} overflow-x-auto p-0`}>
@@ -150,7 +204,7 @@ export function ChemicalMaterialsPortal({
               <th className="border-b border-zinc-200 px-3 py-2 text-right">Stock available</th>
               <th className="border-b border-zinc-200 px-3 py-2 w-16">Unit</th>
               {canRequest || stockEditable ? (
-                <th className="border-b border-zinc-200 px-3 py-2 w-28" />
+                <th className="border-b border-zinc-200 px-3 py-2 w-36" />
               ) : null}
             </tr>
           </thead>
@@ -181,28 +235,31 @@ export function ChemicalMaterialsPortal({
                 <td className="px-3 py-2 text-zinc-600">{m.unit}</td>
                 {canRequest || stockEditable ? (
                   <td className="px-3 py-2">
-                    {canRequest ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRequestModal(m);
-                          setRequestQty("");
-                          setRequestNote("");
-                          setRequestError("");
-                        }}
-                        className={ui.btnSecondarySm}
-                      >
-                        Request
-                      </button>
-                    ) : stockEditable ? (
-                      <button
-                        type="button"
-                        onClick={() => saveStock(m.code)}
-                        className={ui.btnSecondarySm}
-                      >
-                        Adjust
-                      </button>
-                    ) : null}
+                    <div className="flex flex-wrap gap-1">
+                      {canRequest ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRequestModal(m);
+                            setRequestQty("");
+                            setRequestNote("");
+                            setRequestError("");
+                          }}
+                          className={ui.btnSecondarySm}
+                        >
+                          Request
+                        </button>
+                      ) : null}
+                      {stockEditable ? (
+                        <button
+                          type="button"
+                          onClick={() => saveStock(m.code)}
+                          className={ui.btnSecondarySm}
+                        >
+                          Save
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                 ) : null}
               </tr>
@@ -240,6 +297,66 @@ export function ChemicalMaterialsPortal({
               </tbody>
             </table>
           </div>
+        </div>
+      ) : null}
+
+      {addOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <form
+            onSubmit={submitAddMaterial}
+            className={`${ui.card} w-full max-w-md space-y-4 p-4`}
+          >
+            <h3 className="text-base font-semibold text-zinc-900">Add material</h3>
+            <div>
+              <label className={ui.label} htmlFor="add-name">
+                Material name
+              </label>
+              <input
+                id="add-name"
+                required
+                value={addName}
+                onChange={(e) => setAddName(e.target.value)}
+                className={`${ui.input} mt-1`}
+                placeholder="e.g. Caustic soda"
+              />
+            </div>
+            <div>
+              <label className={ui.label} htmlFor="add-unit">
+                Unit
+              </label>
+              <input
+                id="add-unit"
+                value={addUnit}
+                onChange={(e) => setAddUnit(e.target.value)}
+                className={`${ui.input} mt-1`}
+                placeholder="kg"
+              />
+            </div>
+            <div>
+              <label className={ui.label} htmlFor="add-onhand">
+                Starting stock (optional)
+              </label>
+              <input
+                id="add-onhand"
+                type="number"
+                min={0}
+                step="any"
+                value={addOnHand}
+                onChange={(e) => setAddOnHand(e.target.value)}
+                className={`${ui.input} mt-1`}
+                placeholder="0"
+              />
+            </div>
+            {addError ? <p className="text-sm text-red-700">{addError}</p> : null}
+            <div className="flex gap-2">
+              <button type="submit" disabled={addSaving} className={ui.btnPrimary}>
+                {addSaving ? "Adding…" : "Add to catalog"}
+              </button>
+              <button type="button" onClick={() => setAddOpen(false)} className={ui.btnGhost}>
+                Cancel
+              </button>
+            </div>
+          </form>
         </div>
       ) : null}
 
