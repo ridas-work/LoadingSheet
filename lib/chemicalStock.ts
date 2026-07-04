@@ -1,4 +1,5 @@
 import { connectToDatabase } from "@/lib/db";
+import type { ChemicalMaterialKind } from "@/lib/chemicalMaterials";
 import type { ChemicalMaterialRequestDoc } from "@/lib/models/ChemicalMaterialRequest";
 import { ChemicalRawMaterial, type ChemicalRawMaterialDoc } from "@/lib/models/ChemicalRawMaterial";
 import { ChemicalStockMovement } from "@/lib/models/ChemicalStockMovement";
@@ -39,6 +40,7 @@ async function uniqueCode(base: string): Promise<string> {
 export async function resolveOrCreateMaterial(input: {
   materialCode?: string;
   materialName: string;
+  kind?: ChemicalMaterialKind;
   unit?: string;
 }): Promise<{ material: ChemicalRawMaterialDoc; created: boolean }> {
   await connectToDatabase();
@@ -47,6 +49,7 @@ export async function resolveOrCreateMaterial(input: {
     throw new Error("Material name is required.");
   }
 
+  const kind = input.kind ?? "chemical";
   const codeHint = input.materialCode?.trim().toLowerCase();
   if (codeHint) {
     const byCode = await ChemicalRawMaterial.findOne({ code: codeHint, active: true });
@@ -65,6 +68,7 @@ export async function resolveOrCreateMaterial(input: {
   const doc = await ChemicalRawMaterial.create({
     code,
     name,
+    kind,
     unit: input.unit?.trim() || "kg",
     onHand: 0,
     sortOrder: 9999,

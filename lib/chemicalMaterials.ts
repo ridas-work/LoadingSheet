@@ -28,9 +28,20 @@ export function canReviewChemicalRequests(role: AppRole | null): boolean {
 export type SerializedChemicalMaterial = {
   code: string;
   name: string;
+  kind: ChemicalMaterialKind;
   unit: string;
   onHand: number;
   sortOrder: number;
+};
+
+export type ChemicalMaterialKind = "chemical" | "accessory";
+
+export type ChemicalRequestAccessory = {
+  itemCode: string;
+  itemName: string;
+  quantityRequested: number;
+  unit: string;
+  onHandAtRequest: number;
 };
 
 export type SerializedChemicalRequest = {
@@ -40,6 +51,7 @@ export type SerializedChemicalRequest = {
   quantityRequested: number;
   unit: string;
   onHandAtRequest: number;
+  accessories: ChemicalRequestAccessory[];
   status: string;
   note: string;
   adminNote: string;
@@ -50,6 +62,23 @@ export type SerializedChemicalRequest = {
   orderedAt: string | null;
   createdAt: string | null;
 };
+
+export const CHEMICAL_ACCESSORIES = [
+  { code: "shoppers", name: "Shoppers", unit: "pcs" },
+  { code: "drums", name: "Drums", unit: "pcs" },
+  { code: "seals", name: "Seals", unit: "pcs" },
+] as const;
+
+export const CHEMICAL_ACCESSORY_CODES = CHEMICAL_ACCESSORIES.map((item) => item.code);
+
+export function normalizeChemicalMaterialKind(value: unknown): ChemicalMaterialKind {
+  return value === "accessory" ? "accessory" : "chemical";
+}
+
+export function findChemicalAccessory(code: string) {
+  const normalized = code.trim().toLowerCase();
+  return CHEMICAL_ACCESSORIES.find((item) => item.code === normalized) ?? null;
+}
 
 export type SerializedChemicalIntake = {
   id: string;
@@ -76,9 +105,24 @@ export function serializeChemicalMaterial(
   return {
     code: String(d.code ?? ""),
     name: String(d.name ?? ""),
+    kind: normalizeChemicalMaterialKind(d.kind),
     unit: String(d.unit ?? "kg"),
     onHand: typeof d.onHand === "number" && Number.isFinite(d.onHand) ? d.onHand : 0,
     sortOrder: typeof d.sortOrder === "number" ? d.sortOrder : 0,
+  };
+}
+
+function serializeChemicalRequestAccessory(input: unknown): ChemicalRequestAccessory | null {
+  const item = input as Partial<ChemicalRequestAccessory> | null;
+  if (!item) return null;
+  const itemCode = String(item.itemCode ?? "").trim().toLowerCase();
+  if (!itemCode) return null;
+  return {
+    itemCode,
+    itemName: String(item.itemName ?? ""),
+    quantityRequested: Number(item.quantityRequested) || 0,
+    unit: String(item.unit ?? "pcs"),
+    onHandAtRequest: Number(item.onHandAtRequest) || 0,
   };
 }
 
@@ -86,6 +130,9 @@ export function serializeChemicalRequest(
   doc: ChemicalMaterialRequestDoc | Record<string, unknown>,
 ): SerializedChemicalRequest {
   const d = doc as ChemicalMaterialRequestDoc;
+  const accessories = Array.isArray(d.accessories)
+    ? d.accessories.map((item) => serializeChemicalRequestAccessory(item)).filter((item) => !!item)
+    : [];
   return {
     id: String((d as { _id?: { toString(): string } })._id?.toString() ?? ""),
     materialCode: String(d.materialCode ?? ""),
@@ -93,6 +140,7 @@ export function serializeChemicalRequest(
     quantityRequested: Number(d.quantityRequested) || 0,
     unit: String(d.unit ?? "kg"),
     onHandAtRequest: Number(d.onHandAtRequest) || 0,
+    accessories,
     status: String(d.status ?? "pending"),
     note: String(d.note ?? ""),
     adminNote: String(d.adminNote ?? ""),

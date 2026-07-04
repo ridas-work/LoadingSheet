@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import {
   canEditChemicalStock,
   canViewChemicalMaterials,
+  normalizeChemicalMaterialKind,
   serializeChemicalMaterial,
 } from "@/lib/chemicalMaterials";
 import { adminAdjustStock, resolveOrCreateMaterial } from "@/lib/chemicalStock";
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
 
   const body = (await req.json().catch(() => null)) as {
     name?: unknown;
+    kind?: unknown;
     unit?: unknown;
     onHand?: unknown;
   } | null;
@@ -56,14 +58,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Material name is required." }, { status: 400 });
   }
 
-  const unit = typeof body.unit === "string" && body.unit.trim() ? body.unit.trim() : "kg";
+  const kind = normalizeChemicalMaterialKind(body.kind);
+  const defaultUnit = kind === "accessory" ? "pcs" : "kg";
+  const unit = typeof body.unit === "string" && body.unit.trim() ? body.unit.trim() : defaultUnit;
   const onHandRaw = body.onHand === undefined ? 0 : Number(body.onHand);
   if (!Number.isFinite(onHandRaw) || onHandRaw < 0) {
     return NextResponse.json({ error: "onHand must be a number ≥ 0." }, { status: 400 });
   }
 
   await connectToDatabase();
-  const { material, created } = await resolveOrCreateMaterial({ materialName: name, unit });
+  const { material, created } = await resolveOrCreateMaterial({ materialName: name, kind, unit });
 
   const userId = (session.user as { id?: string })?.id ?? "";
   const userName = session.user.name ?? "User";
