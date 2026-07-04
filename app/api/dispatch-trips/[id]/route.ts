@@ -10,6 +10,7 @@ import {
   trimDispatchBody,
 } from "@/lib/dispatchTripSync";
 import { connectToDatabase } from "@/lib/db";
+import { GATE_STATUS_LABELS, isRashidActiveGateStatus, normalizeGateStatus } from "@/lib/gateDelivery";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
 import { canDiscardDispatchTrip, canEditDispatchTrip, roleFromSession } from "@/lib/roles";
@@ -137,6 +138,20 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
   const trip = await DispatchTrip.findById(id);
   if (!trip) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const linkedOrders = await Order.find({ _id: { $in: trip.orderIds ?? [] } })
+    .select({ poNumber: 1, gateDeliveryStatus: 1 })
+    .lean();
+  const inactiveOrder = linkedOrders.find((order) => !isRashidActiveGateStatus(order.gateDeliveryStatus));
+  if (inactiveOrder) {
+    const status = normalizeGateStatus(inactiveOrder.gateDeliveryStatus);
+    return NextResponse.json(
+      {
+        error: `Cannot discard this trip because PO ${inactiveOrder.poNumber} is ${GATE_STATUS_LABELS[status]}. Linked POs must still be active at the factory.`,
+      },
+      { status: 400 },
+    );
   }
 
   await clearDispatchTripIdOnOrders(trip.orderIds ?? []);

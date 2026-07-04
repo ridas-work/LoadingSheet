@@ -123,9 +123,13 @@ export function DispatchTripForm({
     router.refresh();
   };
 
-  const onDelete = async () => {
+  const onDiscard = async () => {
     if (!tripId) return;
-    if (!window.confirm("Delete this trip? Linked orders will no longer show a vehicle trip.")) {
+    if (
+      !window.confirm(
+        "Discard this trip? Linked POs will return to available trip planning and no longer show this vehicle trip.",
+      )
+    ) {
       return;
     }
     setSaving(true);
@@ -133,7 +137,7 @@ export function DispatchTripForm({
     setSaving(false);
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      setError((data as { error?: string }).error ?? "Delete failed");
+      setError((data as { error?: string }).error ?? "Discard failed");
       return;
     }
     router.push("/dispatch/trips");
@@ -217,11 +221,11 @@ export function DispatchTripForm({
         {tripId ? (
           <button
             type="button"
-            onClick={onDelete}
+            onClick={onDiscard}
             disabled={saving}
             className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-red-700 shadow-sm ring-1 ring-red-200"
           >
-            Delete trip
+            Discard trip
           </button>
         ) : null}
       </div>
