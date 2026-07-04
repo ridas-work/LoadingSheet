@@ -153,6 +153,25 @@ function FooterField({
   );
 }
 
+const printTimestampFormatter = new Intl.DateTimeFormat("en-GB", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+function formatPrintedAt(date: Date) {
+  const parts = Object.fromEntries(
+    printTimestampFormatter.formatToParts(date).map((part) => [part.type, part.value]),
+  );
+  const dayPeriod = parts.dayPeriod ? ` ${parts.dayPeriod.toUpperCase()}` : "";
+
+  return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year}, ${parts.hour}:${parts.minute}${dayPeriod}`;
+}
+
 export function LoadingSheetBatchEditor({
   orderId,
   poNumber,
@@ -213,6 +232,7 @@ export function LoadingSheetBatchEditor({
   const [readyBatchLots, setReadyBatchLots] = useState<
     Array<{ batchNo: string; productCode: string; bottles: number; createdAt?: string | null }>
   >([]);
+  const [printedAt, setPrintedAt] = useState<Date | null>(null);
   const [cartonWeights, setCartonWeights] = useState<Record<number, string>>(() => {
     const initial: Record<number, string> = {};
     for (const line of sheetLines) {
@@ -614,6 +634,9 @@ export function LoadingSheetBatchEditor({
           <div className="flex gap-2 border-b border-zinc-300 py-1">
             <span className="font-semibold whitespace-nowrap">Date:</span>
             <span className="flex-1 border-b border-dotted border-zinc-400 print:border-black">{createdDate}</span>
+          </div>
+          <div className="text-xs text-zinc-500 md:col-span-2 print:text-[10px] print:text-black">
+            Printed: {printedAt ? formatPrintedAt(printedAt) : "Not printed yet"}
           </div>
           <HeaderField
             label="HELPER NAME:"
