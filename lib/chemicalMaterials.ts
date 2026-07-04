@@ -3,6 +3,7 @@ import type { ChemicalMaterialRequestDoc } from "@/lib/models/ChemicalMaterialRe
 import type { ChemicalRawMaterialDoc } from "@/lib/models/ChemicalRawMaterial";
 import {
   canReviewChemicalRequests as roleCanReview,
+  canEditChemicalAccessoryStock as roleCanEditAccessoryStock,
   canEditChemicalStock as roleCanEditStock,
   canViewChemicalMaterials as roleCanView,
   canRequestChemicalMaterials as roleCanRequest,
@@ -15,6 +16,10 @@ export function canViewChemicalMaterials(role: AppRole | null): boolean {
 
 export function canEditChemicalStock(role: AppRole | null): boolean {
   return roleCanEditStock(role);
+}
+
+export function canEditChemicalAccessoryStock(role: AppRole | null): boolean {
+  return roleCanEditAccessoryStock(role);
 }
 
 export function canRequestChemicalMaterials(role: AppRole | null): boolean {

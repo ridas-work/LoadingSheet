@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
-import { canEditChemicalStock, serializeChemicalMaterial } from "@/lib/chemicalMaterials";
+import {
+  canEditChemicalAccessoryStock,
+  canEditChemicalStock,
+  findChemicalAccessory,
+  serializeChemicalMaterial,
+} from "@/lib/chemicalMaterials";
 import { adminAdjustStock } from "@/lib/chemicalStock";
 import { connectToDatabase } from "@/lib/db";
 import { ChemicalRawMaterial } from "@/lib/models/ChemicalRawMaterial";
@@ -15,9 +20,6 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const role = roleFromSession(session.user as { role?: string });
-  if (!canEditChemicalStock(role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const { code } = await ctx.params;
   const materialCode = code.trim().toLowerCase();
@@ -37,6 +39,10 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   const exists = await ChemicalRawMaterial.findOne({ code: materialCode, active: true }).lean();
   if (!exists) {
     return NextResponse.json({ error: "Material not found." }, { status: 404 });
+  }
+  const fixedAccessory = exists.kind === "accessory" && !!findChemicalAccessory(materialCode);
+  if (!canEditChemicalStock(role) && !(fixedAccessory && canEditChemicalAccessoryStock(role))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const userId = (session.user as { id?: string })?.id ?? "";

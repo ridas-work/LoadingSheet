@@ -160,6 +160,11 @@ export function canEditChemicalStock(role: AppRole | null): boolean {
   return role === "chemicals_editor" || role === "admin";
 }
 
+/** Esha can maintain packing/accessory stock without opening chemical stock edits. */
+export function canEditChemicalAccessoryStock(role: AppRole | null): boolean {
+  return role === "batch_editor" || role === "admin";
+}
+
 /** Esha only — record QC intake on incoming chemicals. */
 export function canRecordChemicalIntake(role: AppRole | null): boolean {
   return role === "batch_editor";

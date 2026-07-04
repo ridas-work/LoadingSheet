@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { SerializedChemicalIntake, SerializedChemicalMaterial } from "@/lib/chemicalMaterials";
+import {
+  CHEMICAL_ACCESSORIES,
+  type SerializedChemicalIntake,
+  type SerializedChemicalMaterial,
+} from "@/lib/chemicalMaterials";
 import type { QcOutcomeInput } from "@/lib/productionBatchQc";
 import { ui } from "@/lib/ui";
 
@@ -33,7 +37,7 @@ export function ChemicalIntakeForm({ onSaved }: { onSaved?: () => void }) {
     const res = await fetch("/api/chemical-materials", { credentials: "same-origin" });
     if (res.ok) {
       const data = (await res.json()) as { materials?: SerializedChemicalMaterial[] };
-      setMaterials(data.materials ?? []);
+      setMaterials((data.materials ?? []).filter((material) => material.kind !== "accessory"));
     }
   }, []);
 
@@ -351,6 +355,163 @@ export function ChemicalIntakeForm({ onSaved }: { onSaved?: () => void }) {
         {saving ? "Saving…" : "Save intake"}
       </button>
     </form>
+  );
+}
+
+export function AccessoryStockCard() {
+  const [materials, setMaterials] = useState<SerializedChemicalMaterial[]>([]);
+  const [stockDraft, setStockDraft] = useState<Record<string, string>>({});
+  const [stockStatus, setStockStatus] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  const loadMaterials = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/chemical-materials", { credentials: "same-origin" });
+      if (!res.ok) {
+        throw new Error("Could not load accessory stock.");
+      }
+      const data = (await res.json()) as { materials?: SerializedChemicalMaterial[] };
+      const accessories = (data.materials ?? []).filter((material) => material.kind === "accessory");
+      const draft: Record<string, string> = {};
+      for (const item of CHEMICAL_ACCESSORIES) {
+        const material = accessories.find((m) => m.code === item.code);
+        draft[item.code] = material ? String(material.onHand) : "";
+      }
+      setMaterials(accessories);
+      setStockDraft(draft);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load accessory stock.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadMaterials();
+  }, [loadMaterials]);
+
+  const materialByCode = useMemo(() => {
+    const map = new Map<string, SerializedChemicalMaterial>();
+    for (const material of materials) map.set(material.code, material);
+    return map;
+  }, [materials]);
+
+  async function saveAccessoryStock(item: (typeof CHEMICAL_ACCESSORIES)[number]) {
+    const onHand = Number(stockDraft[item.code]);
+    if (!Number.isFinite(onHand) || onHand < 0) {
+      setStockStatus((prev) => ({ ...prev, [item.code]: "error" }));
+      setError(`${item.name} stock must be 0 or more.`);
+      return;
+    }
+
+    const existing = materialByCode.get(item.code);
+    setStockStatus((prev) => ({ ...prev, [item.code]: "saving" }));
+    setError("");
+    const res = await fetch(
+      existing ? `/api/chemical-materials/${encodeURIComponent(item.code)}` : "/api/chemical-materials",
+      {
+        method: existing ? "PATCH" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          existing
+            ? { onHand, note: "Accessory stock update" }
+            : { name: item.name, kind: "accessory", unit: item.unit, onHand },
+        ),
+      },
+    );
+    const data = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      material?: SerializedChemicalMaterial;
+    };
+    if (!res.ok || !data.material) {
+      setStockStatus((prev) => ({ ...prev, [item.code]: "error" }));
+      setError(data.error ?? `Could not save ${item.name} stock.`);
+      return;
+    }
+
+    const savedMaterial = data.material;
+    setMaterials((prev) => {
+      const exists = prev.some((material) => material.code === savedMaterial.code);
+      if (exists) {
+        return prev.map((material) =>
+          material.code === savedMaterial.code ? savedMaterial : material,
+        );
+      }
+      return [...prev, savedMaterial];
+    });
+    setStockDraft((prev) => ({ ...prev, [item.code]: String(savedMaterial.onHand) }));
+    setStockStatus((prev) => ({ ...prev, [item.code]: "saved" }));
+    setTimeout(() => setStockStatus((prev) => ({ ...prev, [item.code]: "" })), 1200);
+  }
+
+  return (
+    <section className={`${ui.card} space-y-3 p-4`}>
+      <div>
+        <h2 className="text-sm font-semibold text-zinc-900">Accessory stock</h2>
+        <p className="mt-1 text-sm text-zinc-600">
+          Update Shoppers, Drums, and Seals stock for chemical requests. Unit: pcs.
+        </p>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-zinc-600">Loading accessory stock…</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[520px] border-collapse text-sm">
+            <thead>
+              <tr className="bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                <th className="border-b border-zinc-200 px-3 py-2">Item</th>
+                <th className="border-b border-zinc-200 px-3 py-2 text-right">Stock now</th>
+                <th className="border-b border-zinc-200 px-3 py-2 w-16">Unit</th>
+                <th className="border-b border-zinc-200 px-3 py-2 w-24" />
+              </tr>
+            </thead>
+            <tbody>
+              {CHEMICAL_ACCESSORIES.map((item) => {
+                const material = materialByCode.get(item.code);
+                return (
+                  <tr key={item.code} className="border-b border-zinc-100">
+                    <td className="px-3 py-2 font-medium text-zinc-900">{item.name}</td>
+                    <td className="px-3 py-2 text-right">
+                      <input
+                        type="number"
+                        min={0}
+                        step="1"
+                        value={stockDraft[item.code] ?? ""}
+                        onChange={(e) =>
+                          setStockDraft((prev) => ({ ...prev, [item.code]: e.target.value }))
+                        }
+                        onBlur={() => saveAccessoryStock(item)}
+                        className="w-28 rounded border border-zinc-200 px-2 py-1 text-right text-sm tabular-nums"
+                        placeholder={material ? undefined : "0"}
+                      />
+                      {stockStatus[item.code] === "saved" ? (
+                        <span className="ml-1 text-xs text-emerald-700">✓</span>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-zinc-600">{item.unit}</td>
+                    <td className="px-3 py-2">
+                      <button
+                        type="button"
+                        onClick={() => saveAccessoryStock(item)}
+                        disabled={stockStatus[item.code] === "saving"}
+                        className={ui.btnSecondarySm}
+                      >
+                        Save
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+    </section>
   );
 }
 

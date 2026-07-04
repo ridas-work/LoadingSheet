@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import {
+  CHEMICAL_ACCESSORIES,
+  canEditChemicalAccessoryStock,
   canEditChemicalStock,
   canViewChemicalMaterials,
   normalizeChemicalMaterialKind,
@@ -39,9 +41,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const role = roleFromSession(session.user as { role?: string });
-  if (!canEditChemicalStock(role)) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const body = (await req.json().catch(() => null)) as {
     name?: unknown;
@@ -59,15 +58,36 @@ export async function POST(req: Request) {
   }
 
   const kind = normalizeChemicalMaterialKind(body.kind);
+  if (!canEditChemicalStock(role) && !(kind === "accessory" && canEditChemicalAccessoryStock(role))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const accessoryDefinition =
+    kind === "accessory"
+      ? CHEMICAL_ACCESSORIES.find(
+          (item) =>
+            item.code === name.toLowerCase() || item.name.toLowerCase() === name.toLowerCase(),
+        )
+      : null;
+  if (kind === "accessory" && !accessoryDefinition) {
+    return NextResponse.json(
+      { error: "Only Shoppers, Drums, and Seals can be added as accessory stock." },
+      { status: 400 },
+    );
+  }
+
   const defaultUnit = kind === "accessory" ? "pcs" : "kg";
-  const unit = typeof body.unit === "string" && body.unit.trim() ? body.unit.trim() : defaultUnit;
+  const unit =
+    accessoryDefinition?.unit ??
+    (typeof body.unit === "string" && body.unit.trim() ? body.unit.trim() : defaultUnit);
+  const materialName = accessoryDefinition?.name ?? name;
   const onHandRaw = body.onHand === undefined ? 0 : Number(body.onHand);
   if (!Number.isFinite(onHandRaw) || onHandRaw < 0) {
     return NextResponse.json({ error: "onHand must be a number ≥ 0." }, { status: 400 });
   }
 
   await connectToDatabase();
-  const { material, created } = await resolveOrCreateMaterial({ materialName: name, kind, unit });
+  const { material, created } = await resolveOrCreateMaterial({ materialName, kind, unit });
 
   const userId = (session.user as { id?: string })?.id ?? "";
   const userName = session.user.name ?? "User";

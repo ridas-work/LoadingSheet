@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { AccessoryStockCard } from "@/components/ChemicalIntakeForm";
 import { ChemicalIntakePanel } from "@/components/ChemicalIntakePanel";
 import { auth } from "@/lib/auth";
 import { canRecordChemicalIntake, homePathForRole, roleFromSession } from "@/lib/roles";
@@ -28,6 +29,7 @@ export default async function ChemicalIntakePage() {
         </p>
       </header>
 
+      <AccessoryStockCard />
       <ChemicalIntakePanel />
     </div>
   );
