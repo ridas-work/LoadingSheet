@@ -18,7 +18,7 @@ Phase **45 complete** — print timestamp, Ali trip control, and chemical access
 
 ## Next planned
 - Phase 45 is complete.
-- Remaining validation cleanup is outside this phase: resolve the untracked manual generator `docx` dependency before requiring full `npm run build` to pass.
+- Human UAT remains for print preview timing and authenticated role workflows.
 
 ## Decisions
 - Print timestamp is local client metadata only and is not persisted to order data.
@@ -36,7 +36,7 @@ Phase **45 complete** — print timestamp, Ali trip control, and chemical access
 - Waleed's approval UI compares loaded chemical and accessory stock before enabling approval, while the API remains authoritative.
 
 ## Concerns / blockers
-- `npm run build` is currently blocked by unrelated untracked `scripts/generate-user-manual-docx.ts` importing missing `docx`.
+- No automated Phase 45 code gaps found. Verifier status is `human_needed` for browser print preview and live role-flow checks.
 - `npm run lint` currently fails on pre-existing repository-wide React hook and TypeScript lint issues outside the plan 02 touched files.
 - Full ESLint still reports existing `react-hooks/set-state-in-effect` patterns in touched chemical UI components when that repository-wide rule is enabled.
 

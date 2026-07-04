@@ -16,5 +16,14 @@ Executable plans:
 - `.planning/phases/44-esha-chemical-qc-intake/03-PLAN.md` — Esha UI, Ramazan read-only, Waleed shortage UI
 - `.planning/phases/44-esha-chemical-qc-intake/44-VERIFICATION.md`
 
+## Phase 45: Print timestamp, Ali trip control, and chemical accessories ✓
+Loading sheets should print the live day/time when printed. Ali is the only dispatch user allowed to create, edit, or discard vehicle trips; Rashid keeps batch/weight/filling work only. Esha tracks stock for shoppers, drums, and seals. Ramazan can optionally request those accessories alongside a chemical request, and Waleed approval is blocked when either chemical stock or requested accessory stock is below the requested requirement.
+
+Executable plans:
+- `.planning/phases/45-print-trip-accessory-stock/01-PLAN.md` — loading-sheet print timestamp
+- `.planning/phases/45-print-trip-accessory-stock/02-PLAN.md` — Ali-only trip create/edit/discard authority
+- `.planning/phases/45-print-trip-accessory-stock/03-PLAN.md` — accessory stock/request schema and approval guards
+- `.planning/phases/45-print-trip-accessory-stock/04-PLAN.md` — Esha/Ramazan/Waleed accessory UI
+
 ## Phase 39: Glim bulk fill (planned)
 No production batch on loading sheet for Glim bulk lines.
