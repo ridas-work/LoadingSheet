@@ -515,6 +515,14 @@ export function LoadingSheetBatchEditor({
     });
   }, []);
 
+  useEffect(() => {
+    window.addEventListener("beforeprint", updatePrintedAt);
+
+    return () => {
+      window.removeEventListener("beforeprint", updatePrintedAt);
+    };
+  }, [updatePrintedAt]);
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
