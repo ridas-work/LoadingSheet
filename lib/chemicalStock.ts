@@ -1,3 +1,5 @@
+import mongoose from "mongoose";
+
 import { connectToDatabase } from "@/lib/db";
 import type { ChemicalMaterialKind } from "@/lib/chemicalMaterials";
 import type { ChemicalMaterialRequestDoc } from "@/lib/models/ChemicalMaterialRequest";
@@ -14,6 +16,22 @@ export type StockShortageError = {
   error: string;
   onHand: number;
   requested: number;
+  unit: string;
+  shortages: StockShortageLine[];
+};
+
+export type StockShortageLine = {
+  itemCode: string;
+  itemName: string;
+  requested: number;
+  onHand: number;
+  unit: string;
+};
+
+type RequestedStockLine = {
+  itemCode: string;
+  itemName: string;
+  quantityRequested: number;
   unit: string;
 };
 
@@ -77,22 +95,119 @@ export async function resolveOrCreateMaterial(input: {
   return { material: doc, created: true };
 }
 
+function requestStockLines(request: ChemicalMaterialRequestDoc): RequestedStockLine[] {
+  const lines: RequestedStockLine[] = [
+    {
+      itemCode: String(request.materialCode).toLowerCase(),
+      itemName: String(request.materialName),
+      quantityRequested: Number(request.quantityRequested),
+      unit: String(request.unit ?? "kg"),
+    },
+  ];
+
+  const accessories = Array.isArray(request.accessories) ? request.accessories : [];
+  for (const item of accessories) {
+    const itemCode = String(item.itemCode ?? "").trim().toLowerCase();
+    const quantityRequested = Number(item.quantityRequested);
+    if (!itemCode || !Number.isFinite(quantityRequested) || quantityRequested <= 0) continue;
+    lines.push({
+      itemCode,
+      itemName: String(item.itemName ?? itemCode),
+      quantityRequested,
+      unit: String(item.unit ?? "pcs"),
+    });
+  }
+
+  return lines;
+}
+
+function aggregateStockLines(lines: RequestedStockLine[]): RequestedStockLine[] {
+  const byCode = new Map<string, RequestedStockLine>();
+  for (const line of lines) {
+    const itemCode = line.itemCode.trim().toLowerCase();
+    const quantityRequested = Number(line.quantityRequested);
+    if (!itemCode || !Number.isFinite(quantityRequested) || quantityRequested <= 0) continue;
+    const existing = byCode.get(itemCode);
+    if (existing) {
+      existing.quantityRequested += quantityRequested;
+    } else {
+      byCode.set(itemCode, { ...line, itemCode, quantityRequested });
+    }
+  }
+  return Array.from(byCode.values());
+}
+
+export function formatStockShortageError(shortages: StockShortageLine[]): string {
+  if (shortages.length === 0) {
+    return "Cannot approve - insufficient stock.";
+  }
+  return shortages
+    .map(
+      (item) =>
+        `Cannot approve - ${item.itemName} stock is less. On hand: ${item.onHand} ${item.unit}, requested: ${item.requested} ${item.unit}.`,
+    )
+    .join(" ");
+}
+
 export function validateStockForApprove(
-  material: { onHand?: number | null; unit?: string | null },
+  material: { code?: string | null; name?: string | null; onHand?: number | null; unit?: string | null },
   quantityRequested: number,
 ): { ok: true } | StockShortageError {
   const onHand =
     typeof material.onHand === "number" && Number.isFinite(material.onHand) ? material.onHand : 0;
   const unit = material.unit ?? "kg";
   if (onHand < quantityRequested) {
-    return {
-      ok: false,
-      error: `Cannot approve — insufficient stock. On hand: ${onHand} ${unit}, requested: ${quantityRequested} ${unit}. Record a new intake (Esha) or adjust stock first.`,
+    const shortage = {
+      itemCode: material.code ?? "",
+      itemName: material.name ?? "Chemical",
       onHand,
       requested: quantityRequested,
       unit,
     };
+    return {
+      ok: false,
+      error: formatStockShortageError([shortage]),
+      onHand,
+      requested: quantityRequested,
+      unit,
+      shortages: [shortage],
+    };
   }
+  return { ok: true };
+}
+
+export async function validateRequestStockForApprove(
+  request: ChemicalMaterialRequestDoc,
+): Promise<{ ok: true } | { ok: false; error: string; shortages: StockShortageLine[] }> {
+  await connectToDatabase();
+  const lines = aggregateStockLines(requestStockLines(request));
+  const materials = await ChemicalRawMaterial.find({
+    code: { $in: lines.map((line) => line.itemCode) },
+    active: true,
+  }).lean();
+  const byCode = new Map(materials.map((material) => [String(material.code), material]));
+  const shortages: StockShortageLine[] = [];
+
+  for (const line of lines) {
+    const material = byCode.get(line.itemCode);
+    const onHand =
+      typeof material?.onHand === "number" && Number.isFinite(material.onHand) ? material.onHand : 0;
+    const unit = String(material?.unit ?? line.unit);
+    if (onHand < line.quantityRequested) {
+      shortages.push({
+        itemCode: line.itemCode,
+        itemName: line.itemName,
+        requested: line.quantityRequested,
+        onHand,
+        unit,
+      });
+    }
+  }
+
+  if (shortages.length > 0) {
+    return { ok: false, error: formatStockShortageError(shortages), shortages };
+  }
+
   return { ok: true };
 }
 
@@ -104,8 +219,9 @@ async function logMovement(input: {
   referenceId?: string;
   note?: string;
   actor: StockActor;
+  session?: mongoose.ClientSession;
 }) {
-  await ChemicalStockMovement.create({
+  const doc = {
     materialCode: input.materialCode,
     movementType: input.movementType,
     quantityDelta: input.quantityDelta,
@@ -114,7 +230,12 @@ async function logMovement(input: {
     note: input.note ?? "",
     recordedByUserId: input.actor.userId ?? "",
     recordedByName: input.actor.name,
-  });
+  };
+  if (input.session) {
+    await ChemicalStockMovement.create([doc], { session: input.session });
+  } else {
+    await ChemicalStockMovement.create(doc);
+  }
 }
 
 export async function addIntakeToStock(input: {
@@ -145,38 +266,170 @@ export async function addIntakeToStock(input: {
   return updated;
 }
 
+async function currentShortageForLine(
+  line: RequestedStockLine,
+  session?: mongoose.ClientSession,
+): Promise<StockShortageLine> {
+  const query = ChemicalRawMaterial.findOne({ code: line.itemCode, active: true }).lean();
+  if (session) query.session(session);
+  const current = await query;
+  const onHand =
+    typeof current?.onHand === "number" && Number.isFinite(current.onHand) ? current.onHand : 0;
+  return {
+    itemCode: line.itemCode,
+    itemName: line.itemName,
+    requested: line.quantityRequested,
+    onHand,
+    unit: String(current?.unit ?? line.unit),
+  };
+}
+
+async function deductStockLines(input: {
+  lines: RequestedStockLine[];
+  actor: StockActor;
+  referenceId: string;
+  session?: mongoose.ClientSession;
+}): Promise<ChemicalRawMaterialDoc[]> {
+  const deducted: { line: RequestedStockLine; material: ChemicalRawMaterialDoc }[] = [];
+  for (const line of input.lines) {
+    const material = await ChemicalRawMaterial.findOneAndUpdate(
+      { code: line.itemCode, active: true, onHand: { $gte: line.quantityRequested } },
+      { $inc: { onHand: -line.quantityRequested } },
+      { new: true, session: input.session },
+    );
+    if (!material) {
+      const shortage = await currentShortageForLine(line, input.session);
+      throw new Error(formatStockShortageError([shortage]));
+    }
+    deducted.push({ line, material });
+  }
+
+  for (const item of deducted) {
+    await logMovement({
+      materialCode: item.line.itemCode,
+      movementType: "request_approved",
+      quantityDelta: -item.line.quantityRequested,
+      onHandAfter: item.material.onHand ?? 0,
+      referenceId: input.referenceId,
+      actor: input.actor,
+      session: input.session,
+    });
+  }
+
+  return deducted.map((item) => item.material);
+}
+
+async function deductStockLinesWithRollback(input: {
+  lines: RequestedStockLine[];
+  actor: StockActor;
+  referenceId: string;
+}): Promise<ChemicalRawMaterialDoc[]> {
+  const deducted: { line: RequestedStockLine; material: ChemicalRawMaterialDoc }[] = [];
+  try {
+    for (const line of input.lines) {
+      const material = await ChemicalRawMaterial.findOneAndUpdate(
+        { code: line.itemCode, active: true, onHand: { $gte: line.quantityRequested } },
+        { $inc: { onHand: -line.quantityRequested } },
+        { new: true },
+      );
+      if (!material) {
+        const shortage = await currentShortageForLine(line);
+        throw new Error(formatStockShortageError([shortage]));
+      }
+      deducted.push({ line, material });
+    }
+
+    for (const item of deducted) {
+      await logMovement({
+        materialCode: item.line.itemCode,
+        movementType: "request_approved",
+        quantityDelta: -item.line.quantityRequested,
+        onHandAfter: item.material.onHand ?? 0,
+        referenceId: input.referenceId,
+        actor: input.actor,
+      });
+    }
+
+    return deducted.map((item) => item.material);
+  } catch (e) {
+    for (const item of deducted.reverse()) {
+      await ChemicalRawMaterial.findOneAndUpdate(
+        { code: item.line.itemCode, active: true },
+        { $inc: { onHand: item.line.quantityRequested } },
+      );
+    }
+    throw e;
+  }
+}
+
+function findPrimaryDeductedMaterial(
+  request: ChemicalMaterialRequestDoc,
+  materials: ChemicalRawMaterialDoc[],
+): ChemicalRawMaterialDoc {
+  const code = String(request.materialCode).toLowerCase();
+  const material = materials.find((item) => item.code === code);
+  if (!material) {
+    throw new Error("Could not deduct stock for approved request.");
+  }
+  return material;
+}
+
+function isTransactionUnsupportedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message.includes("Transaction numbers are only allowed") ||
+    message.includes("transactions are not supported") ||
+    message.includes("Transaction not supported") ||
+    message.includes("This MongoDB deployment does not support retryable writes")
+  );
+}
+
 export async function deductForApprovedRequest(input: {
   request: ChemicalMaterialRequestDoc;
   actor: StockActor;
-}): Promise<{ material: ChemicalRawMaterialDoc; request: ChemicalMaterialRequestDoc }> {
+}): Promise<{
+  material: ChemicalRawMaterialDoc;
+  materials: ChemicalRawMaterialDoc[];
+  request: ChemicalMaterialRequestDoc;
+}> {
   await connectToDatabase();
-  const qty = Number(input.request.quantityRequested);
-  const code = String(input.request.materialCode).toLowerCase();
-
-  const material = await ChemicalRawMaterial.findOneAndUpdate(
-    { code, active: true, onHand: { $gte: qty } },
-    { $inc: { onHand: -qty } },
-    { new: true },
-  );
-  if (!material) {
-    const current = await ChemicalRawMaterial.findOne({ code, active: true }).lean();
-    const check = validateStockForApprove(current ?? { onHand: 0 }, qty);
-    if (!check.ok) {
-      throw new Error(check.error);
-    }
-    throw new Error("Could not deduct stock for approved request.");
+  const check = await validateRequestStockForApprove(input.request);
+  if (!check.ok) {
+    throw new Error(check.error);
   }
 
-  await logMovement({
-    materialCode: code,
-    movementType: "request_approved",
-    quantityDelta: -qty,
-    onHandAfter: material.onHand ?? 0,
-    referenceId: String(input.request._id),
-    actor: input.actor,
-  });
+  const lines = aggregateStockLines(requestStockLines(input.request));
+  const referenceId = String(input.request._id);
 
-  return { material, request: input.request };
+  const session = await mongoose.startSession();
+  try {
+    let updated: ChemicalRawMaterialDoc[] = [];
+    await session.withTransaction(async () => {
+      updated = await deductStockLines({ lines, actor: input.actor, referenceId, session });
+    });
+    return {
+      material: findPrimaryDeductedMaterial(input.request, updated),
+      materials: updated,
+      request: input.request,
+    };
+  } catch (e) {
+    if (!isTransactionUnsupportedError(e)) {
+      throw e;
+    }
+  } finally {
+    await session.endSession();
+  }
+
+  const updated = await deductStockLinesWithRollback({
+    lines,
+    actor: input.actor,
+    referenceId,
+  });
+  return {
+    material: findPrimaryDeductedMaterial(input.request, updated),
+    materials: updated,
+    request: input.request,
+  };
 }
 
 export async function adminAdjustStock(input: {
