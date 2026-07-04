@@ -31,7 +31,6 @@ function formatAccessorySummary(accessories: ChemicalRequestAccessory[]) {
 }
 
 export function ChemicalMaterialsPortal({
-  readOnly = false,
   stockEditable = false,
   canRequest = false,
   canAddMaterial = false,

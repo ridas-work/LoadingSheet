@@ -62,7 +62,7 @@ export function ChemicalIntakeForm({ onSaved }: { onSaved?: () => void }) {
     setUnit(m.unit);
   }
 
-  function useNewName() {
+  function clearSelectedMaterial() {
     setSelectedCode("");
     setSearch("");
   }
@@ -201,7 +201,7 @@ export function ChemicalIntakeForm({ onSaved }: { onSaved?: () => void }) {
           value={newName}
           onChange={(e) => {
             setNewName(e.target.value);
-            useNewName();
+            clearSelectedMaterial();
           }}
           placeholder="If not in catalog, type name here"
           className={`${ui.input} mt-1`}
@@ -366,8 +366,6 @@ export function AccessoryStockCard() {
   const [loading, setLoading] = useState(true);
 
   const loadMaterials = useCallback(async () => {
-    setLoading(true);
-    setError("");
     try {
       const res = await fetch("/api/chemical-materials", { credentials: "same-origin" });
       if (!res.ok) {
