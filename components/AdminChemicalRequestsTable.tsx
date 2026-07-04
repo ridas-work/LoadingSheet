@@ -2,8 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { SerializedChemicalMaterial, SerializedChemicalRequest } from "@/lib/chemicalMaterials";
+import type {
+  ChemicalRequestAccessory,
+  SerializedChemicalMaterial,
+  SerializedChemicalRequest,
+} from "@/lib/chemicalMaterials";
 import { ui } from "@/lib/ui";
+
+function fmt(n: number) {
+  return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
 
 function statusBadge(status: string) {
   switch (status) {
@@ -20,6 +28,42 @@ function statusBadge(status: string) {
   }
 }
 
+type RequestStockLine = {
+  itemCode: string;
+  itemName: string;
+  requested: number;
+  unit: string;
+  onHandAtRequest: number;
+};
+
+function accessorySummary(accessories: ChemicalRequestAccessory[]) {
+  const items = accessories
+    .filter((item) => item.quantityRequested > 0)
+    .map((item) => `${fmt(item.quantityRequested)} ${item.itemName || item.itemCode}`);
+  return items.length > 0 ? items.join(", ") : "";
+}
+
+function requestStockLines(request: SerializedChemicalRequest): RequestStockLine[] {
+  return [
+    {
+      itemCode: request.materialCode,
+      itemName: request.materialName,
+      requested: request.quantityRequested,
+      unit: request.unit,
+      onHandAtRequest: request.onHandAtRequest,
+    },
+    ...request.accessories
+      .filter((item) => item.quantityRequested > 0)
+      .map((item) => ({
+        itemCode: item.itemCode,
+        itemName: item.itemName || item.itemCode,
+        requested: item.quantityRequested,
+        unit: item.unit,
+        onHandAtRequest: item.onHandAtRequest,
+      })),
+  ];
+}
+
 export function AdminChemicalRequestsTable() {
   const [tab, setTab] = useState<"pending" | "all">("pending");
   const [requests, setRequests] = useState<SerializedChemicalRequest[]>([]);
@@ -28,9 +72,9 @@ export function AdminChemicalRequestsTable() {
   const [acting, setActing] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  const onHandByCode = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const m of materials) map.set(m.code, m.onHand);
+  const materialByCode = useMemo(() => {
+    const map = new Map<string, SerializedChemicalMaterial>();
+    for (const m of materials) map.set(m.code, m);
     return map;
   }, [materials]);
 
@@ -48,10 +92,9 @@ export function AdminChemicalRequestsTable() {
       if (!reqRes.ok) throw new Error("Could not load requests");
       const reqData = (await reqRes.json()) as { requests?: SerializedChemicalRequest[] };
       setRequests(reqData.requests ?? []);
-      if (matRes.ok) {
-        const matData = (await matRes.json()) as { materials?: SerializedChemicalMaterial[] };
-        setMaterials(matData.materials ?? []);
-      }
+      if (!matRes.ok) throw new Error("Could not load current stock");
+      const matData = (await matRes.json()) as { materials?: SerializedChemicalMaterial[] };
+      setMaterials(matData.materials ?? []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
     } finally {
@@ -124,11 +167,20 @@ export function AdminChemicalRequestsTable() {
             </thead>
             <tbody>
               {requests.map((r) => {
-                const onHand = onHandByCode.get(r.materialCode) ?? null;
-                const shortage =
-                  r.status === "pending" &&
-                  onHand != null &&
-                  onHand < r.quantityRequested;
+                const stockLines = requestStockLines(r);
+                const accessoryLines = stockLines.slice(1);
+                const shortageLines =
+                  r.status === "pending"
+                    ? stockLines
+                        .map((line) => {
+                          const material = materialByCode.get(line.itemCode);
+                          if (!material || material.onHand >= line.requested) return null;
+                          return { ...line, onHand: material.onHand };
+                        })
+                        .filter((line) => line != null)
+                    : [];
+                const chemicalStock = materialByCode.get(r.materialCode);
+                const shortage = shortageLines.length > 0;
                 return (
                   <tr
                     key={r.id}
@@ -136,27 +188,64 @@ export function AdminChemicalRequestsTable() {
                   >
                     <td className="px-3 py-2">
                       <div className="font-medium">{r.materialName}</div>
+                      {accessorySummary(r.accessories) ? (
+                        <div className="text-xs text-zinc-600">
+                          Accessories: {accessorySummary(r.accessories)}
+                        </div>
+                      ) : null}
                       {r.note ? <div className="text-xs text-zinc-500">{r.note}</div> : null}
                       {shortage ? (
                         <div className="text-xs font-medium text-red-800">
-                          Insufficient stock to approve
+                          Insufficient stock:{" "}
+                          {shortageLines
+                            .map(
+                              (line) =>
+                                `${line.itemName} stock is less (${fmt(line.onHand)} ${line.unit} on hand, ${fmt(line.requested)} ${line.unit} requested)`,
+                            )
+                            .join("; ")}
                         </div>
                       ) : null}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">
-                      {r.quantityRequested.toLocaleString()} {r.unit}
+                      {fmt(r.quantityRequested)} {r.unit}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">
-                      {onHand != null ? (
-                        <span className={shortage ? "font-semibold text-red-800" : "text-zinc-900"}>
-                          {onHand.toLocaleString()} {r.unit}
-                        </span>
+                      {chemicalStock ? (
+                        <div
+                          className={
+                            chemicalStock.onHand < r.quantityRequested && r.status === "pending"
+                              ? "font-semibold text-red-800"
+                              : "text-zinc-900"
+                          }
+                        >
+                          {fmt(chemicalStock.onHand)} {r.unit}
+                        </div>
                       ) : (
                         <span className="text-zinc-400">—</span>
                       )}
+                      {accessoryLines.map((line) => {
+                        const material = materialByCode.get(line.itemCode);
+                        const lineShortage =
+                          r.status === "pending" && material && material.onHand < line.requested;
+                        return (
+                          <div
+                            key={line.itemCode}
+                            className={`text-xs ${lineShortage ? "font-semibold text-red-800" : "text-zinc-600"}`}
+                          >
+                            {line.itemName}: {material ? fmt(material.onHand) : "—"} {line.unit}
+                          </div>
+                        );
+                      })}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums text-zinc-600">
-                      {r.onHandAtRequest.toLocaleString()} {r.unit}
+                      <div>
+                        {fmt(r.onHandAtRequest)} {r.unit}
+                      </div>
+                      {accessoryLines.map((line) => (
+                        <div key={line.itemCode} className="text-xs">
+                          {line.itemName}: {fmt(line.onHandAtRequest)} {line.unit}
+                        </div>
+                      ))}
                     </td>
                     <td className="px-3 py-2">{r.requestedByName}</td>
                     <td className="px-3 py-2">{statusBadge(r.status)}</td>
@@ -166,7 +255,7 @@ export function AdminChemicalRequestsTable() {
                           <>
                             <button
                               type="button"
-                              disabled={acting === r.id}
+                              disabled={acting === r.id || shortage}
                               onClick={() => act(r.id, "approve")}
                               className={ui.btnPrimaryXs}
                             >
