@@ -2,10 +2,9 @@ import { NextResponse } from "next/server";
 
 import { auth } from "@/lib/auth";
 import { serializeChemicalRequest } from "@/lib/chemicalMaterials";
-import { deductForApprovedRequest, validateStockForApprove } from "@/lib/chemicalStock";
+import { deductForApprovedRequest, validateRequestStockForApprove } from "@/lib/chemicalStock";
 import { connectToDatabase } from "@/lib/db";
 import { ChemicalMaterialRequest } from "@/lib/models/ChemicalMaterialRequest";
-import { ChemicalRawMaterial } from "@/lib/models/ChemicalRawMaterial";
 import type { ChemicalRequestStatus } from "@/lib/models/ChemicalMaterialRequest";
 import { isAdmin, roleFromSession } from "@/lib/roles";
 
@@ -57,20 +56,10 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   let onHandAfter: number | undefined;
 
   if (nextStatus === "approved") {
-    const material = await ChemicalRawMaterial.findOne({
-      code: doc.materialCode,
-      active: true,
-    }).lean();
-    if (!material) {
-      return NextResponse.json({ error: "Material not found in catalog." }, { status: 404 });
-    }
-    const check = validateStockForApprove(
-      { onHand: material.onHand ?? 0, unit: material.unit ?? "kg" },
-      doc.quantityRequested,
-    );
+    const check = await validateRequestStockForApprove(doc);
     if (!check.ok) {
       return NextResponse.json(
-        { error: check.error, onHand: check.onHand, requested: check.requested },
+        { error: check.error, shortages: check.shortages },
         { status: 400 },
       );
     }
