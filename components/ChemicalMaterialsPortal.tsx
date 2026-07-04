@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { SerializedChemicalMaterial, SerializedChemicalRequest } from "@/lib/chemicalMaterials";
+import {
+  CHEMICAL_ACCESSORIES,
+  type ChemicalRequestAccessory,
+  type SerializedChemicalMaterial,
+  type SerializedChemicalRequest,
+} from "@/lib/chemicalMaterials";
 import { ui } from "@/lib/ui";
 
 type Props = {
@@ -16,6 +21,13 @@ type Props = {
 
 function fmt(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function formatAccessorySummary(accessories: ChemicalRequestAccessory[]) {
+  const summary = accessories
+    .filter((item) => item.quantityRequested > 0)
+    .map((item) => `${fmt(item.quantityRequested)} ${item.itemName || item.itemCode}`);
+  return summary.length > 0 ? summary.join(", ") : "";
 }
 
 export function ChemicalMaterialsPortal({
@@ -32,6 +44,7 @@ export function ChemicalMaterialsPortal({
   const [loading, setLoading] = useState(true);
   const [requestModal, setRequestModal] = useState<SerializedChemicalMaterial | null>(null);
   const [requestQty, setRequestQty] = useState("");
+  const [requestAccessories, setRequestAccessories] = useState<Record<string, string>>({});
   const [requestNote, setRequestNote] = useState("");
   const [requestError, setRequestError] = useState("");
   const [requestSaving, setRequestSaving] = useState(false);
@@ -53,7 +66,7 @@ export function ChemicalMaterialsPortal({
       ]);
       if (matRes.ok) {
         const data = (await matRes.json()) as { materials?: SerializedChemicalMaterial[] };
-        const list = data.materials ?? [];
+        const list = (data.materials ?? []).filter((material) => material.kind !== "accessory");
         setMaterials(list);
         const draft: Record<string, string> = {};
         for (const m of list) draft[m.code] = String(m.onHand);
@@ -138,6 +151,10 @@ export function ChemicalMaterialsPortal({
     if (!requestModal) return;
     setRequestSaving(true);
     setRequestError("");
+    const accessories = CHEMICAL_ACCESSORIES.map((item) => ({
+      itemCode: item.code,
+      quantityRequested: Number(requestAccessories[item.code]) || 0,
+    })).filter((item) => item.quantityRequested > 0);
     try {
       const res = await fetch("/api/chemical-material-requests", {
         method: "POST",
@@ -145,6 +162,7 @@ export function ChemicalMaterialsPortal({
         body: JSON.stringify({
           materialCode: requestModal.code,
           quantityRequested: Number(requestQty) || 0,
+          accessories,
           note: requestNote.trim(),
         }),
       });
@@ -155,6 +173,7 @@ export function ChemicalMaterialsPortal({
       }
       setRequestModal(null);
       setRequestQty("");
+      setRequestAccessories({});
       setRequestNote("");
       await load();
     } finally {
@@ -242,6 +261,7 @@ export function ChemicalMaterialsPortal({
                           onClick={() => {
                             setRequestModal(m);
                             setRequestQty("");
+                            setRequestAccessories({});
                             setRequestNote("");
                             setRequestError("");
                           }}
@@ -284,7 +304,14 @@ export function ChemicalMaterialsPortal({
               <tbody>
                 {requests.slice(0, 20).map((r) => (
                   <tr key={r.id} className="border-t border-zinc-100">
-                    <td className="py-2 pr-2">{r.materialName}</td>
+                    <td className="py-2 pr-2">
+                      <div>{r.materialName}</div>
+                      {formatAccessorySummary(r.accessories) ? (
+                        <div className="text-xs text-zinc-500">
+                          Accessories: {formatAccessorySummary(r.accessories)}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="py-2 pr-2 text-right tabular-nums">
                       {fmt(r.quantityRequested)} {r.unit}
                     </td>
@@ -398,6 +425,41 @@ export function ChemicalMaterialsPortal({
                 placeholder="Urgency or supplier hint"
               />
             </div>
+            <fieldset className="space-y-3 rounded-lg border border-zinc-200 p-3">
+              <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                Optional packing/accessories
+              </legend>
+              <p className="text-xs text-zinc-500">
+                Only fill these if needed for this chemical request.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                {CHEMICAL_ACCESSORIES.map((item) => (
+                  <div key={item.code}>
+                    <label className={ui.label} htmlFor={`req-accessory-${item.code}`}>
+                      {item.name}
+                    </label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        id={`req-accessory-${item.code}`}
+                        type="number"
+                        min={0}
+                        step="1"
+                        value={requestAccessories[item.code] ?? ""}
+                        onChange={(e) =>
+                          setRequestAccessories((prev) => ({
+                            ...prev,
+                            [item.code]: e.target.value,
+                          }))
+                        }
+                        className={ui.input}
+                        placeholder="0"
+                      />
+                      <span className="text-xs text-zinc-500">{item.unit}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </fieldset>
             {requestError ? <p className="text-sm text-red-700">{requestError}</p> : null}
             <div className="flex gap-2">
               <button type="submit" disabled={requestSaving} className={ui.btnPrimary}>
