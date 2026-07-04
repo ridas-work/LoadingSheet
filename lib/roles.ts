@@ -97,13 +97,17 @@ export function canViewOrdersList(role: AppRole | null, username?: string | null
 }
 
 export function canCreateDispatchTrips(role: AppRole | null, username?: string | null): boolean {
-  if (role !== "dispatch_editor") return false;
-  return (username?.toLowerCase().trim() ?? "") === DISPATCH_TRIP_PLANNER_USERNAME;
+  return isDispatchTripPlanner(role, username);
 }
 
-/** Ali (trip planner), Rashid, or admin — edit vehicle/driver and PO list on a dispatch trip. */
+/** Ali (trip planner) or admin — edit vehicle/driver and PO list on a dispatch trip. */
 export function canEditDispatchTrip(role: AppRole | null, username?: string | null): boolean {
-  return isAdmin(role) || role === "dispatch_editor";
+  return isDispatchTripPlanner(role, username);
+}
+
+/** Ali (trip planner) or admin — discard a vehicle trip before it leaves the factory. */
+export function canDiscardDispatchTrip(role: AppRole | null, username?: string | null): boolean {
+  return isDispatchTripPlanner(role, username);
 }
 
 export function canAssignDispatchBatches(role: AppRole | null, username?: string | null): boolean {
