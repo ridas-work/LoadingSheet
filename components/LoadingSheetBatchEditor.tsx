@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 
 import { PrintCartonLabelsButton } from "@/components/PrintCartonLabelsButton";
 import {
@@ -508,6 +509,11 @@ export function LoadingSheetBatchEditor({
   const showVehicleInputs = showDispatchInputs && !onTrip && !batchesLocked;
   const showBatchInputs = showDispatchInputs && !batchesLocked;
   const showWeightInputs = showDispatchInputs;
+  const updatePrintedAt = useCallback(() => {
+    flushSync(() => {
+      setPrintedAt(new Date());
+    });
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -557,7 +563,7 @@ export function LoadingSheetBatchEditor({
             customerName={customerName}
             labels={printableCartonLabels}
           />
-          <PrintSheetButton />
+          <PrintSheetButton onBeforePrint={updatePrintedAt} />
         </div>
       </div>
 
