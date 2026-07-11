@@ -5,6 +5,13 @@ import { ProductPacking } from "@/lib/models/ProductPacking";
 
 export type NimraBatchKind = "standard" | "custom_box";
 
+export type UnifiedBatchProductGroup = "dispatch" | "custom";
+
+export type UnifiedBatchProductOption = {
+  name: string;
+  group: UnifiedBatchProductGroup;
+};
+
 export function nimraProductKey(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, " ");
 }
@@ -50,6 +57,50 @@ export async function listStandardBatchFamilies(): Promise<string[]> {
     families.push(family);
   }
   return families.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+/** All products Esha can pick — dispatch families plus custom/drum catalog. */
+export async function listUnifiedBatchProductOptions(): Promise<UnifiedBatchProductOption[]> {
+  const customNames = await listCustomBoxBatchProductNames();
+  const customKeys = new Set(customNames.map((n) => nimraProductKey(n)));
+  const dispatchFamilies = await listStandardBatchFamilies();
+
+  const options: UnifiedBatchProductOption[] = [];
+  for (const name of dispatchFamilies) {
+    if (customKeys.has(nimraProductKey(name))) continue;
+    options.push({ name, group: "dispatch" });
+  }
+  for (const name of customNames) {
+    options.push({ name, group: "custom" });
+  }
+  return options;
+}
+
+export async function isCustomBoxBatchProduct(resolvedName: string): Promise<boolean> {
+  const hit = await resolveCustomBoxBatchProduct(resolvedName);
+  return hit !== null && nimraProductKey(hit) === nimraProductKey(resolvedName);
+}
+
+export async function inferBatchKindForProduct(resolvedName: string): Promise<NimraBatchKind> {
+  return (await isCustomBoxBatchProduct(resolvedName)) ? "custom_box" : "standard";
+}
+
+export async function resolveUnifiedBatchProduct(productInput: string): Promise<string | null> {
+  const custom = await resolveCustomBoxBatchProduct(productInput);
+  if (custom) return custom;
+
+  const trimmed = productInput.trim();
+  if (!trimmed) return null;
+
+  await connectToDatabase();
+  const hit = await ProductPacking.findOne({
+    active: true,
+    $or: [{ batchFamily: trimmed }, { name: trimmed }, { aliases: trimmed }],
+  }).lean();
+
+  if (!hit) return null;
+  const family = hit.batchFamily?.trim();
+  return family || hit.name;
 }
 
 export async function resolveCustomBoxBatchProduct(productInput: string): Promise<string | null> {

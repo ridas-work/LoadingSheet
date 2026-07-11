@@ -22,7 +22,18 @@ export function batchProgress(
           ? lineBatchCompleteWithReady(l, catalog, readyByBox)
           : lineBatchComplete(l, catalog),
       ).length
-    : lines.filter((l) => typeof l.batchNo === "string" && l.batchNo.trim().length > 0).length;
+    : lines.filter((l) => {
+        if (l.lineKind === "mixed_sample") {
+          const components = l.componentBatches ?? [];
+          const expected = l.mixedContents?.length ?? 0;
+          return (
+            expected > 0 &&
+            components.length >= expected &&
+            components.slice(0, expected).every((c) => c.batchNo?.trim())
+          );
+        }
+        return typeof l.batchNo === "string" && l.batchNo.trim().length > 0;
+      }).length;
   return { filled, total, complete: total > 0 && filled === total };
 }
 

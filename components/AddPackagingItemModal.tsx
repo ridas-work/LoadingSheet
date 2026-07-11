@@ -89,7 +89,7 @@ export function AddPackagingItemModal() {
           >
             <h2 className="text-lg font-bold text-slate-900">Add packaging material</h2>
             <p className={`${ui.pageDesc} mt-1`}>
-              Manually register bottles, caps, boxes, or other packaging Haider tracks. Code is optional
+              Manually register bottles, caps, boxes, or other packaging items. Code is optional
               — leave blank to auto-generate from the name.
             </p>
 

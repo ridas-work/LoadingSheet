@@ -11,6 +11,7 @@ import {
   type SampleMode,
   type SerializedTicket,
 } from "@/lib/fieldVisitTickets";
+import { formatDisplayDate } from "@/lib/dateOnly";
 
 type SampleStockLine = {
   productName: string;
@@ -24,6 +25,16 @@ const FEEDBACK_OPTIONS = [
   { value: "disliked", label: "Did not like" },
   { value: "neutral", label: "Neutral" },
 ] as const;
+
+function customerDirectoryError(name: string, directory: { name: string }[]): string {
+  if (!name.trim()) return "Customer name is required.";
+  if (directory.length === 0) return "";
+  const key = name.trim().toLowerCase();
+  if (!directory.some((c) => c.name.trim().toLowerCase() === key)) {
+    return "Pick a customer from the approved list only. New accounts must be opened and approved first.";
+  }
+  return "";
+}
 
 async function patchTicket(id: string, body: Record<string, unknown>) {
   const res = await fetch(`/api/field-visits/${id}`, {
@@ -52,6 +63,7 @@ export function FieldVisitDetailForm({ id, readOnly }: { id: string; readOnly?: 
   const [placeName, setPlaceName] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [city, setCity] = useState("");
+  const [directory, setDirectory] = useState<Array<{ code: string; name: string; city?: string }>>([]);
   const [contactPhone, setContactPhone] = useState("");
   const [contactPerson, setContactPerson] = useState("");
   const [notes, setNotes] = useState("");
@@ -105,6 +117,31 @@ export function FieldVisitDetailForm({ id, readOnly }: { id: string; readOnly?: 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/customer-directory", { credentials: "same-origin" });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          customers?: Array<{ code: string; name: string; city?: string }>;
+        };
+        if (!cancelled) setDirectory(Array.isArray(data.customers) ? data.customers : []);
+      } catch {
+        if (!cancelled) setDirectory([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function onCustomerNameChange(value: string) {
+    setCustomerName(value);
+    const match = directory.find((c) => c.name.toLowerCase() === value.trim().toLowerCase());
+    if (match?.city && !city.trim()) setCity(match.city);
+  }
 
   async function runAction(body: Record<string, unknown>, success?: string) {
     setBusy(true);
@@ -188,11 +225,13 @@ export function FieldVisitDetailForm({ id, readOnly }: { id: string; readOnly?: 
   const canAct = !readOnly && ticket.status === "active";
   const canOutcome = !readOnly && ticket.status === "visit_concluded";
   const canMarkLostActive = !readOnly && ticket.status === "active" && ticket.visitLogCount >= 1;
+  const sampleApproval = ticket.sampleApprovalStatus;
   const canRequestSample =
-    !readOnly && ticket.allowedActions.includes("request_sample_approval");
+    canAct &&
+    sampleMode !== "none" &&
+    (sampleApproval === "none" || sampleApproval === "rejected");
   const canRecordSample =
     !readOnly && ticket.allowedActions.includes("record_sample_event");
-  const sampleApproval = ticket.sampleApprovalStatus;
 
   return (
     <div className="space-y-6">
@@ -242,10 +281,20 @@ export function FieldVisitDetailForm({ id, readOnly }: { id: string; readOnly?: 
               <label className="block text-sm font-medium text-zinc-800">Customer name *</label>
               <input
                 value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+                list="fv-customer-directory-options"
+                onChange={(e) => onCustomerNameChange(e.target.value)}
                 disabled={!canAct}
                 className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm disabled:bg-zinc-50"
               />
+              <datalist id="fv-customer-directory-options">
+                {directory.map((c) => (
+                  <option key={c.code} value={c.name} />
+                ))}
+              </datalist>
+              <p className="mt-1 text-xs text-zinc-500">
+                Choose from the approved list only — new customers must be opened as an account and
+                approved by admin first.
+              </p>
               {errors.customerName ? (
                 <p className="mt-1 text-sm text-red-700">{errors.customerName}</p>
               ) : null}
@@ -292,7 +341,12 @@ export function FieldVisitDetailForm({ id, readOnly }: { id: string; readOnly?: 
             <button
               type="button"
               disabled={busy}
-              onClick={() =>
+              onClick={() => {
+                const customerErr = customerDirectoryError(customerName, directory);
+                if (customerErr) {
+                  setErrors({ customerName: customerErr });
+                  return;
+                }
                 runAction(
                   {
                     action: "update_profile",
@@ -306,8 +360,8 @@ export function FieldVisitDetailForm({ id, readOnly }: { id: string; readOnly?: 
                     sampleProducts: sampleProductsPayload(),
                   },
                   "Customer details saved.",
-                )
-              }
+                );
+              }}
               className="mt-3 rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               Save customer details
@@ -406,7 +460,10 @@ export function FieldVisitDetailForm({ id, readOnly }: { id: string; readOnly?: 
                   <div className="rounded-lg border border-sky-100 bg-sky-50 p-3 space-y-2">
                     <p className="text-xs text-sky-950">
                       <strong>Step 1 — Request sample:</strong> Sends full details to Waleed for approval.
-                      You can record delivery and customer reaction after he approves.
+                      {sampleMode === "outgoing"
+                        ? " After Waleed approves, Rashid assigns sample batches — the bottle count is deducted from Esha’s sample production stock at that point, not now. "
+                        : " "}
+                      Record delivery and customer reaction after he approves.
                     </p>
                     <button
                       type="button"
@@ -417,6 +474,11 @@ export function FieldVisitDetailForm({ id, readOnly }: { id: string; readOnly?: 
                             placeName: !placeName.trim() ? "Place / shop name is required." : "",
                             customerName: !customerName.trim() ? "Customer name is required." : "",
                           });
+                          return;
+                        }
+                        const customerErr = customerDirectoryError(customerName, directory);
+                        if (customerErr) {
+                          setErrors({ customerName: customerErr });
                           return;
                         }
                         void runAction(
@@ -514,8 +576,8 @@ export function FieldVisitDetailForm({ id, readOnly }: { id: string; readOnly?: 
                 {ticket.sampleDeliveredAt || ticket.sampleReceivedAt ? (
                   <p className="text-xs text-zinc-500">
                     {ticket.sampleDeliveredAt
-                      ? `Delivered ${new Date(ticket.sampleDeliveredAt).toLocaleDateString()}`
-                      : `Received ${ticket.sampleReceivedAt ? new Date(ticket.sampleReceivedAt).toLocaleDateString() : ""}`}
+                      ? `Delivered ${formatDisplayDate(ticket.sampleDeliveredAt)}`
+                      : `Received ${ticket.sampleReceivedAt ? formatDisplayDate(ticket.sampleReceivedAt) : ""}`}
                   </p>
                 ) : null}
               </>
@@ -535,7 +597,7 @@ export function FieldVisitDetailForm({ id, readOnly }: { id: string; readOnly?: 
             {ticket.visitLogs.map((log) => (
               <li key={log.id || log.recordedAt} className="rounded-lg border border-zinc-100 bg-zinc-50 p-3">
                 <p className="text-xs font-medium text-zinc-500">
-                  {log.visitDate ? new Date(log.visitDate).toLocaleDateString() : "—"}
+                  {log.visitDate ? formatDisplayDate(log.visitDate) : "—"}
                   {log.recordedByName ? ` · ${log.recordedByName}` : ""}
                 </p>
                 <p className="mt-1 text-sm text-zinc-800">{log.conclusion}</p>
@@ -637,18 +699,6 @@ export function FieldVisitDetailForm({ id, readOnly }: { id: string; readOnly?: 
           >
             Submit final conclusion
           </button>
-        </section>
-      ) : null}
-
-      {canOutcome ? (
-        <section className="rounded-xl border border-zinc-200 bg-white p-4 space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-900">Order outcome</h2>
-          <Link
-            href={`/new-order?visitTicketId=${ticket.id}&customerName=${encodeURIComponent(ticket.customerName)}&city=${encodeURIComponent(ticket.city)}`}
-            className="inline-block rounded-lg bg-emerald-700 px-3 py-2 text-sm font-medium text-white"
-          >
-            Create PO (+10 points on save)
-          </Link>
         </section>
       ) : null}
 

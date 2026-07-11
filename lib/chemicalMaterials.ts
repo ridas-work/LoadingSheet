@@ -68,13 +68,44 @@ export type SerializedChemicalRequest = {
   createdAt: string | null;
 };
 
-export const CHEMICAL_ACCESSORIES = [
-  { code: "shoppers", name: "Shoppers", unit: "pcs" },
-  { code: "drums", name: "Drums", unit: "pcs" },
-  { code: "seals", name: "Seals", unit: "pcs" },
-] as const;
+export type ChemicalAccessoryCategory = "drums" | "shoppers" | "seals";
+
+export type ChemicalAccessoryDefinition = {
+  code: string;
+  name: string;
+  unit: "pcs";
+  category: ChemicalAccessoryCategory;
+};
+
+export const CHEMICAL_ACCESSORY_CATEGORIES: { id: ChemicalAccessoryCategory; label: string }[] = [
+  { id: "drums", label: "Drums" },
+  { id: "shoppers", label: "Shoppers" },
+  { id: "seals", label: "Seals" },
+];
+
+export const CHEMICAL_ACCESSORIES: readonly ChemicalAccessoryDefinition[] = [
+  { code: "drum-25l", name: "25 litre drum", unit: "pcs", category: "drums" },
+  { code: "drum-100l", name: "100 litre drum", unit: "pcs", category: "drums" },
+  { code: "drum-115l", name: "115 litre drum", unit: "pcs", category: "drums" },
+  { code: "drum-150l", name: "150 litre drum", unit: "pcs", category: "drums" },
+  { code: "drum-200l", name: "200 litre drum", unit: "pcs", category: "drums" },
+  { code: "drum-215l", name: "215 litre drum", unit: "pcs", category: "drums" },
+  { code: "shopper-40x60", name: "40 × 60", unit: "pcs", category: "shoppers" },
+  { code: "shopper-25x40", name: "25 × 40", unit: "pcs", category: "shoppers" },
+  { code: "seal-plastic", name: "Plastic seals", unit: "pcs", category: "seals" },
+  { code: "seal-steel", name: "Steel seals", unit: "pcs", category: "seals" },
+  { code: "seal-lock", name: "Lock seals", unit: "pcs", category: "seals" },
+  { code: "seal-tile", name: "Tile seals", unit: "pcs", category: "seals" },
+];
+
+/** Retired generic rows — kept for migration only. */
+export const LEGACY_CHEMICAL_ACCESSORY_CODES = ["shoppers", "drums", "seals"] as const;
 
 export const CHEMICAL_ACCESSORY_CODES = CHEMICAL_ACCESSORIES.map((item) => item.code);
+
+export function chemicalAccessoriesByCategory(category: ChemicalAccessoryCategory) {
+  return CHEMICAL_ACCESSORIES.filter((item) => item.category === category);
+}
 
 export function normalizeChemicalMaterialKind(value: unknown): ChemicalMaterialKind {
   return value === "accessory" ? "accessory" : "chemical";

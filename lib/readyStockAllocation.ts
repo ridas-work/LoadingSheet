@@ -325,19 +325,35 @@ export function formatReadyBatchLabels(batchNos: string[]): string {
   return unique.join(" / ");
 }
 
+export type ReadyAllocationSharedState = {
+  remaining: Map<string, number>;
+  lotPools: Map<string, LotPoolEntry[]>;
+};
+
+export function createReadyAllocationSharedState(
+  onHandByProductCode: Map<string, number> | Record<string, number>,
+  batchLots: ReadyBatchLotInput[] | undefined,
+  catalog: DeductionPacking[],
+): ReadyAllocationSharedState {
+  return {
+    remaining: stockMap(onHandByProductCode),
+    lotPools: buildLotPools(batchLots, catalog),
+  };
+}
+
 export function allocateReadyStockToLines(
   sheetLines: DeductionSheetLine[],
   catalog: DeductionPacking[],
   onHandByProductCode: Map<string, number> | Record<string, number>,
   batchLots?: ReadyBatchLotInput[],
+  sharedState?: ReadyAllocationSharedState,
 ): {
   byBoxNo: Map<number, LineReadySplit>;
   productSummary: ProductReadySummary[];
   lotDeductions: ReadyLotDeduction[];
 } {
-  const onHand = stockMap(onHandByProductCode);
-  const remaining = new Map(onHand);
-  const lotPools = buildLotPools(batchLots, catalog);
+  const remaining = sharedState?.remaining ?? new Map(stockMap(onHandByProductCode));
+  const lotPools = sharedState?.lotPools ?? buildLotPools(batchLots, catalog);
   const byBoxNo = new Map<number, LineReadySplit>();
   const productTotals = new Map<string, ProductReadySummary>();
   const lotDeductions: ReadyLotDeduction[] = [];

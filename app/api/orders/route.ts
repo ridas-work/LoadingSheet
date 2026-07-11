@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
-import mongoose from "mongoose";
 
 import { auth } from "@/lib/auth";
+import { validateApprovedCustomerName, mergeOrderFilter } from "@/lib/customerAccountAccess";
 import { connectToDatabase } from "@/lib/db";
-import { closeTicketWon, canEditFieldVisit, isFieldVisitRep } from "@/lib/fieldVisitTickets";
-import { FieldVisitTicket } from "@/lib/models/FieldVisitTicket";
 import { Order } from "@/lib/models/Order";
 import { initialApprovalStatusForPoCreator } from "@/lib/orderApproval";
 import { notDiscardedOrdersMongoFilter } from "@/lib/orderDiscard";
+import { poCreatorOrdersMongoFilter } from "@/lib/orderAccess";
 import { parseOrderBody, type OrderBody } from "@/lib/orderPayload";
 import { roleFromSession } from "@/lib/roles";
 
@@ -23,7 +22,14 @@ export async function GET() {
 
   await connectToDatabase();
 
-  const orders = await Order.find(notDiscardedOrdersMongoFilter())
+  const userId = (session.user as { id?: string }).id;
+  const filter = await mergeOrderFilter(
+    role === "po_creator" && userId
+      ? poCreatorOrdersMongoFilter(userId)
+      : notDiscardedOrdersMongoFilter(),
+  );
+
+  const orders = await Order.find(filter)
     .sort({ createdAt: -1 })
     .select("_id poNumber customerName createdAt sheetLines")
     .lean();
@@ -70,9 +76,13 @@ export async function POST(req: Request) {
   }
 
   const { payload } = parsed;
-  const username = (session.user as { username?: string })?.username;
 
   await connectToDatabase();
+
+  const customerCheck = await validateApprovedCustomerName(payload.customerName);
+  if (!customerCheck.ok) {
+    return NextResponse.json({ errors: { customerName: customerCheck.error } }, { status: 400 });
+  }
 
   const existing = await Order.findOne({
     poNumber: payload.poNumber.trim(),
@@ -88,51 +98,6 @@ export async function POST(req: Request) {
       },
       { status: 400 },
     );
-  }
-
-  let visitTicket = null;
-  if (payload.visitTicketId) {
-    if (!isFieldVisitRep(username)) {
-      return NextResponse.json(
-        { errors: { visitTicketId: "Only field reps can link a visit ticket." } },
-        { status: 403 },
-      );
-    }
-    if (!mongoose.Types.ObjectId.isValid(payload.visitTicketId)) {
-      return NextResponse.json(
-        { errors: { visitTicketId: "Invalid visit ticket id." } },
-        { status: 400 },
-      );
-    }
-    visitTicket = await FieldVisitTicket.findById(payload.visitTicketId);
-    if (!visitTicket) {
-      return NextResponse.json(
-        { errors: { visitTicketId: "Visit ticket not found." } },
-        { status: 400 },
-      );
-    }
-    if (!canEditFieldVisit(roleFromSession(session.user as { role?: string }), username, visitTicket, userId)) {
-      return NextResponse.json(
-        { errors: { visitTicketId: "You can only link visit tickets you have access to." } },
-        { status: 403 },
-      );
-    }
-    if (visitTicket.status !== "visit_concluded") {
-      return NextResponse.json(
-        {
-          errors: {
-            visitTicketId: "Visit must be concluded before creating a PO from it.",
-          },
-        },
-        { status: 400 },
-      );
-    }
-    if (visitTicket.linkedOrderId) {
-      return NextResponse.json(
-        { errors: { visitTicketId: "This visit ticket is already linked to an order." } },
-        { status: 400 },
-      );
-    }
   }
 
   const approvalStatus = initialApprovalStatusForPoCreator();
@@ -153,28 +118,5 @@ export async function POST(req: Request) {
     approvalRequestedAt: approvalStatus === "pending" ? now : null,
   });
 
-  if (visitTicket) {
-    try {
-      await closeTicketWon(visitTicket, created._id, payload.poNumber);
-    } catch (e) {
-      await Order.findByIdAndDelete(created._id);
-      return NextResponse.json(
-        {
-          errors: {
-            visitTicketId: e instanceof Error ? e.message : "Could not link visit ticket.",
-          },
-        },
-        { status: 400 },
-      );
-    }
-  }
-
-  return NextResponse.json(
-    {
-      id: created._id.toString(),
-      visitTicketClosed: visitTicket ? true : undefined,
-      pointsAwarded: visitTicket?.pointsAwarded,
-    },
-    { status: 200 },
-  );
+  return NextResponse.json({ id: created._id.toString() }, { status: 200 });
 }

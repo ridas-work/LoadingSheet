@@ -1,20 +1,65 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { getSession, signIn, signOut } from "next-auth/react";
 
+import { PORTAL_IMAGES } from "@/lib/portalTheme";
 import { homePathForRole, roleFromSession } from "@/lib/roles";
-import { ui } from "@/lib/ui";
+
+const REMEMBER_USERNAME_KEY = "loadingsheet-remember-username";
+
+function UserIcon() {
+  return (
+    <svg className="auth-field-icon" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+      <path
+        d="M5 20a7 7 0 0 1 14 0"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function KeyIcon() {
+  return (
+    <svg className="auth-field-icon" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="8" cy="12" r="4" stroke="currentColor" strokeWidth="1.75" />
+      <path
+        d="M12 12h2.5l2 2v2M16 14h2"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 export default function LoginPage() {
   const [ready, setReady] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    signOut({ redirect: false }).finally(() => setReady(true));
+    signOut({ redirect: false }).finally(() => {
+      const saved = localStorage.getItem(REMEMBER_USERNAME_KEY);
+      if (saved) {
+        setUsername(saved);
+        setRememberMe(true);
+      }
+      setReady(true);
+    });
   }, []);
 
   const canSubmit = useMemo(() => username.trim().length > 0 && password.length > 0, [password, username]);
@@ -23,6 +68,12 @@ export default function LoginPage() {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
+
+    if (rememberMe) {
+      localStorage.setItem(REMEMBER_USERNAME_KEY, username.trim());
+    } else {
+      localStorage.removeItem(REMEMBER_USERNAME_KEY);
+    }
 
     const res = await signIn("credentials", {
       username: username.trim(),
@@ -50,64 +101,45 @@ export default function LoginPage() {
 
   if (!ready) {
     return (
-      <div className="login-form-panel min-h-dvh">
+      <div className="auth-form-panel min-h-dvh">
         <p className="text-sm text-slate-500">Loading…</p>
       </div>
     );
   }
 
   return (
-    <div className="login-shell">
-      <div className="login-brand-panel">
-        <div className="relative z-10 max-w-md">
-          <div className={`${ui.brandMark} mb-6 h-12 w-12 text-sm`}>LS</div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">Loading Sheet</h1>
-          <p className="mt-3 text-base leading-relaxed text-brand-100/90">
-            PO entry, production batches, dispatch loading sheets, and packaging — one connected
-            workflow for Waleed Tech.
-          </p>
-          <ul className="mt-8 space-y-2 text-sm text-brand-100/75">
-            <li className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
-              Purchase orders &amp; loading sheets
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
-              Batch assignment &amp; ready stock
-            </li>
-            <li className="flex items-center gap-2">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand-400" />
-              Packaging inventory &amp; gate delivery
-            </li>
-          </ul>
-        </div>
+    <div className="auth-page">
+      <div className="auth-art-panel">
+        <Image
+          src={PORTAL_IMAGES.signup}
+          alt=""
+          width={720}
+          height={540}
+          className="auth-hero-image"
+          priority
+        />
       </div>
 
-      <div className="login-form-panel">
-        <div className="login-card">
-          <h2 className="text-xl font-bold tracking-tight text-slate-900">Welcome back</h2>
-          <p className="mt-1 text-sm text-slate-500">Sign in with your authorized account.</p>
+      <div className="auth-form-panel">
+        <div className="auth-signin-card">
+          <h1 className="auth-signin-title">Sign in</h1>
 
-          <form className="mt-6 space-y-4" onSubmit={onSubmit} autoComplete="off">
-            <div>
-              <label className={ui.label} htmlFor="username">
-                Username
-              </label>
+          <form className="auth-signin-form" onSubmit={onSubmit} autoComplete="off">
+            <label className="auth-field-pill">
+              <UserIcon />
               <input
                 id="username"
                 name="username"
                 autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className={`${ui.input} mt-1.5`}
-                placeholder="e.g. nouman"
+                className="auth-field-input"
+                placeholder="Username"
               />
-            </div>
+            </label>
 
-            <div>
-              <label className={ui.label} htmlFor="password">
-                Password
-              </label>
+            <label className="auth-field-pill">
+              <KeyIcon />
               <input
                 id="password"
                 name="password"
@@ -115,13 +147,24 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className={`${ui.input} mt-1.5`}
+                className="auth-field-input"
+                placeholder="Password"
               />
-            </div>
+            </label>
 
-            {error ? <div className={ui.alertDanger}>{error}</div> : null}
+            <label className="auth-remember">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="auth-remember-check"
+              />
+              <span>Remember Me</span>
+            </label>
 
-            <button type="submit" disabled={!canSubmit || submitting} className={ui.btnPrimaryFull}>
+            {error ? <div className="auth-error">{error}</div> : null}
+
+            <button type="submit" disabled={!canSubmit || submitting} className="auth-submit-pill">
               {submitting ? "Signing in…" : "Sign in"}
             </button>
           </form>

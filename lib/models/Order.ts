@@ -146,10 +146,20 @@ const OrderSchema = new mongoose.Schema(
     deadlineDate: { type: Date, required: false, default: null },
     orderKind: {
       type: String,
-      enum: ["standard", "mixed_sample", "hybrid"],
+      enum: ["standard", "mixed_sample", "hybrid", "field_sample"],
       required: false,
       default: "standard",
     },
+    /** Field visit sample dispatch — links back to the originating visit ticket. */
+    fieldVisitTicketId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "FieldVisitTicket",
+      required: false,
+      default: null,
+    },
+    sampleRepName: { type: String, required: false, default: "", trim: true },
+    /** Set when Rashid assigns sample batches and Esha sample pool is deducted. */
+    sampleStockDeductedAt: { type: Date, required: false, default: null },
     mixedSample: {
       type: MixedSampleSchema,
       required: false,
@@ -207,6 +217,13 @@ const OrderSchema = new mongoose.Schema(
       type: [SubtractedItemSchema],
       required: false,
       default: [],
+    },
+    /** When this PO was created automatically from boss-subtracted items. */
+    subtractedFromOrderId: {
+      type: String,
+      required: false,
+      default: null,
+      trim: true,
     },
     approvalStatus: {
       type: String,
@@ -273,6 +290,53 @@ const OrderSchema = new mongoose.Schema(
       default: [],
     },
     readyBottleRestoredAt: { type: Date, required: false, default: null },
+    deliveryOutcome: {
+      type: String,
+      enum: ["full", "partial"],
+      required: false,
+      default: null,
+    },
+    orderClosedAt: { type: Date, required: false, default: null },
+    orderClosedByUserId: { type: String, required: false, default: null },
+    orderClosedByName: { type: String, required: false, default: "", trim: true },
+    deliveryClosureLines: {
+      type: [
+        {
+          productCode: { type: String, required: true, trim: true, lowercase: true },
+          productName: { type: String, required: true, trim: true },
+          dispatchedBottles: { type: Number, required: true, min: 0 },
+          deliveredBottles: { type: Number, required: true, min: 0 },
+          damagedBottles: { type: Number, required: true, min: 0 },
+          returnedBottles: { type: Number, required: true, min: 0 },
+        },
+      ],
+      required: false,
+      default: [],
+    },
+    deliveryLateReturns: {
+      type: [
+        {
+          note: { type: String, required: false, default: "", trim: true, maxlength: 500 },
+          recordedAt: { type: Date, required: true },
+          recordedByUserId: { type: String, required: false, default: null },
+          recordedByName: { type: String, required: true, trim: true },
+          lines: {
+            type: [
+              {
+                productCode: { type: String, required: true, trim: true, lowercase: true },
+                productName: { type: String, required: true, trim: true },
+                damagedBottles: { type: Number, required: true, min: 0 },
+                returnedBottles: { type: Number, required: true, min: 0 },
+              },
+            ],
+            required: true,
+            default: [],
+          },
+        },
+      ],
+      required: false,
+      default: [],
+    },
   },
   { timestamps: { createdAt: true, updatedAt: true } },
 );

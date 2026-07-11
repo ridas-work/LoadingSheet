@@ -1,5 +1,6 @@
 import { GATE_STATUS_LABELS, type GateDeliveryStatus } from "@/lib/gateDelivery";
 import type { OrderPoDetail } from "@/lib/orderPoDetail";
+import { formatDisplayDate } from "@/lib/dateOnly";
 import { ui } from "@/lib/ui";
 import { OrderPoDetailPanel } from "@/components/OrderPoDetailPanel";
 
@@ -28,7 +29,7 @@ export function RashidPoOrdersList({ orders }: Props) {
               <p className="text-base font-semibold text-slate-900">{o.poNumber}</p>
               <p className="mt-0.5 text-sm font-medium text-slate-600">{o.customerName}</p>
               <p className="mt-0.5 text-xs text-slate-500">
-                {new Date(o.createdAt).toLocaleDateString()}
+                {formatDisplayDate(o.createdAt)}
                 {o.createdByName ? ` · Entered by ${o.createdByName}` : ""}
                 {` · ${GATE_STATUS_LABELS[o.gateDeliveryStatus]}`}
                 {o.pendingLineCount > 0

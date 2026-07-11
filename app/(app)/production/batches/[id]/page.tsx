@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import { ProductionBatchCloseForm } from "@/components/ProductionBatchCloseForm";
 import { auth } from "@/lib/auth";
 import { formatLiters } from "@/lib/batchVolume";
+import { formatDisplayDate, formatDisplayDateTime } from "@/lib/dateOnly";
 import { connectToDatabase } from "@/lib/db";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { isBatchClosed } from "@/lib/productionBatchClose";
@@ -111,7 +112,7 @@ export default async function ProductionBatchDetailPage(props: PageProps) {
           <DetailRow label="Batch number" value={batch.batchNo} />
           <DetailRow label="Product" value={batch.productName} />
           <DetailRow label="Purpose" value={batch.productionPurpose === "sample" ? "Sample" : "Regular"} />
-          <DetailRow label="Date" value={new Date(batch.preparedAt).toLocaleDateString()} />
+          <DetailRow label="Date" value={formatDisplayDate(batch.preparedAt)} />
           <DetailRow label="Used on POs / filling" value={`${displayUsed} L`} />
           <DetailRow label="Remaining pool (at close)" value={`${displayRemaining} L`} />
           <DetailRow label="pH" value={batch.ph ?? ""} />
@@ -123,11 +124,13 @@ export default async function ProductionBatchDetailPage(props: PageProps) {
             <DetailRow label="Viscosity" value={batch.viscosity ?? ""} />
           ) : null}
           <DetailRow label="Quantity" value={batch.quantity ?? ""} />
+          {batch.drum?.trim() ? <DetailRow label="Drum" value={batch.drum} /> : null}
+          {batch.customer?.trim() ? <DetailRow label="Customer" value={batch.customer} /> : null}
           <DetailRow label="Total liters (dispatch pool)" value={`${formatLiters(batch.totalLiters)} L`} />
           <DetailRow label="Registered by" value={batch.createdByName ?? ""} />
           <DetailRow
             label="Registered at"
-            value={batch.createdAt ? new Date(batch.createdAt).toLocaleString() : ""}
+            value={batch.createdAt ? formatDisplayDateTime(batch.createdAt) : ""}
           />
           {batch.notes?.trim() ? <DetailRow label="Legacy notes" value={batch.notes} /> : null}
         </dl>
@@ -151,7 +154,7 @@ export default async function ProductionBatchDetailPage(props: PageProps) {
               <dt className="font-medium text-zinc-600">Closed by</dt>
               <dd className="text-zinc-900">
                 {batch.closedByName?.trim() || "—"}
-                {batch.closedAt ? ` · ${new Date(batch.closedAt).toLocaleString()}` : ""}
+                {batch.closedAt ? ` · ${formatDisplayDateTime(batch.closedAt)}` : ""}
               </dd>
             </div>
           </dl>

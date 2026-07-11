@@ -2,8 +2,11 @@ import { NextResponse } from "next/server";
 
 import { buildAdminDeliverySummary } from "@/lib/adminDeliverySummary";
 import { auth } from "@/lib/auth";
+import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
+import { ProductPacking } from "@/lib/models/ProductPacking";
+import type { DeductionSheetLine } from "@/lib/packagingDeduction";
 import { canViewAdminSummary, roleFromSession } from "@/lib/roles";
 
 export async function GET() {
@@ -19,6 +22,11 @@ export async function GET() {
 
   await connectToDatabase();
 
+  const catalogDocs = await ProductPacking.find({ active: true })
+    .select({ code: 1, name: 1, bottlesPerCarton: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1, bundleComponents: 1 })
+    .lean();
+  const catalog = packingCatalogFromDocs(catalogDocs);
+
   const orders = await Order.find({})
     .sort({ createdAt: -1 })
     .select({
@@ -29,6 +37,11 @@ export async function GET() {
       discardedAt: 1,
       items: 1,
       subtractedItems: 1,
+      sheetLines: 1,
+      deliveryOutcome: 1,
+      orderClosedAt: 1,
+      deliveryClosureLines: 1,
+      deliveryLateReturns: 1,
     })
     .lean();
 
@@ -56,7 +69,25 @@ export async function GET() {
         carriedOutAt: item.carriedOutAt,
         discardedAt: item.discardedAt,
       })),
+      sheetLines: (o.sheetLines ?? []) as DeductionSheetLine[],
+      deliveryOutcome: o.deliveryOutcome,
+      orderClosedAt: o.orderClosedAt,
+      deliveryClosureLines: (o.deliveryClosureLines ?? []).map((l) => ({
+        productName: l.productName,
+        deliveredBottles: l.deliveredBottles,
+        damagedBottles: l.damagedBottles,
+        returnedBottles: l.returnedBottles,
+      })),
+      deliveryLateReturns: (o.deliveryLateReturns ?? []).map((r) => ({
+        lines: (r.lines ?? []).map((l) => ({
+          productName: l.productName,
+          damagedBottles: l.damagedBottles,
+          returnedBottles: l.returnedBottles,
+        })),
+      })),
     })),
+    new Date(),
+    { catalog },
   );
 
   return NextResponse.json(summary);

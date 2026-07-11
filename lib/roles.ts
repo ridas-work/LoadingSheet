@@ -4,18 +4,18 @@ export type AppRole =
   | "po_creator"
   | "batch_editor"
   | "dispatch_editor"
-  | "packaging_editor"
   | "chemicals_editor"
   | "gate_guard"
+  | "account_opener"
   | "admin";
 
 const ALLOWED_ROLES: AppRole[] = [
   "po_creator",
   "batch_editor",
   "dispatch_editor",
-  "packaging_editor",
   "chemicals_editor",
   "gate_guard",
+  "account_opener",
   "admin",
 ];
 
@@ -26,18 +26,35 @@ export function isAppRole(role: unknown): role is AppRole {
 /** Ali — creates dispatch trips and picks POs. Rashid assigns batches and weights. */
 const DISPATCH_TRIP_PLANNER_USERNAME = "ali";
 
+/** Nouman — read-only boss summaries and selected oversight pages. */
+const ADMIN_SUMMARY_VIEWER_USERNAMES = new Set(["nouman"]);
+
 export function homePathForRole(role: AppRole, username?: string | null): string {
   if (role === "admin") return "/admin";
+  if (role === "po_creator") {
+    const u = username?.toLowerCase().trim() ?? "";
+    if (ADMIN_SUMMARY_VIEWER_USERNAMES.has(u)) return "/admin";
+  }
   if (role === "batch_editor") return "/production/batches";
   if (role === "dispatch_editor") {
     const u = username?.toLowerCase().trim() ?? "";
     if (u === DISPATCH_TRIP_PLANNER_USERNAME) return "/orders";
     return "/dispatch/trips";
   }
-  if (role === "packaging_editor") return "/dispatch/inventory";
   if (role === "chemicals_editor") return "/chemicals/inventory";
   if (role === "gate_guard") return "/gate/orders";
+  if (role === "account_opener") return "/accounts/open";
   return "/new-order";
+}
+
+/** Account opener (and admin) — register new customer accounts. */
+export function canOpenCustomerAccounts(role: AppRole | null): boolean {
+  return role === "account_opener" || role === "admin";
+}
+
+/** Account opener, admin, and PO reps — read the customer directory for pickers. */
+export function canViewCustomerAccounts(role: AppRole | null): boolean {
+  return role === "account_opener" || role === "admin";
 }
 
 export function roleFromSession(user: { role?: unknown } | undefined): AppRole | null {
@@ -89,7 +106,7 @@ export function isRashidDispatchUser(role: AppRole | null, username?: string | n
 
 /** PO team and Ali — not Rashid, Ramazan, or packaging. */
 export function canViewOrdersList(role: AppRole | null, username?: string | null): boolean {
-  if (role === "chemicals_editor" || role === "packaging_editor" || role === "batch_editor") {
+  if (role === "chemicals_editor" || role === "batch_editor") {
     return false;
   }
   if (role === "admin" || role === "po_creator") return true;
@@ -143,11 +160,11 @@ export function canEditRashidMorningPlan(role: AppRole | null): boolean {
 }
 
 export function canViewPackagingInventory(role: AppRole | null): boolean {
-  return role === "packaging_editor" || role === "admin";
+  return role === "batch_editor" || role === "admin";
 }
 
 export function canEditPackagingInventory(role: AppRole | null): boolean {
-  return role === "packaging_editor";
+  return role === "batch_editor";
 }
 
 /** Ramazan, Esha (catalog read), or Waleed admin. */
@@ -184,11 +201,13 @@ export function canUseCustomerDirectory(role: AppRole | null, username?: string 
   return isPoOrderEditor(role, username);
 }
 
-/** Nouman, Aslam, Ahtisham & Javeria — edit their own POs (add/remove products) like Waleed. */
-const PO_ORDER_EDITOR_USERNAMES = new Set(["nouman", "aslam", "ahtisham", "javeria"]);
+/** Nouman, Javeria, Aslam, Ahtisham & Ibtisam — edit POs before delivery. */
+const PO_ORDER_EDITOR_USERNAMES = new Set(["nouman", "javeria", "aslam", "ahtisham", "ibtisam"]);
 
 /** Nouman — read-only boss summaries (orders matrix + delivered/pending). Waleed uses admin role. */
-const ADMIN_SUMMARY_VIEWER_USERNAMES = new Set(["nouman"]);
+export function isAdminSummaryViewer(role: AppRole | null, username?: string | null): boolean {
+  return canViewAdminSummary(role, username) && !isAdmin(role);
+}
 
 export function isPoOrderEditor(role: AppRole | null, username: string | undefined | null): boolean {
   if (role !== "po_creator") return false;
@@ -203,9 +222,28 @@ export function canViewAdminSummary(role: AppRole | null, username?: string | nu
   return ADMIN_SUMMARY_VIEWER_USERNAMES.has(u);
 }
 
-/** Waleed admin only — operations reports hub (not Nouman summary viewer). */
-export function canViewAdminReports(role: AppRole | null): boolean {
-  return isAdmin(role);
+/** Waleed admin and Nouman — operations reports hub. */
+export function canViewAdminReports(role: AppRole | null, username?: string | null): boolean {
+  if (isAdmin(role)) return true;
+  return canViewAdminSummary(role, username);
+}
+
+/** Waleed admin and Nouman — packaging low-stock alerts. */
+export function canViewPackagingAlerts(role: AppRole | null, username?: string | null): boolean {
+  if (isAdmin(role)) return true;
+  return canViewAdminSummary(role, username);
+}
+
+/** Waleed admin and Nouman — all-orders list with PO detail. */
+export function canViewAdminOrdersList(role: AppRole | null, username?: string | null): boolean {
+  if (isAdmin(role)) return true;
+  return canViewAdminSummary(role, username);
+}
+
+/** Rashid, Waleed admin, or Nouman (read-only) — ready bottle stock. */
+export function canViewDispatchReadyStock(role: AppRole | null, username?: string | null): boolean {
+  if (canEditDispatch(role, username) || isAdmin(role)) return true;
+  return canViewAdminSummary(role, username);
 }
 
 /** Boss (Waleed) or designated PO creators — edit PO lines after creation. */

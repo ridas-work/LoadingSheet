@@ -6,6 +6,8 @@ import { connectToDatabase } from "@/lib/db";
 import { isRashidActiveGateStatus, isTripActiveForPlanner, normalizeGateStatus } from "@/lib/gateDelivery";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
+import { batchProgress } from "@/lib/orderBatchStatus";
+import { regularTripsMongoFilter } from "@/lib/sampleDispatch";
 import {
   canCreateDispatchTrips,
   canEditDispatchTrip,
@@ -29,7 +31,7 @@ export default async function DispatchTripsPage() {
   const hideCompletedTrips = isDispatchTripPlanner(role, username) && role !== "admin";
   const rashidView = isDispatchBatchOperator(role, username) && role !== "admin";
 
-  const allTrips = await DispatchTrip.find({}).sort({ updatedAt: -1 }).lean();
+  const allTrips = await DispatchTrip.find(regularTripsMongoFilter()).sort({ updatedAt: -1 }).lean();
   const allOrderIds = allTrips.flatMap((t) => t.orderIds ?? []);
   const orders =
     allOrderIds.length > 0
@@ -40,14 +42,12 @@ export default async function DispatchTripsPage() {
   const poById = new Map(orders.map((o) => [o._id.toString(), o.poNumber]));
   const orderMetaById = new Map(
     orders.map((o) => {
-      const lines = (o as { sheetLines?: Array<{ batchNo?: string }> }).sheetLines ?? [];
-      const total = lines.length;
-      const filled = lines.filter((l) => typeof l.batchNo === "string" && l.batchNo.trim().length > 0).length;
+      const progress = batchProgress(o.sheetLines);
       return [
         o._id.toString(),
         {
           gateStatus: normalizeGateStatus(o.gateDeliveryStatus),
-          complete: total > 0 && filled === total,
+          complete: progress.complete,
         },
       ];
     }),

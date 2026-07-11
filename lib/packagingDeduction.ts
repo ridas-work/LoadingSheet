@@ -1,10 +1,17 @@
 import { isMixedSampleLine } from "@/lib/mixedSampleBox";
-import { isDrumContainerProduct } from "@/lib/customBottleSizes";
+import {
+  isDrumContainerProduct,
+  isJarOnlyDeductionBottleSize,
+  isNoPackagingDeductionBottleSize,
+  jarPackagingDeductionForLine,
+  normalizeBottleSizeCode,
+} from "@/lib/customBottleSizes";
 import {
   familyKeyForLineName,
   familyStockKey,
   findPackingForLineName,
 } from "@/lib/productPackingMatch";
+import { expandBomRequirements, findBomEntry } from "@/lib/packagingBom";
 import type { LineReadySplit } from "@/lib/readyStockAllocation";
 import { packagingBalance, type PackagingQtyFields } from "@/lib/packagingInventory";
 
@@ -60,28 +67,36 @@ type Consumption = {
   customCartonBoxes: Map<string, number>;
 };
 
-function emptyConsumption(): Consumption {
-  return {
-    productBottles: new Map(),
-    productCartons: new Map(),
-    mixedBoxFamilies: new Map(),
-    customCartonBoxes: new Map(),
-  };
-}
-
-function addCustomCartonBox(consumption: Consumption, customBoxCode: string | null | undefined) {
-  const code = key(customBoxCode);
-  if (!code) return;
-  add(consumption.customCartonBoxes, code, 1);
-}
-
 function key(value: string | null | undefined): string {
   return (value ?? "").trim().toLowerCase();
 }
 
 function add(map: Map<string, number>, code: string, qty: number) {
-  if (!code || qty <= 0) return;
-  map.set(code, (map.get(code) ?? 0) + qty);
+  const c = key(code);
+  if (!c || qty <= 0) return;
+  map.set(c, (map.get(c) ?? 0) + qty);
+}
+
+function mixedPartSkipsDeduction(part: {
+  productName: string;
+  bottleSizeCode?: string;
+}): boolean {
+  return (
+    isNoPackagingDeductionBottleSize(part.bottleSizeCode) ||
+    isDrumContainerProduct(part.productName, part.bottleSizeCode)
+  );
+}
+
+function mixedPartUsesCatalogBom(part: { bottleSizeCode?: string }): boolean {
+  const code = normalizeBottleSizeCode(part.bottleSizeCode);
+  if (!code || code === "catalog") return true;
+  if (isJarOnlyDeductionBottleSize(code)) return false;
+  if (isNoPackagingDeductionBottleSize(code)) return false;
+  return true;
+}
+
+function mergeQty(target: Map<string, number>, source: Map<string, number>) {
+  for (const [code, qty] of source) add(target, code, qty);
 }
 
 function findPackingByName(
@@ -92,44 +107,49 @@ function findPackingByName(
   return findPackingForLineName(name, catalog, context) as DeductionPacking | null;
 }
 
-function resolvePackingOrFamily(
-  name: string,
-  catalog: DeductionPacking[],
-  context: { parentLineName?: string } | undefined,
-  missingProducts: Set<string>,
-  onPacking: (packing: DeductionPacking, bottles: number) => void,
-  onFamily: (family: string, bottles: number) => void,
-  bottles: number,
-) {
-  const packing = findPackingByName(name, catalog, context);
-  if (packing) {
-    onPacking(packing, bottles);
-    return;
-  }
-  const family = familyKeyForLineName(name, catalog);
-  if (family) {
-    onFamily(family, bottles);
-    return;
-  }
-  missingProducts.add(name);
+function findCustomCartonBoxItem(
+  items: DeductionPackagingItem[],
+  boxCode: string,
+): DeductionPackagingItem | null {
+  const code = key(boxCode);
+  return (
+    items.find(
+      (item) =>
+        item.active !== false &&
+        key(item.code) === code &&
+        key(item.deductAs || item.category) === "box",
+    ) ?? null
+  );
 }
 
-function matchesFamily(itemFamily: string | null | undefined, packingFamily: string): boolean {
-  const item = key(itemFamily);
-  const packing = key(packingFamily);
-  return Boolean(item && packing && (packing === item || packing.startsWith(item) || item.startsWith(packing)));
+function itemByCode(
+  items: DeductionPackagingItem[],
+  code: string,
+): DeductionPackagingItem | null {
+  const c = key(code);
+  return items.find((item) => item.active !== false && key(item.code) === c) ?? null;
 }
 
 function packingFamily(packing: DeductionPacking): string {
   return packing.batchFamily?.trim() || packing.name;
 }
 
-function containerKind(packing: DeductionPacking): "pouch" | "bottle" {
-  return /pouch/i.test(packing.name) ? "pouch" : "bottle";
+function emptyConsumption(): Consumption {
+  return {
+    productBottles: new Map(),
+    productCartons: new Map(),
+    mixedBoxFamilies: new Map(),
+    customCartonBoxes: new Map(),
+  };
 }
 
-function consumePacking(consumption: Consumption, packing: DeductionPacking, bottles: number, cartons: number) {
-  if (bottles <= 0) return;
+function consumePacking(
+  consumption: Consumption,
+  packing: DeductionPacking,
+  bottles: number,
+  cartons: number,
+) {
+  if (bottles <= 0 && cartons <= 0) return;
   if (packing.bundleComponents?.length) {
     for (const ref of packing.bundleComponents) {
       add(consumption.productBottles, key(ref.code), bottles * ref.bottlesPerUnit);
@@ -141,6 +161,116 @@ function consumePacking(consumption: Consumption, packing: DeductionPacking, bot
   add(consumption.productCartons, key(packing.code), cartons);
 }
 
+/** Expand one product packing into packaging SKU quantities from the BOM. */
+function bomQtyForPacking(
+  packing: DeductionPacking,
+  bottles: number,
+  cartons: number,
+): Map<string, number> {
+  if (findBomEntry(packing.code)) {
+    return expandBomRequirements(packing.code, bottles, cartons);
+  }
+
+  const out = new Map<string, number>();
+  if (packing.bundleComponents?.length) {
+    for (const ref of packing.bundleComponents) {
+      mergeQty(out, expandBomRequirements(ref.code, bottles * ref.bottlesPerUnit, 0));
+    }
+  }
+  return out;
+}
+
+/**
+ * One sheet box → full BOM packaging recipe on packaging inventory.
+ * qtyPerBottle × bottles in that row + qtyPerCarton × 1 carton.
+ */
+export function summarizeBomPackagingRequirements(
+  sheetLines: DeductionSheetLine[],
+  catalog: DeductionPacking[],
+): {
+  requirements: Map<string, number>;
+  missingProducts: string[];
+  missingBom: string[];
+  customBoxCodes: Map<string, number>;
+} {
+  const requirements = new Map<string, number>();
+  const missingProducts = new Set<string>();
+  const missingBom = new Set<string>();
+  const customBoxCodes = new Map<string, number>();
+
+  for (const line of sheetLines) {
+    if (!isMixedSampleLine(line) && isDrumContainerProduct(line.productName)) {
+      continue;
+    }
+
+    if (isMixedSampleLine(line) && line.mixedContents?.length) {
+      const parts = line.mixedContents.filter((part) => !mixedPartSkipsDeduction(part));
+      if (parts.length === 0) continue;
+
+      for (const part of parts) {
+        const jarDeduction = jarPackagingDeductionForLine({
+          productName: part.productName,
+          bottleSizeCode: part.bottleSizeCode,
+          bottleCount: part.bottles,
+        });
+        if (jarDeduction) {
+          add(customBoxCodes, jarDeduction.jarCode, jarDeduction.quantity);
+          continue;
+        }
+
+        const packing = findPackingByName(part.productName, catalog, {
+          parentLineName: line.productName,
+        });
+        if (!packing) {
+          missingProducts.add(part.productName);
+          continue;
+        }
+        if (!findBomEntry(packing.code) && !packing.bundleComponents?.length) {
+          missingBom.add(packing.name);
+          continue;
+        }
+        mergeQty(requirements, bomQtyForPacking(packing, part.bottles, 0));
+      }
+
+      const needsOuterBox = line.mixedContents.some((part) => mixedPartUsesCatalogBom(part));
+      if (needsOuterBox && line.customBoxCode?.trim()) {
+        add(customBoxCodes, line.customBoxCode, 1);
+      }
+      continue;
+    }
+
+    const jarDeduction = jarPackagingDeductionForLine({
+      productName: line.productName,
+      bottleCount: Math.max(0, Math.floor(line.bottlesPerBox) || 1),
+    });
+    if (jarDeduction) {
+      add(customBoxCodes, jarDeduction.jarCode, jarDeduction.quantity);
+      continue;
+    }
+
+    const packing = findPackingByName(line.productName, catalog);
+    if (!packing) {
+      missingProducts.add(line.productName);
+      continue;
+    }
+    if (!findBomEntry(packing.code) && !packing.bundleComponents?.length) {
+      missingBom.add(packing.name);
+      continue;
+    }
+
+    const bottles = Math.max(0, Math.floor(line.bottlesPerBox) || packing.bottlesPerCarton);
+    mergeQty(requirements, bomQtyForPacking(packing, bottles, 1));
+  }
+
+  return {
+    requirements,
+    missingProducts: [...missingProducts],
+    missingBom: [...missingBom],
+    customBoxCodes,
+  };
+}
+
+/** Bottle/carton totals for ready stock + reports (not packaging UIP). */
 export function summarizePackagingConsumption(
   sheetLines: DeductionSheetLine[],
   catalog: DeductionPacking[],
@@ -154,35 +284,55 @@ export function summarizePackagingConsumption(
     }
 
     if (isMixedSampleLine(line) && line.mixedContents?.length) {
-      const parts = line.mixedContents.filter(
-        (part) => !isDrumContainerProduct(part.productName, part.bottleSizeCode),
-      );
+      const parts = line.mixedContents.filter((part) => !mixedPartSkipsDeduction(part));
       if (parts.length === 0) continue;
 
       const families = new Set<string>();
       for (const part of parts) {
-        resolvePackingOrFamily(
-          part.productName,
-          catalog,
-          { parentLineName: line.productName },
-          missingProducts,
-          (packing, bottles) => {
-            consumePacking(consumption, packing, bottles, 0);
-            families.add(packingFamily(packing));
-          },
-          (family, bottles) => {
-            add(consumption.productBottles, familyStockKey(family), bottles);
-            families.add(family);
-          },
-          part.bottles,
-        );
+        const jarDeduction = jarPackagingDeductionForLine({
+          productName: part.productName,
+          bottleSizeCode: part.bottleSizeCode,
+          bottleCount: part.bottles,
+        });
+        if (jarDeduction) {
+          add(consumption.customCartonBoxes, jarDeduction.jarCode, jarDeduction.quantity);
+          continue;
+        }
+
+        const packing = findPackingByName(part.productName, catalog, {
+          parentLineName: line.productName,
+        });
+        if (packing) {
+          consumePacking(consumption, packing, part.bottles, 0);
+          families.add(packingFamily(packing));
+          continue;
+        }
+        const family = familyKeyForLineName(part.productName, catalog);
+        if (family) {
+          add(consumption.productBottles, familyStockKey(family), part.bottles);
+          families.add(family);
+          continue;
+        }
+        missingProducts.add(part.productName);
       }
-      if (line.customBoxCode?.trim()) {
-        addCustomCartonBox(consumption, line.customBoxCode);
-      } else {
-        const family = [...families][0];
-        if (family) add(consumption.mixedBoxFamilies, key(family), 1);
+      const needsOuterBox = line.mixedContents.some((part) => mixedPartUsesCatalogBom(part));
+      if (needsOuterBox) {
+        if (line.customBoxCode?.trim()) {
+          add(consumption.customCartonBoxes, line.customBoxCode, 1);
+        } else {
+          const family = [...families][0];
+          if (family) add(consumption.mixedBoxFamilies, key(family), 1);
+        }
       }
+      continue;
+    }
+
+    const jarDeduction = jarPackagingDeductionForLine({
+      productName: line.productName,
+      bottleCount: Math.max(0, Math.floor(line.bottlesPerBox) || 1),
+    });
+    if (jarDeduction) {
+      add(consumption.customCartonBoxes, jarDeduction.jarCode, jarDeduction.quantity);
       continue;
     }
 
@@ -202,157 +352,30 @@ export function summarizePackagingConsumption(
   return { consumption, missingProducts: [...missingProducts] };
 }
 
-/**
- * Packaging consumption for gate delivery: only bottles/cartons that still need
- * Nimra fill. Ready-shelf bottles are already labelled, capped, and boxed.
- */
+/** Delivery always uses the full BOM; ready-stock no longer skips packaging. */
 export function summarizePackagingConsumptionExcludingReady(
   sheetLines: DeductionSheetLine[],
   catalog: DeductionPacking[],
-  readyByBox: Map<number, LineReadySplit>,
-): { consumption: Consumption; missingProducts: string[] } {
-  const consumption = emptyConsumption();
-  const missingProducts = new Set<string>();
-
-  for (const line of sheetLines) {
-    if (!isMixedSampleLine(line) && isDrumContainerProduct(line.productName)) {
-      continue;
-    }
-
-    const boxNo = line.boxNo ?? 0;
-    const split = readyByBox.get(boxNo);
-    if (!split || split.bottlesNeedingBatch <= 0) continue;
-
-    const deductCarton = split.bottlesFromReady <= 0;
-
-    if (isMixedSampleLine(line) && line.mixedContents?.length) {
-      const parts = line.mixedContents.filter(
-        (part) => !isDrumContainerProduct(part.productName, part.bottleSizeCode),
-      );
-      if (parts.length === 0) continue;
-
-      const families = new Set<string>();
-      for (const part of parts) {
-        const packing = findPackingByName(part.productName, catalog, { parentLineName: line.productName });
-        if (!packing) {
-          const family = familyKeyForLineName(part.productName, catalog);
-          if (family) {
-            const comp = split.components?.find(
-              (c) => key(c.productName) === key(part.productName) || key(c.productCode) === familyStockKey(family),
-            );
-            const needing = comp?.bottlesNeedingBatch ?? part.bottles;
-            if (needing > 0) {
-              add(consumption.productBottles, familyStockKey(family), needing);
-            }
-            families.add(family);
-            continue;
-          }
-          missingProducts.add(part.productName);
-          continue;
-        }
-        const comp = split.components?.find(
-          (c) => key(c.productName) === key(packing.name) || key(c.productCode) === key(packing.code),
-        );
-        const needing = comp?.bottlesNeedingBatch ?? part.bottles;
-        if (needing > 0) {
-          add(consumption.productBottles, key(packing.code), needing);
-        }
-        families.add(packingFamily(packing));
-      }
-      if (deductCarton) {
-        if (line.customBoxCode?.trim()) {
-          addCustomCartonBox(consumption, line.customBoxCode);
-        } else {
-          const family = [...families][0];
-          if (family) add(consumption.mixedBoxFamilies, key(family), 1);
-        }
-      }
-      continue;
-    }
-
-    const packing = findPackingByName(line.productName, catalog);
-    if (!packing) {
-      missingProducts.add(line.productName);
-      continue;
-    }
-
-    if (packing.bundleComponents?.length) {
-      for (const ref of packing.bundleComponents) {
-        const partPacking = catalog.find((p) => key(p.code) === key(ref.code));
-        if (!partPacking) continue;
-        const comp = split.components?.find((c) => key(c.productCode) === key(ref.code));
-        const needing = comp?.bottlesNeedingBatch ?? line.bottlesPerBox * ref.bottlesPerUnit;
-        if (needing > 0) {
-          add(consumption.productBottles, key(partPacking.code), needing);
-        }
-      }
-      if (deductCarton) {
-        add(consumption.productCartons, key(packing.code), 1);
-      }
-      continue;
-    }
-
-    add(consumption.productBottles, key(packing.code), split.bottlesNeedingBatch);
-    if (deductCarton) {
-      add(consumption.productCartons, key(packing.code), 1);
-    }
-  }
-
-  return { consumption, missingProducts: [...missingProducts] };
-}
-
-function productItemMatches(item: DeductionPackagingItem, packing: DeductionPacking, deductAs: string): boolean {
-  if (key(item.deductAs || item.category) !== deductAs) return false;
-  if (key(item.linkedProductCode) === key(packing.code)) return true;
-  return matchesFamily(item.linkedBatchFamily, packingFamily(packing));
-}
-
-function findProductItem(
-  items: DeductionPackagingItem[],
-  packing: DeductionPacking,
-  deductAs: string,
-): DeductionPackagingItem | null {
-  return items.find((item) => item.active !== false && productItemMatches(item, packing, deductAs)) ?? null;
-}
-
-function findFamilyBoxItem(
-  items: DeductionPackagingItem[],
-  family: string,
-): DeductionPackagingItem | null {
-  return (
-    items.find(
-      (item) =>
-        item.active !== false &&
-        key(item.deductAs || item.category) === "box" &&
-        matchesFamily(item.linkedBatchFamily, family),
-    ) ?? null
-  );
-}
-
-function findCustomCartonBoxItem(
-  items: DeductionPackagingItem[],
-  boxCode: string,
-): DeductionPackagingItem | null {
-  const code = key(boxCode);
-  return (
-    items.find(
-      (item) => item.active !== false && key(item.code) === code && key(item.deductAs || item.category) === "box",
-    ) ?? null
-  );
+  _readyByBox: Map<number, LineReadySplit>,
+) {
+  return summarizePackagingConsumption(sheetLines, catalog);
 }
 
 export function buildPackagingDeductionPreview(args: {
   sheetLines: DeductionSheetLine[];
   catalog: DeductionPacking[];
   packagingItems: DeductionPackagingItem[];
-  /** When set, skip packaging for ready-shelf bottles (already assembled). */
+  /** Ignored — one sheet box always deducts the full BOM recipe. */
   readyByBox?: Map<number, LineReadySplit>;
 }): PackagingDeductionPreview {
-  const { consumption, missingProducts } = args.readyByBox
-    ? summarizePackagingConsumptionExcludingReady(args.sheetLines, args.catalog, args.readyByBox)
-    : summarizePackagingConsumption(args.sheetLines, args.catalog);
+  const { requirements, missingProducts, missingBom, customBoxCodes } =
+    summarizeBomPackagingRequirements(args.sheetLines, args.catalog);
+
   const quantities = new Map<string, PackagingDeductionLine>();
-  const missingMappings = new Set<string>(missingProducts.map((name) => `No product packing found for "${name}"`));
+  const missingMappings = new Set<string>([
+    ...missingProducts.map((name) => `No product packing found for "${name}"`),
+    ...missingBom.map((name) => `No packaging BOM recipe for "${name}"`),
+  ]);
 
   function push(item: DeductionPackagingItem, quantity: number, detail: string) {
     if (quantity <= 0) return;
@@ -368,42 +391,29 @@ export function buildPackagingDeductionPreview(args: {
     });
   }
 
-  for (const [productCode, bottles] of consumption.productBottles) {
-    if (bottles <= 0) continue;
-    const packing = args.catalog.find((p) => key(p.code) === productCode);
-    if (!packing) continue;
-    const primaryKind = containerKind(packing);
-    const primary = findProductItem(args.packagingItems, packing, primaryKind);
-    if (primary) push(primary, bottles, `${bottles} ${packing.name} ${primaryKind}s`);
-    else missingMappings.add(`No ${primaryKind} packaging item mapped for ${packing.name}`);
-
-    for (const kind of ["cap", "sticker", "label"] as const) {
-      const item = findProductItem(args.packagingItems, packing, kind);
-      if (item) push(item, bottles, `${bottles} ${packing.name} ${kind}s`);
+  for (const [itemCode, quantity] of requirements) {
+    const item = itemByCode(args.packagingItems, itemCode);
+    if (!item) {
+      missingMappings.add(`Packaging item "${itemCode}" missing from packaging inventory catalog`);
+      continue;
     }
+    push(item, quantity, `${quantity} × ${item.name} (BOM)`);
   }
 
-  for (const [productCode, cartons] of consumption.productCartons) {
-    if (cartons <= 0) continue;
-    const packing = args.catalog.find((p) => key(p.code) === productCode);
-    if (!packing) continue;
-    const item = findProductItem(args.packagingItems, packing, "box");
-    if (item) push(item, cartons, `${cartons} ${packing.name} carton(s), ${packing.bottlesPerCarton} bottles/carton`);
-    else missingMappings.add(`No carton/box packaging item mapped for ${packing.name}`);
-  }
-
-  for (const [family, boxes] of consumption.mixedBoxFamilies) {
-    if (boxes <= 0) continue;
-    const item = findFamilyBoxItem(args.packagingItems, family);
-    if (item) push(item, boxes, `${boxes} mixed/custom carton(s) for ${family}`);
-    else missingMappings.add(`No carton/box packaging item mapped for mixed/custom carton family "${family}"`);
-  }
-
-  for (const [boxCode, boxes] of consumption.customCartonBoxes) {
-    if (boxes <= 0) continue;
+  for (const [boxCode, boxes] of customBoxCodes) {
     const item = findCustomCartonBoxItem(args.packagingItems, boxCode);
-    if (item) push(item, boxes, `${boxes} custom outer box (${boxCode})`);
-    else missingMappings.add(`No custom carton box item for code "${boxCode}"`);
+    const isJarSku = boxCode.startsWith("custom-box-");
+    if (item) {
+      push(
+        item,
+        boxes,
+        isJarSku && boxes !== 1
+          ? `${boxes} jar/container (${boxCode})`
+          : isJarSku
+            ? `1 jar/container (${boxCode})`
+            : `${boxes} custom outer box (${boxCode})`,
+      );
+    } else missingMappings.add(`No custom carton box item for code "${boxCode}"`);
   }
 
   const lines = [...quantities.values()].sort((a, b) => a.itemName.localeCompare(b.itemName));
@@ -422,7 +432,9 @@ export function buildPackagingDeductionPreview(args: {
 }
 
 export function assertPackagingDeductionPreview(preview: PackagingDeductionPreview): string | null {
-  if (preview.missingMappings.length > 0) return `Packaging mapping missing: ${preview.missingMappings.join("; ")}`;
+  if (preview.missingMappings.length > 0) {
+    return `Packaging mapping missing: ${preview.missingMappings.join("; ")}`;
+  }
   if (preview.insufficientStock.length > 0) return preview.insufficientStock.join("; ");
   return null;
 }

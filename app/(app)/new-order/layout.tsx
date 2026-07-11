@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
-import { roleFromSession } from "@/lib/roles";
+import { homePathForRole, roleFromSession } from "@/lib/roles";
 
 export default async function NewOrderLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
+  const username = (session?.user as { username?: string })?.username;
   if (role === "batch_editor") {
     redirect("/production/batches");
   }
@@ -13,7 +14,7 @@ export default async function NewOrderLayout({ children }: { children: React.Rea
     redirect("/gate/orders");
   }
   if (role === "dispatch_editor") {
-    redirect("/orders");
+    redirect(homePathForRole(role, username));
   }
   if (role === "admin") {
     redirect("/orders");

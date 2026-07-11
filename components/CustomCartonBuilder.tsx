@@ -6,6 +6,11 @@ import {
   inferBottleSizeCodeFromSavedLine,
   normalizeBottleSizeCode,
 } from "@/lib/customBottleSizes";
+import {
+  CUSTOM_CARTON_SIZE_BOX_OPTIONS,
+  PRODUCT_FAMILY_BOX_OPTIONS,
+  suggestCustomBoxCodeFromContents,
+} from "@/lib/customCartonBoxes";
 import { findPackingForLineName } from "@/lib/productPackingMatch";
 
 /** Minimal product shape for the custom-carton picker (matches `CatalogProduct` fields used here). */
@@ -35,7 +40,7 @@ export type CustomCartonDraft = {
   id: string;
   boxCount: string;
   label: string;
-  /** Legacy outer box code — optional, not shown in UI. */
+  /** Outer shipping box SKU (custom-box-*). Required when saving a custom carton. */
   customBoxCode: string;
   rows: CartonContentRow[];
 };
@@ -103,44 +108,58 @@ export function draftsFromSavedCartons(
 ): CustomCartonDraft[] {
   return cartons.map((c) => {
     const savedCode = typeof c.customBoxCode === "string" ? c.customBoxCode.trim() : "";
+    const rows = c.contents.map((row) => {
+      const productName = row.productName;
+      let productPick: string | undefined;
+      let catalogName: string | undefined;
+      const savedPackingCode = row.packingCode?.trim();
+      if (catalog?.length) {
+        if (savedPackingCode && catalog.some((p) => p.code === savedPackingCode)) {
+          productPick = savedPackingCode;
+          catalogName = findCatalogProduct(savedPackingCode, catalog)?.name;
+        } else {
+          const code = findCatalogCodeForName(productName, catalog);
+          if (code) {
+            productPick = code;
+            catalogName = findCatalogProduct(code, catalog)?.name;
+          } else {
+            productPick = productName.trim() ? "__other__" : "";
+          }
+        }
+      }
+      const bottleSizeCode = inferBottleSizeCodeFromSavedLine(
+        productName,
+        catalogName,
+        row.bottleSizeCode,
+      );
+      return {
+        id: rid(),
+        productPick,
+        productName: catalogName ?? productName,
+        bottles: String(row.bottles),
+        bottleSizeCode,
+        ...(savedPackingCode ? { packingCode: savedPackingCode } : {}),
+      };
+    });
+    const suggested =
+      !savedCode && catalog?.length
+        ? suggestCustomBoxCodeFromContents(
+            rows
+              .map((r) => {
+                const pn = resolvedCustomRowProductName(r, catalog);
+                const b = Number(r.bottles);
+                return pn && Number.isInteger(b) && b >= 1 ? { productName: pn, bottles: b } : null;
+              })
+              .filter((x): x is { productName: string; bottles: number } => x !== null),
+            catalog,
+          )
+        : "";
     return {
       id: rid(),
       boxCount: String(c.boxCount),
       label: typeof c.label === "string" ? c.label : "",
-      customBoxCode: savedCode,
-      rows: c.contents.map((row) => {
-        const productName = row.productName;
-        let productPick: string | undefined;
-        let catalogName: string | undefined;
-        const savedPackingCode = row.packingCode?.trim();
-        if (catalog?.length) {
-          if (savedPackingCode && catalog.some((p) => p.code === savedPackingCode)) {
-            productPick = savedPackingCode;
-            catalogName = findCatalogProduct(savedPackingCode, catalog)?.name;
-          } else {
-            const code = findCatalogCodeForName(productName, catalog);
-            if (code) {
-              productPick = code;
-              catalogName = findCatalogProduct(code, catalog)?.name;
-            } else {
-              productPick = productName.trim() ? "__other__" : "";
-            }
-          }
-        }
-        const bottleSizeCode = inferBottleSizeCodeFromSavedLine(
-          productName,
-          catalogName,
-          row.bottleSizeCode,
-        );
-        return {
-          id: rid(),
-          productPick,
-          productName: catalogName ?? productName,
-          bottles: String(row.bottles),
-          bottleSizeCode,
-          ...(savedPackingCode ? { packingCode: savedPackingCode } : {}),
-        };
-      }),
+      customBoxCode: savedCode || suggested,
+      rows,
     };
   });
 }
@@ -214,7 +233,7 @@ export function buildCustomCartonsPayload(
     out.push({
       boxCount,
       contents,
-      ...(customBoxCode ? { customBoxCode } : {}),
+      customBoxCode,
       ...(label ? { label } : {}),
     });
   }
@@ -262,27 +281,52 @@ export function CustomCartonBuilder({ cartons, onChange, disabled, errors, catal
     ? [...catalogProducts!].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
     : [];
 
+  function contentsForSuggest(carton: CustomCartonDraft) {
+    return carton.rows
+      .map((r) => {
+        const pn = resolvedCustomRowProductName(r, sortedCatalog);
+        const b = Number(r.bottles);
+        return pn && Number.isInteger(b) && b >= 1 ? { productName: pn, bottles: b } : null;
+      })
+      .filter((x): x is { productName: string; bottles: number } => x !== null);
+  }
+
+  function maybeSuggestOuterBox(carton: CustomCartonDraft): string {
+    if (!useCatalog || carton.customBoxCode.trim()) return carton.customBoxCode;
+    return suggestCustomBoxCodeFromContents(contentsForSuggest(carton), sortedCatalog);
+  }
+
   function updateCarton(index: number, patch: Partial<CustomCartonDraft>) {
     onChange(cartons.map((c, i) => (i === index ? { ...c, ...patch } : c)));
+  }
+
+  function updateCartonWithSuggest(index: number, patch: Partial<CustomCartonDraft>) {
+    const next = { ...cartons[index]!, ...patch };
+    const suggested = maybeSuggestOuterBox(next);
+    onChange(
+      cartons.map((c, i) =>
+        i === index ? { ...next, ...(suggested ? { customBoxCode: suggested } : {}) } : c,
+      ),
+    );
   }
 
   function updateRow(cartonIndex: number, rowId: string, patch: Partial<CartonContentRow>) {
     const c = cartons[cartonIndex];
     if (!c) return;
     const rows = c.rows.map((r) => (r.id === rowId ? { ...r, ...patch } : r));
-    updateCarton(cartonIndex, { rows });
+    updateCartonWithSuggest(cartonIndex, { rows });
   }
 
   function addRow(cartonIndex: number) {
     const c = cartons[cartonIndex];
     if (!c) return;
-    updateCarton(cartonIndex, { rows: [...c.rows, emptyContentRow()] });
+    updateCartonWithSuggest(cartonIndex, { rows: [...c.rows, emptyContentRow()] });
   }
 
   function removeRow(cartonIndex: number, rowId: string) {
     const c = cartons[cartonIndex];
     if (!c || c.rows.length <= 1) return;
-    updateCarton(cartonIndex, { rows: c.rows.filter((r) => r.id !== rowId) });
+    updateCartonWithSuggest(cartonIndex, { rows: c.rows.filter((r) => r.id !== rowId) });
   }
 
   function removeCarton(index: number) {
@@ -295,20 +339,23 @@ export function CustomCartonBuilder({ cartons, onChange, disabled, errors, catal
       <p className="text-xs text-zinc-600">
         Pack several different products in one physical carton — e.g. pouches and bottles together. Each custom
         carton appears as its own row on the loading sheet (like a mixed box). Standard lines above stay separate.
-        For each product line, pick the bottle or jar size (e.g. 5 litre jar for Rhino) — not the outer shipping
-        box.
+        For each product line, pick the <strong>container size</strong> (bottle or jar). Then pick the{" "}
+        <strong>outer shipping box</strong> deducted from packaging inventory on delivery — separate from bottle, cap, and sticker BOM.
         The label on sheet is printed as a stick-on carton label from the loading sheet (Print carton labels).
         {useCatalog ? " Pick a catalog product from the list, or “Other…” for a name not in the list." : ""}
       </p>
       {cartons.map((carton, ci) => {
         const boxCountErr = cartonError(errors, ci, "boxCount");
         const contentsErr = cartonError(errors, ci, "contents");
+        const customBoxErr = cartonError(errors, ci, "customBoxCode");
 
         return (
         <div
           key={carton.id}
           className={`rounded-lg border bg-zinc-50/80 p-4 ring-1 ${
-            boxCountErr || contentsErr ? "border-red-300 ring-red-100" : "border-zinc-200 ring-zinc-100"
+            boxCountErr || contentsErr || customBoxErr
+              ? "border-red-300 ring-red-100"
+              : "border-zinc-200 ring-zinc-100"
           }`}
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -354,6 +401,41 @@ export function CustomCartonBuilder({ cartons, onChange, disabled, errors, catal
                 placeholder="Auto from products if empty"
                 className="mt-1 w-full rounded-lg border border-zinc-200 bg-white px-2 py-1.5 text-sm"
               />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-zinc-700" htmlFor={`cc-${carton.id}-outer`}>
+                Outer box (required)
+              </label>
+              <select
+                id={`cc-${carton.id}-outer`}
+                disabled={disabled}
+                value={carton.customBoxCode}
+                onChange={(e) => updateCarton(ci, { customBoxCode: e.target.value })}
+                className={`mt-1 w-full rounded-lg border bg-white px-2 py-1.5 text-sm ${
+                  customBoxErr ? "border-red-400" : "border-zinc-200"
+                }`}
+              >
+                <option value="">Select outer box…</option>
+                <optgroup label="Custom carton by size">
+                  {CUSTOM_CARTON_SIZE_BOX_OPTIONS.map((opt) => (
+                    <option key={opt.code} value={opt.code}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Standard product boxes">
+                  {PRODUCT_FAMILY_BOX_OPTIONS.map((opt) => (
+                    <option key={`${opt.code}-${opt.label}`} value={opt.code}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+              <p className="mt-1 text-[11px] text-zinc-500">
+                Pick the empty carton deducted on delivery — generic custom size or a standard product box
+                (Rhino, Brighten, Power Wash, etc.).
+              </p>
+              {customBoxErr ? <p className="mt-1 text-[11px] text-red-700">{customBoxErr}</p> : null}
             </div>
           </div>
           <div className="mt-3 space-y-2">

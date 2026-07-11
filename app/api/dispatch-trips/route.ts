@@ -3,13 +3,17 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import {
   assertOrdersAvailableForTrip,
+  assertOrdersMatchTripKind,
+  normalizeOrderChallans,
   parseOrderIds,
+  parseTripKind,
   syncTripDispatchToOrders,
   trimDispatchBody,
 } from "@/lib/dispatchTripSync";
 import { connectToDatabase } from "@/lib/db";
 import { DispatchTrip } from "@/lib/models/DispatchTrip";
 import { Order } from "@/lib/models/Order";
+import { regularTripsMongoFilter } from "@/lib/sampleDispatch";
 import { canCreateDispatchTrips, roleFromSession } from "@/lib/roles";
 
 export async function GET() {
@@ -19,7 +23,7 @@ export async function GET() {
   }
 
   await connectToDatabase();
-  const trips = await DispatchTrip.find({}).sort({ updatedAt: -1 }).lean();
+  const trips = await DispatchTrip.find(regularTripsMongoFilter()).sort({ updatedAt: -1 }).lean();
 
   const allOrderIds = trips.flatMap((t) => t.orderIds ?? []);
   const orders =
@@ -39,6 +43,10 @@ export async function GET() {
         vehicleNo: t.vehicleNo ?? "",
         driverName: t.driverName ?? "",
         dcNo: t.dcNo ?? "",
+        orderChallans: (t.orderChallans ?? []).map((row) => ({
+          orderId: row.orderId.toString(),
+          dcNo: row.dcNo ?? "",
+        })),
         orderIds: orderIdStrings,
         poNumbers: orderIdStrings.map((oid) => poById.get(oid) ?? oid),
         orderCount: orderIdStrings.length,
@@ -71,17 +79,25 @@ export async function POST(req: Request) {
   }
 
   const orderIds = parseOrderIds(body.orderIds);
+  const tripKind = parseTripKind(body.tripKind);
   await connectToDatabase();
 
   const conflict = await assertOrdersAvailableForTrip(orderIds);
   if (conflict) {
     return NextResponse.json({ error: conflict }, { status: 400 });
   }
+  const kindMismatch = await assertOrdersMatchTripKind(orderIds, tripKind);
+  if (kindMismatch) {
+    return NextResponse.json({ error: kindMismatch }, { status: 400 });
+  }
 
   const fields = trimDispatchBody(body);
+  const orderChallans = normalizeOrderChallans(body.orderChallans, orderIds, [], fields.dcNo);
   const trip = await DispatchTrip.create({
     ...fields,
+    tripKind,
     orderIds,
+    orderChallans,
     dispatchedAt: new Date(),
     createdByUserId: userId,
     createdByName: user.name ?? "",

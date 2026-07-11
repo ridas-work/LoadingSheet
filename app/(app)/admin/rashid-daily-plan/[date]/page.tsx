@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { RashidDailyPlanView } from "@/components/RashidDailyPlanView";
 import { parsePlanDate } from "@/lib/rashidDailyPlan";
@@ -7,10 +7,16 @@ import { ui } from "@/lib/ui";
 
 type Props = {
   params: Promise<{ date: string }>;
+  searchParams: Promise<{ date?: string }>;
 };
 
-export default async function RashidDailyPlanDatePage({ params }: Props) {
+export default async function RashidDailyPlanDatePage({ params, searchParams }: Props) {
   const { date } = await params;
+  if (date === "new") {
+    const query = await searchParams;
+    const qs = query.date?.trim() ? `?date=${encodeURIComponent(query.date.trim())}` : "";
+    redirect(`/admin/rashid-daily-plan/create${qs}`);
+  }
   if (!parsePlanDate(date)) {
     notFound();
   }

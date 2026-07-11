@@ -3,6 +3,7 @@ import { isCustomBottleSizeCode } from "@/lib/customBottleSizes";
 import { buildMixedSampleSheetLines, mixedSampleItemsFromContents, type MixedSampleContent } from "@/lib/mixedSampleBox";
 import { buildSheetLines, type OrderItemInput, type SheetLine } from "@/lib/buildSheetLines";
 import { mergeStandardAndCustomSheetLines, type CustomCartonDef } from "@/lib/hybridSheetLines";
+import { parseDeadlineFromBody } from "@/lib/dateOnly";
 
 export type OrderBody = {
   poNumber?: unknown;
@@ -156,15 +157,13 @@ function parseCustomCartons(body: Record<string, unknown>):
       errors[`customCartons.${ci}.contents`] = "Add at least one product line in this carton.";
     }
     const customBoxCodeRaw = typeof obj.customBoxCode === "string" ? obj.customBoxCode.trim() : "";
-    if (customBoxCodeRaw) {
-      const boxErr = assertValidCustomBoxCode(customBoxCodeRaw);
-      if (boxErr) errors[`customCartons.${ci}.customBoxCode`] = boxErr;
-    }
-    if (boxCount !== null && contents.length > 0) {
+    const boxErr = assertValidCustomBoxCode(customBoxCodeRaw);
+    if (boxErr) errors[`customCartons.${ci}.customBoxCode`] = boxErr;
+    if (boxCount !== null && contents.length > 0 && !boxErr) {
       cartons.push({
         boxCount,
         contents,
-        ...(customBoxCodeRaw ? { customBoxCode: customBoxCodeRaw.toLowerCase() } : {}),
+        customBoxCode: customBoxCodeRaw.toLowerCase(),
         ...(label ? { label } : {}),
       });
     }
@@ -193,11 +192,7 @@ export function parseOrderBody(
     body.orderKind === "mixed_sample" ? ("mixed_sample" as const) : ("standard" as const);
 
   const city = typeof body.city === "string" ? body.city.trim() : "";
-  let deadlineDate: Date | null = null;
-  if (typeof body.deadlineDate === "string" && body.deadlineDate.trim()) {
-    const parsed = new Date(body.deadlineDate.trim());
-    if (!Number.isNaN(parsed.getTime())) deadlineDate = parsed;
-  }
+  const deadlineDate = parseDeadlineFromBody(body.deadlineDate);
 
   const poNumber = String(body.poNumber ?? "").trim();
   const customerName = String(body.customerName ?? "").trim();

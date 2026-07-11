@@ -362,7 +362,10 @@ export function batchUsageKey(
 export function productsMatch(a: string, b: string, catalog: CatalogProduct[]): boolean {
   const keyA = catalogProductKey(a, catalog);
   const keyB = catalogProductKey(b, catalog);
-  return keyA !== null && keyB !== null && keyA === keyB;
+  if (keyA !== null && keyB !== null && keyA === keyB) return true;
+  const normA = a.trim().toLowerCase().replace(/\s+/g, " ");
+  const normB = b.trim().toLowerCase().replace(/\s+/g, " ");
+  return normA.length > 0 && normA === normB;
 }
 
 export function findPoolBatch(

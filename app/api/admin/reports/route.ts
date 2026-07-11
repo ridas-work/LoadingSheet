@@ -49,6 +49,8 @@ function mapOrders(orders: Array<Record<string, unknown>>): ReportOrderInput[] {
       createdAt?: Date | string | null;
       gateDeliveryStatus?: string | null;
       gateDeliveredAt?: Date | string | null;
+      dispatchTripId?: unknown;
+      dispatch?: { vehicleNo?: string | null; dcNo?: string | null } | null;
       discardedAt?: Date | string | null;
       orderKind?: string | null;
       items?: ReportOrderInput["items"];
@@ -64,6 +66,8 @@ function mapOrders(orders: Array<Record<string, unknown>>): ReportOrderInput[] {
       createdAt: doc.createdAt,
       gateDeliveryStatus: doc.gateDeliveryStatus,
       gateDeliveredAt: doc.gateDeliveredAt,
+      dispatchTripId: doc.dispatchTripId,
+      dispatch: doc.dispatch,
       discardedAt: doc.discardedAt,
       orderKind: doc.orderKind,
       items: doc.items,
@@ -83,6 +87,7 @@ function mapCatalog(docs: Array<Record<string, unknown>>): ReportCatalogRow[] {
       summaryLabel?: string;
       litersPerBottle?: number | null;
       bottlesPerCarton?: number | null;
+      batchFamily?: string | null;
     };
     return {
       code: doc.code,
@@ -91,6 +96,7 @@ function mapCatalog(docs: Array<Record<string, unknown>>): ReportCatalogRow[] {
       summaryLabel: doc.summaryLabel ?? "",
       litersPerBottle: doc.litersPerBottle ?? undefined,
       bottlesPerCarton: doc.bottlesPerCarton ?? undefined,
+      batchFamily: doc.batchFamily ?? undefined,
     };
   });
 }
@@ -105,7 +111,7 @@ export async function GET(req: Request) {
   if (!canViewAdminSummary(role, username)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (!canViewAdminReports(role)) {
+  if (!canViewAdminReports(role, username)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -147,6 +153,8 @@ export async function GET(req: Request) {
     createdAt: 1,
     gateDeliveryStatus: 1,
     gateDeliveredAt: 1,
+    dispatchTripId: 1,
+    dispatch: 1,
     discardedAt: 1,
     items: 1,
     sheetLines: 1,
@@ -187,6 +195,7 @@ export async function GET(req: Request) {
         return NextResponse.json({
           customerQuery: "",
           orders: [],
+          productTotals: [],
           customerNames: distinctCustomerNames(scoped).slice(0, 500),
           grandTotals: {
             orderCount: 0,

@@ -6,6 +6,7 @@ import {
   normalizeApprovalStatus,
   type ApprovalStatus,
 } from "@/lib/orderApproval";
+import { formatDateOnlyDisplay, formatDisplayDate } from "@/lib/dateOnly";
 
 export type SummaryColumn = {
   key: string;
@@ -68,13 +69,6 @@ export type SummaryOrderInput = {
 
 function columnLabel(p: SummaryCatalogRow): string {
   return p.summaryLabel?.trim() || p.name;
-}
-
-function formatDeadline(value: Date | string | null | undefined): string {
-  if (!value) return "";
-  const d = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
 }
 
 function isBuiltyDone(order: SummaryOrderInput): boolean {
@@ -180,7 +174,7 @@ export function buildAdminOrderSummary(
       orderId: order._id.toString(),
       customerName: order.customerName,
       city: order.city?.trim() ?? "",
-      deadlineDisplay: builtyDone ? "BUILTY DONE" : formatDeadline(order.deadlineDate),
+      deadlineDisplay: builtyDone ? "BUILTY DONE" : formatDateOnlyDisplay(order.deadlineDate),
       builtyDone,
       gateDeliveryStatus: gate,
       statusLabel: statusLabelFor(order),
@@ -201,7 +195,7 @@ export function buildAdminOrderSummary(
   const now = new Date();
 
   return {
-    reportDate: now.toLocaleDateString(),
+    reportDate: formatDisplayDate(now),
     columns,
     rows,
     columnTotals,

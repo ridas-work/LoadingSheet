@@ -198,6 +198,31 @@ export function lineBatchAllocations(
   ];
 }
 
+/** Liters one row would consume from a batch for the given product (bundle component or simple line). */
+export function lineLitersForProduct(
+  line: SheetLineLike,
+  productName: string,
+  catalog: PackingCatalogRow[],
+): number {
+  if (lineUsesComponentBatches(line, catalog)) {
+    const parts = resolveComponentParts(line, catalog);
+    for (let index = 0; index < parts.length; index++) {
+      const part = parts[index];
+      if (!productsMatch(part.productName, productName, catalog)) continue;
+      if (isMixedSampleLine(line)) {
+        return roundLiters(part.bottlesPerUnit * part.litersPerBottle);
+      }
+      return roundLiters(line.bottlesPerBox * part.bottlesPerUnit * part.litersPerBottle);
+    }
+    return 0;
+  }
+  const packing = findPackingByName(line.productName, catalog);
+  const lp = packing
+    ? inferLitersPerBottleFromName(packing.name, packing.litersPerBottle)
+    : inferLitersPerBottleFromName(line.productName);
+  return roundLiters(line.bottlesPerBox * lp);
+}
+
 export function lineTotalLiters(line: SheetLineLike, catalog: PackingCatalogRow[]): number | null {
   const allocations = lineBatchAllocations(line, catalog);
   if (allocations.length === 0) return null;

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:users": "tsx scripts/seed-users.ts",
+    "seed:custom-carton-boxes": "tsx scripts/seed-custom-carton-boxes.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

@@ -7,9 +7,12 @@ import { useCallback, useEffect, useState } from "react";
 import {
   SAMPLE_MODE_LABELS,
   STATUS_LABELS,
+  VISIT_KIND_LABELS,
   type SampleMode,
   type SerializedTicket,
+  type VisitKind,
 } from "@/lib/fieldVisitTickets";
+import { formatDateOnlyDisplay, formatDisplayDate } from "@/lib/dateOnly";
 
 type Filter = "all" | "open" | "awaiting" | "closed" | "follow_up";
 
@@ -20,7 +23,12 @@ function statusBadgeClass(status: string): string {
   return "bg-sky-100 text-sky-900";
 }
 
-function matchesFilter(t: SerializedTicket, filter: Filter): boolean {
+function matchesFilter(t: SerializedTicket, filter: Filter, marketRepMode?: boolean): boolean {
+  if (marketRepMode) {
+    if (filter === "open") return !t.marketVisitSubmittedAt;
+    if (filter === "closed") return Boolean(t.marketVisitSubmittedAt);
+    return true;
+  }
   if (filter === "follow_up") return t.needsFollowUp;
   if (filter === "open") return t.status === "active";
   if (filter === "awaiting") return t.status === "visit_concluded";
@@ -46,18 +54,48 @@ function matchesSearch(t: SerializedTicket, query: string): boolean {
     t.followUpComments,
     t.feedbackComments,
     t.closedReason,
+    t.marketVisitRemarks,
     STATUS_LABELS[t.status],
+    VISIT_KIND_LABELS[t.visitKind],
     SAMPLE_MODE_LABELS[t.sampleMode as SampleMode],
     ...t.sampleProducts.flatMap((p) => [p.productName, p.notes]),
     ...t.visitLogs.flatMap((l) => [l.conclusion, l.recordedByName]),
+    ...t.marketVisitRows.flatMap((r) => [r.storeName, r.location, r.remarks]),
   ];
 
   return haystack.some((part) => part?.toLowerCase().includes(needle));
 }
 
+function marketVisitTitle(t: SerializedTicket): string {
+  const stores = t.marketVisitRows.filter((r) => r.storeName.trim());
+  if (stores.length === 1) return stores[0].storeName;
+  if (stores.length > 1) return `${stores.length} stores`;
+  if (t.marketVisitDate) {
+    return `Market visit ${t.marketVisitDate.slice(0, 10)}`;
+  }
+  return t.marketVisitSubmittedAt ? "Market visit (submitted)" : "New market visit (draft)";
+}
+
+function marketVisitSubtitle(t: SerializedTicket): string {
+  const parts: string[] = [];
+  const withLocation = t.marketVisitRows.filter((r) => r.location.trim());
+  if (withLocation.length === 1) parts.push(withLocation[0].location);
+  else if (withLocation.length > 1) parts.push(`${withLocation.length} locations`);
+  if (t.marketVisitDate) {
+    parts.push(formatDateOnlyDisplay(t.marketVisitDate) || formatDisplayDate(t.marketVisitDate));
+  }
+  return parts.join(" · ");
+}
+
 type RepPoint = { username: string; name: string; points: number; won: number; lost: number };
 
-export function FieldVisitList({ showRep }: { showRep?: boolean }) {
+export function FieldVisitList({
+  showRep,
+  marketRepMode,
+}: {
+  showRep?: boolean;
+  marketRepMode?: boolean;
+}) {
   const router = useRouter();
   const [tickets, setTickets] = useState<SerializedTicket[]>([]);
   const [repPoints, setRepPoints] = useState<RepPoint[]>([]);
@@ -113,11 +151,12 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
         body: "{}",
       });
       const data = (await res.json()) as { id?: string; ticket?: SerializedTicket; error?: string };
-      if (!res.ok || !data.ticket?.id) {
+      const newId = data.ticket?.id ?? data.id;
+      if (!res.ok || !newId) {
         setError(data.error ?? "Could not create visit.");
         return;
       }
-      router.push(`/field-visits/${data.ticket.id}`);
+      router.push(`/field-visits/${newId}`);
     } catch {
       setError("Could not create visit.");
     } finally {
@@ -126,7 +165,7 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
   }
 
   const filtered = tickets.filter(
-    (t) => matchesFilter(t, filter) && matchesSearch(t, search),
+    (t) => matchesFilter(t, filter, marketRepMode) && matchesSearch(t, search),
   );
 
   return (
@@ -153,7 +192,7 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
           </ul>
         </div>
       ) : null}
-      {followUpCount > 0 ? (
+      {followUpCount > 0 && !marketRepMode ? (
         <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
           <strong>{followUpCount}</strong> visit{followUpCount === 1 ? "" : "s"} need a{" "}
           <strong>2-week follow-up</strong> after sample delivery.
@@ -168,20 +207,30 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
           type="search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Customer, place, city, phone, product, notes, rep…"
+          placeholder={
+            marketRepMode
+              ? "Store, location, remarks, rep…"
+              : "Customer, place, city, phone, product, notes, rep…"
+          }
           className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400"
         />
       </div>
 
       <div className="flex flex-wrap gap-2">
         {(
-          [
-            ["all", "All"],
-            ["follow_up", `Follow-up (${followUpCount})`],
-            ["open", "In progress"],
-            ["awaiting", "Awaiting order"],
-            ["closed", "Closed"],
-          ] as const
+          marketRepMode
+            ? ([
+                ["all", "All"],
+                ["open", "Draft"],
+                ["closed", "Submitted"],
+              ] as const)
+            : ([
+                ["all", "All"],
+                ["follow_up", `Follow-up (${followUpCount})`],
+                ["open", "In progress"],
+                ["awaiting", "Awaiting order"],
+                ["closed", "Closed"],
+              ] as const)
         ).map(([key, label]) => (
           <button
             key={key}
@@ -203,7 +252,7 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
             onClick={() => void createVisit()}
             className="ml-auto rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
           >
-            {creating ? "Creating…" : "New visit"}
+            {creating ? "Creating…" : marketRepMode ? "New market visit" : "New visit"}
           </button>
         ) : null}
       </div>
@@ -212,15 +261,35 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
       {loading ? <p className="text-sm text-zinc-600">Loading…</p> : null}
 
       {!loading && filtered.length === 0 ? (
-        <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
-          {search.trim()
-            ? "No visits match your search."
-            : "No visits in this view."}
-        </p>
+        <div className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
+          {search.trim() ? (
+            "No visits match your search."
+          ) : marketRepMode ? (
+            <div className="space-y-3">
+              <p>No market visits yet.</p>
+              <p className="text-zinc-500">
+                Click <strong>New market visit</strong> to open the store availability and facing
+                grid form.
+              </p>
+              <button
+                type="button"
+                disabled={creating}
+                onClick={() => void createVisit()}
+                className="rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {creating ? "Opening form…" : "Open market visit form"}
+              </button>
+            </div>
+          ) : (
+            "No visits in this view."
+          )}
+        </div>
       ) : null}
 
       <ul className="space-y-2">
-        {filtered.map((t) => (
+        {filtered.map((t) => {
+          const isMarket = t.visitKind === "market_audit" || Boolean(t.marketVisitDate);
+          return (
           <li key={t.id}>
             <Link
               href={`/field-visits/${t.id}`}
@@ -229,17 +298,27 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <div className="font-medium text-zinc-900">
-                    {t.placeName ||
-                      t.customerName ||
-                      (t.visitLogCount > 0 ? "Visit logged — add customer details" : "New visit (draft)")}
+                    {isMarket
+                      ? marketVisitTitle(t)
+                      : t.placeName ||
+                        t.customerName ||
+                        (t.visitLogCount > 0 ? "Visit logged — add customer details" : "New visit (draft)")}
                   </div>
                   <div className="text-sm text-zinc-600">
-                    {t.placeName && t.customerName ? t.customerName : null}
-                    {t.city ? `${t.placeName || t.customerName ? " · " : ""}${t.city}` : ""}
+                    {isMarket
+                      ? marketVisitSubtitle(t)
+                      : (
+                          <>
+                            {t.placeName && t.customerName ? t.customerName : null}
+                            {t.city ? `${t.placeName || t.customerName ? " · " : ""}${t.city}` : ""}
+                          </>
+                        )}
                   </div>
                   <div className="mt-0.5 text-xs text-zinc-500">
-                    {t.visitLogCount} visit{t.visitLogCount !== 1 ? "s" : ""}
-                    {t.sampleMode !== "none"
+                    {isMarket
+                      ? `${t.marketVisitRows.filter((r) => r.storeName.trim()).length} store${t.marketVisitRows.filter((r) => r.storeName.trim()).length !== 1 ? "s" : ""}`
+                      : `${t.visitLogCount} visit${t.visitLogCount !== 1 ? "s" : ""}`}
+                    {!isMarket && t.sampleMode !== "none"
                       ? ` · ${SAMPLE_MODE_LABELS[t.sampleMode as SampleMode]}`
                       : ""}
                     {!showRep && t.createdByName ? ` · ${t.createdByName}` : ""}
@@ -250,14 +329,29 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusBadgeClass(t.status)}`}
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      isMarket
+                        ? t.marketVisitSubmittedAt
+                          ? "bg-emerald-100 text-emerald-800"
+                          : "bg-sky-100 text-sky-900"
+                        : statusBadgeClass(t.status)
+                    }`}
                   >
-                    {STATUS_LABELS[t.status]}
+                    {isMarket
+                      ? t.marketVisitSubmittedAt
+                        ? "Submitted"
+                        : "Draft"
+                      : STATUS_LABELS[t.status]}
                   </span>
-                  {t.needsFollowUp ? (
+                  {showRep ? (
+                    <span className="text-xs text-zinc-500">
+                      {VISIT_KIND_LABELS[t.visitKind as VisitKind]}
+                    </span>
+                  ) : null}
+                  {!isMarket && t.needsFollowUp ? (
                     <span className="text-xs font-medium text-amber-700">2-week follow-up due</span>
                   ) : null}
-                  {t.status === "closed_won" || t.status === "closed_lost" ? (
+                  {!isMarket && (t.status === "closed_won" || t.status === "closed_lost") ? (
                     <span
                       className={`text-xs font-semibold ${
                         t.pointsAwarded >= 0 ? "text-emerald-700" : "text-red-700"
@@ -271,7 +365,8 @@ export function FieldVisitList({ showRep }: { showRep?: boolean }) {
               </div>
             </Link>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </div>
   );

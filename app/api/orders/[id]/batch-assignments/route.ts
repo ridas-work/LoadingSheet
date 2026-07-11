@@ -112,6 +112,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!order) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  if (order.orderKind === "field_sample") {
+    return NextResponse.json(
+      { error: "Field sample orders use the sample batch assignment route." },
+      { status: 400 },
+    );
+  }
 
   const catalog: PackingCatalogRow[] = packingCatalogFromDocs(catalogDocs);
   const catalogDeduction: DeductionPacking[] = catalog.map((p) => ({
@@ -299,6 +305,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   order.batchUpdatedByUserId = userId;
   order.batchUpdatedByName = session.user.name ?? "";
   order.batchUpdatedAt = new Date();
+  order.markModified("sheetLines");
   await order.save();
 
   return NextResponse.json({ ok: true });

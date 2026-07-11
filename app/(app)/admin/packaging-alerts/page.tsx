@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import { PackagingReorderAlertsPanel } from "@/components/PackagingReorderAlertsPanel";
 import { auth } from "@/lib/auth";
-import { isAdmin, roleFromSession } from "@/lib/roles";
+import { canViewPackagingAlerts, roleFromSession } from "@/lib/roles";
 import { ui } from "@/lib/ui";
 
 export default async function PackagingAlertsPage() {
@@ -10,7 +10,8 @@ export default async function PackagingAlertsPage() {
   if (!session?.user) redirect("/login");
 
   const role = roleFromSession(session.user as { role?: string });
-  if (!isAdmin(role)) redirect("/admin");
+  const username = (session.user as { username?: string })?.username;
+  if (!canViewPackagingAlerts(role, username)) redirect("/admin");
 
   return (
     <div className="space-y-4">

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { FieldVisitList } from "@/components/FieldVisitList";
 import { auth } from "@/lib/auth";
+import { isMarketVisitRep } from "@/lib/fieldVisitTickets";
 import { canAccessFieldVisits, roleFromSession } from "@/lib/roles";
 
 export default async function FieldVisitsPage() {
@@ -12,17 +13,21 @@ export default async function FieldVisitsPage() {
     redirect(role ? "/new-order" : "/login");
   }
 
+  const marketRep = isMarketVisitRep(username);
+
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Field visits</h1>
+        <h1 className="text-2xl font-semibold text-zinc-900">
+          {marketRep ? "Market visits" : "Field visits"}
+        </h1>
         <p className="mt-1 text-sm text-zinc-600">
-          Start a visit, choose whether there is a sample (none, we send, or customer gave), log each
-          trip back, then close when the customer orders or the deal is lost. Use search to find
-          customers or any visit detail.
+          {marketRep
+            ? "Record store availability (yes/no) and shelf facing units across the product grid. Submit when the market round is complete."
+            : "Start a visit, choose whether there is a sample (none, we send, or customer gave), log each trip back, then close when the customer orders or the deal is lost. Use search to find customers or any visit detail."}
         </p>
       </div>
-      <FieldVisitList />
+      <FieldVisitList marketRepMode={marketRep} />
     </div>
   );
 }

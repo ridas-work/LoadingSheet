@@ -4,6 +4,7 @@ import { connectToDatabase } from "@/lib/db";
 import {
   listCustomBoxBatchProductNames,
   listStandardBatchFamilies,
+  listUnifiedBatchProductOptions,
 } from "@/lib/nimraBatchProductLists";
 import { ProductPacking } from "@/lib/models/ProductPacking";
 
@@ -36,6 +37,7 @@ export async function GET() {
   const standardNames = await listStandardBatchFamilies();
   const batchFamilies = standardNames.map((name) => ({ name, batchFamily: name }));
   const customBoxProducts = await listCustomBoxBatchProductNames();
+  const unifiedBatchProducts = await listUnifiedBatchProductOptions();
 
-  return NextResponse.json({ products, batchFamilies, customBoxProducts });
+  return NextResponse.json({ products, batchFamilies, customBoxProducts, unifiedBatchProducts });
 }

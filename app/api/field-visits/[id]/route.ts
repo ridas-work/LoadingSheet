@@ -2,23 +2,31 @@ import { NextResponse } from "next/server";
 import mongoose from "mongoose";
 
 import { auth } from "@/lib/auth";
-import { upsertCustomerDirectory } from "@/lib/customerDirectoryStore";
+import { validateApprovedCustomerName } from "@/lib/customerAccountAccess";
 import { connectToDatabase } from "@/lib/db";
 import {
   assertActionAllowed,
   canAccessFieldVisits,
   canEditFieldVisit,
+  canViewFieldVisit,
   closeTicketLost,
   effectiveSampleApprovalStatus,
   followUpDueFromDelivery,
+  marketVisitAllowedActions,
   normalizeTicketStatus,
   parseSampleFeedback,
   parseSampleMode,
   parseSampleProducts,
+  parseVisitKind,
+  persistMarketVisitRows,
+  shouldUseMarketVisitForm,
   serializeTicket,
   type TicketAction,
+  validateMarketVisitPayload,
   visitLogCount,
 } from "@/lib/fieldVisitTickets";
+import { parseMarketVisitRows } from "@/lib/marketVisitTypes";
+import { syncMarketVisitAlerts } from "@/lib/marketVisitAlerts";
 import { FieldVisitTicket } from "@/lib/models/FieldVisitTicket";
 import { ProductPacking } from "@/lib/models/ProductPacking";
 import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
@@ -27,7 +35,7 @@ import {
   persistCustomProductNames,
 } from "@/lib/persistCustomProductNames";
 import { roleFromSession } from "@/lib/roles";
-import { deductSampleProduction, samplePoolForCatalog } from "@/lib/sampleProductionStock";
+import { samplePoolForCatalog } from "@/lib/sampleProductionStock";
 
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -52,7 +60,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   }
 
   const userId = (session.user as { id?: string })?.id ?? "";
-  if (!canEditFieldVisit(role, username, ticket, userId) && role !== "admin") {
+  if (!canViewFieldVisit(role, username, ticket, userId) && role !== "admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -60,7 +68,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     .select({ code: 1, name: 1, bottlesPerCarton: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1 })
     .lean();
   const catalog = packingCatalogFromDocs(catalogDocs);
-  const sampleStock = await samplePoolForCatalog(catalog);
+  const visitKind = parseVisitKind(ticket.visitKind);
+  const sampleStock =
+    visitKind === "sales" ? await samplePoolForCatalog(catalog) : [];
 
   return NextResponse.json({ ticket: serializeTicket(ticket), sampleStock });
 }
@@ -100,13 +110,95 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const visitKind = parseVisitKind(ticket.visitKind);
+  const isMarketTicket =
+    visitKind === "market_audit" || shouldUseMarketVisitForm(ticket);
+
+  if (isMarketTicket) {
+    if (action !== "update_market_visit" && action !== "submit_market_visit") {
+      return NextResponse.json(
+        { error: "This market visit does not support sales visit actions." },
+        { status: 400 },
+      );
+    }
+    if (visitKind !== "market_audit") {
+      ticket.visitKind = "market_audit";
+    }
+    if (ticket.marketVisitSubmittedAt) {
+      return NextResponse.json({ error: "This market visit was already submitted." }, { status: 400 });
+    }
+    if (!marketVisitAllowedActions(ticket).includes(action)) {
+      return NextResponse.json({ error: `Action "${action}" is not allowed.` }, { status: 400 });
+    }
+
+    const errors: Record<string, string> = {};
+    const marketVisitDateRaw =
+      typeof body.marketVisitDate === "string" ? body.marketVisitDate.trim() : "";
+    const marketVisitRemarks =
+      typeof body.marketVisitRemarks === "string" ? body.marketVisitRemarks.trim() : "";
+    const rows = parseMarketVisitRows(body.marketVisitRows);
+
+    if (marketVisitDateRaw) {
+      const d = new Date(marketVisitDateRaw);
+      if (Number.isNaN(d.getTime())) {
+        errors.marketVisitDate = "Invalid visit date.";
+      } else {
+        ticket.marketVisitDate = d;
+      }
+    } else if (!ticket.marketVisitDate) {
+      ticket.marketVisitDate = new Date();
+    }
+
+    ticket.marketVisitRemarks = marketVisitRemarks;
+    persistMarketVisitRows(ticket, rows);
+
+    if (action === "submit_market_visit") {
+      Object.assign(errors, validateMarketVisitPayload(rows));
+    }
+
+    if (Object.keys(errors).length > 0) {
+      return NextResponse.json({ errors }, { status: 400 });
+    }
+
+    if (action === "submit_market_visit") {
+      ticket.marketVisitSubmittedAt = new Date();
+    }
+
+    await ticket.save();
+
+    const openAlertsByStoreKey = await syncMarketVisitAlerts({
+      visitId: ticket._id.toString(),
+      username: username ?? ticket.createdByUsername ?? "",
+      rows,
+    });
+
+    return NextResponse.json({ ticket: serializeTicket(ticket), openAlertsByStoreKey });
+  }
+
+  if (action === "update_market_visit" || action === "submit_market_visit") {
+    return NextResponse.json({ error: "This sales visit does not support market visit actions." }, { status: 400 });
+  }
+
+  if (shouldUseMarketVisitForm(ticket)) {
+    return NextResponse.json(
+      { error: "Use the market visit form to save this ticket." },
+      { status: 400 },
+    );
+  }
+
   const status = normalizeTicketStatus(ticket.status);
   const sampleMode = parseSampleMode(ticket.sampleMode) ?? "none";
   const logCount = visitLogCount(ticket);
   const sampleApprovalStatus = effectiveSampleApprovalStatus(ticket);
 
+  // The rep can pick a sample mode and request approval in one step without a
+  // separate save — gate the request on the submitted mode, not the stored one.
+  const requestedMode = parseSampleMode(body.sampleMode);
+  const gateSampleMode =
+    action === "request_sample_approval" && requestedMode ? requestedMode : sampleMode;
+
   const block = assertActionAllowed(status, action, {
-    sampleMode,
+    sampleMode: gateSampleMode,
     visitLogCount: logCount,
     sampleApprovalStatus,
   });
@@ -121,6 +213,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const customerName = typeof body.customerName === "string" ? body.customerName.trim() : "";
     if (!placeName) errors.placeName = "Place / shop name is required.";
     if (!customerName) errors.customerName = "Customer name is required.";
+    else {
+      const customerCheck = await validateApprovedCustomerName(customerName);
+      if (!customerCheck.ok) errors.customerName = customerCheck.error;
+    }
 
     const nextMode = parseSampleMode(body.sampleMode) ?? sampleMode;
     const sampleProducts = parseSampleProducts(body.sampleProducts);
@@ -149,9 +245,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         userId,
         name: userName,
       });
-      if (customerName) {
-        await upsertCustomerDirectory(customerName, { userId, name: userName });
-      }
     }
   } else if (action === "request_sample_approval") {
     const placeName = typeof body.placeName === "string" ? body.placeName.trim() : ticket.placeName ?? "";
@@ -159,6 +252,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       typeof body.customerName === "string" ? body.customerName.trim() : ticket.customerName ?? "";
     if (!placeName) errors.placeName = "Place / shop name is required.";
     if (!customerName) errors.customerName = "Customer name is required.";
+    else {
+      const customerCheck = await validateApprovedCustomerName(customerName);
+      if (!customerCheck.ok) errors.customerName = customerCheck.error;
+    }
 
     const nextMode = parseSampleMode(body.sampleMode) ?? sampleMode;
     if (nextMode === "none") {
@@ -170,6 +267,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
 
     if (Object.keys(errors).length === 0) {
+      // Sample production stock is deducted later, when Rashid assigns sample
+      // batches to the dispatch order — not at request time.
       ticket.placeName = placeName;
       ticket.customerName = customerName;
       ticket.city = typeof body.city === "string" ? body.city.trim() : ticket.city ?? "";
@@ -194,9 +293,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         userId,
         name: userName,
       });
-      if (customerName) {
-        await upsertCustomerDirectory(customerName, { userId, name: userName });
-      }
     }
   } else if (action === "record_sample_event") {
     const mode = parseSampleMode(ticket.sampleMode) ?? "none";
@@ -224,24 +320,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (Number.isNaN(eventDate.getTime())) {
       errors.eventDate = "Invalid date.";
     } else if (mode === "outgoing") {
-      const catalogDocs = await ProductPacking.find({ active: true })
-        .select({ code: 1, name: 1, bottlesPerCarton: 1, litersPerBottle: 1, aliases: 1, batchFamily: 1 })
-        .lean();
-      const catalog = packingCatalogFromDocs(catalogDocs);
-      const products = (ticket.sampleProducts ?? []).map((p) => ({
-        productName: p.productName,
-        bottles: typeof p.bottles === "number" && p.bottles >= 1 ? p.bottles : 1,
-      }));
-      const deduct = await deductSampleProduction({
-        products,
-        visitTicketId: ticket._id.toString(),
-        actor: { userName, username: username ?? "" },
-        catalog,
-      });
-      if (!deduct.ok) {
-        return NextResponse.json({ error: deduct.error }, { status: 400 });
-      }
-
       const feedback = parseSampleFeedback(body.sampleFeedback) ?? "pending";
       const comments = typeof body.feedbackComments === "string" ? body.feedbackComments.trim() : "";
       ticket.sampleFeedback = feedback;

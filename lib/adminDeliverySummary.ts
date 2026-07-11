@@ -1,5 +1,21 @@
 import { GATE_STATUS_LABELS, normalizeGateStatus } from "@/lib/gateDelivery";
+import { formatDisplayDate } from "@/lib/dateOnly";
+import { normalizeClosureForDisplay } from "@/lib/gateDeliveryClosure";
+import type { DeductionPacking, DeductionSheetLine } from "@/lib/packagingDeduction";
 import { SUBTRACTED_STATUS_LABELS, type SubtractedItemRecord } from "@/lib/subtractedItems";
+
+export type DeliveryClosureRow = {
+  id: string;
+  orderId: string;
+  poNumber: string;
+  customerName: string;
+  productName: string;
+  deliveredBottles: number;
+  damagedBottles: number;
+  returnedBottles: number;
+  deliveryOutcome: string;
+  closedAtLabel: string;
+};
 
 export type SummaryLineRow = {
   id: string;
@@ -18,10 +34,12 @@ export type AdminDeliverySummary = {
   delivered: SummaryLineRow[];
   pending: SummaryLineRow[];
   closed: SummaryLineRow[];
+  closureRows: DeliveryClosureRow[];
   counts: {
     delivered: number;
     pending: number;
     closed: number;
+    closureRows: number;
   };
 };
 
@@ -34,13 +52,28 @@ type OrderInput = {
   discardedAt?: Date | string | null;
   items?: Array<{ productName?: string; boxes?: number; bottlesPerBox?: number }>;
   subtractedItems?: SubtractedItemRecord[];
+  sheetLines?: DeductionSheetLine[];
+  deliveryOutcome?: string | null;
+  orderClosedAt?: Date | string | null;
+  deliveryClosureLines?: Array<{
+    productName?: string;
+    deliveredBottles?: number;
+    damagedBottles?: number;
+    returnedBottles?: number;
+  }>;
+  deliveryLateReturns?: Array<{
+    lines?: Array<{ productName?: string; damagedBottles?: number; returnedBottles?: number }>;
+  }>;
+};
+
+type BuildSummaryOpts = {
+  catalog?: DeductionPacking[];
 };
 
 function formatDate(value: Date | string | null | undefined): string {
   if (!value) return "—";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString();
+  const formatted = formatDisplayDate(value);
+  return formatted || "—";
 }
 
 function qtyLabelForItem(item: SubtractedItemRecord): string {
@@ -89,15 +122,75 @@ function subtractionRow(
 export function buildAdminDeliverySummary(
   orders: OrderInput[],
   reportDate = new Date(),
+  opts: BuildSummaryOpts = {},
 ): AdminDeliverySummary {
   const delivered: SummaryLineRow[] = [];
   const pending: SummaryLineRow[] = [];
   const closed: SummaryLineRow[] = [];
+  const closureRows: DeliveryClosureRow[] = [];
+  const catalog = opts.catalog ?? [];
 
   for (const order of orders) {
     const gate = normalizeGateStatus(order.gateDeliveryStatus);
     const oid = order._id.toString();
     const onLoadSummary = orderProductsSummary(order);
+
+    if (gate === "delivered" && catalog.length > 0) {
+      const display = normalizeClosureForDisplay(
+        {
+          deliveryOutcome: order.deliveryOutcome,
+          orderClosedAt: order.orderClosedAt,
+          deliveryClosureLines: order.deliveryClosureLines,
+          deliveryLateReturns: order.deliveryLateReturns,
+          sheetLines: order.sheetLines,
+        },
+        catalog,
+      );
+      const closedLabel = formatDate(order.orderClosedAt ?? order.gateDeliveredAt);
+      for (const line of display.lines) {
+        const lateDamaged = display.lateReturns.reduce(
+          (s, ev) =>
+            s +
+            (ev.lines.find((l) => l.productName === line.productName)?.damagedBottles ?? 0),
+          0,
+        );
+        const lateReturned = display.lateReturns.reduce(
+          (s, ev) =>
+            s +
+            (ev.lines.find((l) => l.productName === line.productName)?.returnedBottles ?? 0),
+          0,
+        );
+        closureRows.push({
+          id: `closure-${oid}-${line.productCode}`,
+          orderId: oid,
+          poNumber: order.poNumber,
+          customerName: order.customerName,
+          productName: line.productName,
+          deliveredBottles: line.deliveredBottles,
+          damagedBottles: line.damagedBottles + lateDamaged,
+          returnedBottles: line.returnedBottles + lateReturned,
+          deliveryOutcome: display.outcome,
+          closedAtLabel: closedLabel,
+        });
+      }
+      for (const ev of display.lateReturns) {
+        for (const l of ev.lines) {
+          if (display.lines.some((x) => x.productName === l.productName)) continue;
+          closureRows.push({
+            id: `late-${oid}-${l.productCode}-${ev.recordedAt}`,
+            orderId: oid,
+            poNumber: order.poNumber,
+            customerName: order.customerName,
+            productName: l.productName,
+            deliveredBottles: 0,
+            damagedBottles: l.damagedBottles,
+            returnedBottles: l.returnedBottles,
+            deliveryOutcome: "late_return",
+            closedAtLabel: formatDate(ev.recordedAt),
+          });
+        }
+      }
+    }
 
     if (order.discardedAt) {
       closed.push({
@@ -151,14 +244,16 @@ export function buildAdminDeliverySummary(
 
   const rd = reportDate;
   return {
-    reportDate: `${rd.getDate()}/${rd.getMonth() + 1}/${rd.getFullYear()}`,
+    reportDate: formatDisplayDate(rd),
     delivered,
     pending,
     closed,
+    closureRows,
     counts: {
       delivered: delivered.length,
       pending: pending.length,
       closed: closed.length,
+      closureRows: closureRows.length,
     },
   };
 }

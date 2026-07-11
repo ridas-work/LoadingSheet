@@ -265,7 +265,7 @@ export function AdminChemicalRequestsTable() {
                               type="button"
                               disabled={acting === r.id}
                               onClick={() => act(r.id, "reject")}
-                              className={ui.btnGhost}
+                              className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-red-800 ring-1 ring-red-200 disabled:opacity-50"
                             >
                               Reject
                             </button>

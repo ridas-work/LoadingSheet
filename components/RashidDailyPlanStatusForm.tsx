@@ -134,7 +134,7 @@ export function RashidDailyPlanStatusForm({
       <div className={`${ui.card} space-y-3 p-4`}>
         <p className="text-sm text-red-700">{errors.form}</p>
         {showAdminLinks ? (
-          <Link href={`/admin/rashid-daily-plan/new?date=${planDate}`} className={ui.btnPrimary}>
+          <Link href={`/admin/rashid-daily-plan/create?date=${planDate}`} className={ui.btnPrimary}>
             Create morning plan
           </Link>
         ) : (

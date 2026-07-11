@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import type { AdminDeliverySummary, SummaryLineRow } from "@/lib/adminDeliverySummary";
+import type { AdminDeliverySummary, DeliveryClosureRow, SummaryLineRow } from "@/lib/adminDeliverySummary";
 
 function SummaryTable({
   title,
@@ -83,6 +83,67 @@ function SummaryTable({
   );
 }
 
+function ClosureTable({ rows }: { rows: DeliveryClosureRow[] }) {
+  return (
+    <section className="rounded-xl border border-violet-200 bg-white shadow-sm overflow-hidden">
+      <div className="px-4 py-3 bg-violet-100 text-violet-950">
+        <h2 className="text-sm font-semibold">
+          Delivery closure <span className="font-normal opacity-80">({rows.length})</span>
+        </h2>
+        <p className="mt-0.5 text-xs opacity-90">
+          Per PO and product — bottles delivered to customer, damaged (write-off), and returned good to Rashid
+          stock (includes late returns).
+        </p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-zinc-200 bg-zinc-50 text-left text-xs uppercase tracking-wide text-zinc-600">
+              <th className="px-3 py-2 font-semibold">PO no</th>
+              <th className="px-3 py-2 font-semibold">Customer</th>
+              <th className="px-3 py-2 font-semibold">Product</th>
+              <th className="px-3 py-2 font-semibold">Delivered</th>
+              <th className="px-3 py-2 font-semibold">Damaged</th>
+              <th className="px-3 py-2 font-semibold">Returned</th>
+              <th className="px-3 py-2 font-semibold">Outcome</th>
+              <th className="px-3 py-2 font-semibold">Closed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={8} className="px-3 py-6 text-center text-sm text-zinc-500">
+                  No closed deliveries yet.
+                </td>
+              </tr>
+            ) : (
+              rows.map((row) => (
+                <tr key={row.id} className="border-b border-zinc-100 last:border-0">
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <Link
+                      href={`/orders/${row.orderId}/loading-sheet`}
+                      className="font-medium text-zinc-900 underline"
+                    >
+                      {row.poNumber}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">{row.customerName}</td>
+                  <td className="px-3 py-2">{row.productName}</td>
+                  <td className="px-3 py-2 text-zinc-700">{row.deliveredBottles}</td>
+                  <td className="px-3 py-2 text-zinc-700">{row.damagedBottles}</td>
+                  <td className="px-3 py-2 text-zinc-700">{row.returnedBottles}</td>
+                  <td className="px-3 py-2 text-xs capitalize">{row.deliveryOutcome.replace("_", " ")}</td>
+                  <td className="px-3 py-2 whitespace-nowrap text-zinc-600">{row.closedAtLabel}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export function AdminDeliverySummary() {
   const [data, setData] = useState<AdminDeliverySummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -133,6 +194,7 @@ export function AdminDeliverySummary() {
         <p className="text-sm text-red-700">{error}</p>
       ) : data ? (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-1">
+          <ClosureTable rows={data.closureRows} />
           <SummaryTable
             title="Delivered"
             description="POs marked delivered at the gate, plus subtracted lines marked sent."

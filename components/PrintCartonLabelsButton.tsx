@@ -4,11 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
 import type { CartonLabel } from "@/lib/cartonLabels";
+import { recordPrint } from "@/lib/logPrintClient";
+import type { PrintLogInput } from "@/lib/printLog.types";
 
 type Props = {
   poNumber: string;
   customerName: string;
   labels: CartonLabel[];
+  printLog?: PrintLogInput;
 };
 
 function CartonSticker({
@@ -53,13 +56,14 @@ function CartonSticker({
   );
 }
 
-export function PrintCartonLabelsButton({ poNumber, customerName, labels }: Props) {
+export function PrintCartonLabelsButton({ poNumber, customerName, labels, printLog }: Props) {
   const [open, setOpen] = useState(false);
 
   const runPrint = useCallback(() => {
+    if (printLog) recordPrint(printLog);
     document.body.classList.add("printing-carton-labels");
     window.print();
-  }, []);
+  }, [printLog]);
 
   useEffect(() => {
     if (!open) return;

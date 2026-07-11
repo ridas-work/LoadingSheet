@@ -1,0 +1,16 @@
+[
+  { "key": "washout-lemon-1l", "group": "WASH OUT", "columnLabel": "LEMON 1000 ML", "packingCode": "washout-lemon" },
+  { "key": "washout-ocean-1l", "group": "WASH OUT", "columnLabel": "OCEAN 1000 ML", "packingCode": "washout-ocean" },
+  { "key": "washout-floral-1l", "group": "WASH OUT", "columnLabel": "FLORAL 1000 ML", "packingCode": "washout-floral" },
+  { "key": "rhino-750ml", "group": "RHINO", "columnLabel": "BOTTLE 750 ML", "packingCode": "rhino-750ml" },
+  { "key": "rhino-500ml", "group": "RHINO", "columnLabel": "BOTTLE 500 ML", "packingCode": "rhino-500ml" },
+  { "key": "rhino-250ml", "group": "RHINO", "columnLabel": "BOTTLE 250 ML", "packingCode": "rhino-250ml" },
+  { "key": "fabrito-bottle-1l", "group": "FABRITO", "columnLabel": "BOTTLE 1000 ML", "packingCode": "fabrito-fabric-softener" },
+  { "key": "fabrito-pouch-1l", "group": "FABRITO", "columnLabel": "POUCH 1000 ML", "packingCode": "fabrito-fabric-softener-pouch" },
+  { "key": "brighten-bottle-1l", "group": "BRIGHTEN", "columnLabel": "BOTTLE 1000 ML", "packingCode": "brighten-liquid-laundry-detergent" },
+  { "key": "brighten-pouch-1l", "group": "BRIGHTEN", "columnLabel": "POUCH 1000 ML", "packingCode": "brighten-laundry-detergent-pouch" },
+  { "key": "power-wash-bottle-500ml", "group": "POWER WASH", "columnLabel": "BOTTLE 500 ML", "packingCode": "power-wash" },
+  { "key": "power-wash-pouch-1l", "group": "POWER WASH", "columnLabel": "POUCH 1000 ML", "packingCode": "power-wash-pouch" },
+  { "key": "degrease-750ml", "group": "DEGREASER", "columnLabel": "BOTTLE 750 ML", "packingCode": "degrease-spray" },
+  { "key": "titan-jar-125kg", "group": "TITAN", "columnLabel": "JAR 1.25 KG", "packingCode": "titan-1250g" }
+]

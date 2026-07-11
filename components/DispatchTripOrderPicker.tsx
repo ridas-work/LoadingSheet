@@ -5,6 +5,7 @@ export type PickerOrder = {
   poNumber: string;
   customerName: string;
   dispatchTripId: string | null;
+  dcNo?: string;
 };
 
 type Props = {

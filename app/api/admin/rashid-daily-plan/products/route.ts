@@ -16,6 +16,6 @@ export async function GET() {
 
   return NextResponse.json(
     { products: loadRashidPlanProducts() },
-    { headers: { "Cache-Control": "private, max-age=3600" } },
+    { headers: { "Cache-Control": "no-store" } },
   );
 }

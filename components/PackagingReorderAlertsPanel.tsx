@@ -99,7 +99,7 @@ export function PackagingReorderAlertsPanel() {
       </div>
 
       <p className="text-xs text-zinc-500">
-        Stock is managed by Haider on Dispatch → Packaging inventory.
+        Stock is managed on Production → Packaging inventory (Esha).
       </p>
     </div>
   );

@@ -4,13 +4,14 @@ import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { ReadyBottleMovement } from "@/lib/models/ReadyBottleMovement";
-import { canEditDispatch, homePathForRole, isAdmin, roleFromSession } from "@/lib/roles";
+import { canViewDispatchReadyStock, homePathForRole, isAdmin, isAdminSummaryViewer, roleFromSession } from "@/lib/roles";
 
 export default async function ReadyStockMovementsPage() {
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
-  if (!canEditDispatch(role) && !isAdmin(role)) {
-    redirect(role ? homePathForRole(role) : "/login");
+  const username = (session?.user as { username?: string })?.username;
+  if (!canViewDispatchReadyStock(role, username)) {
+    redirect(role ? homePathForRole(role, username) : "/login");
   }
 
   await connectToDatabase();

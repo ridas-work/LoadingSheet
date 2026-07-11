@@ -12,17 +12,42 @@ import {
   SAMPLE_FEEDBACK_VALUES,
   type SampleApprovalStatus,
   SAMPLE_APPROVAL_STATUSES,
+  type VisitKind,
 } from "@/lib/fieldVisitTypes";
+import {
+  parseAvailabilityRecord,
+  parseFacingUnitsRecord,
+  parseMarketVisitRows,
+  rowHasMarketData,
+  serializeMarketVisitRow,
+  type MarketVisitRow,
+} from "@/lib/marketVisitTypes";
 import type { FieldVisitTicketDoc } from "@/lib/models/FieldVisitTicket";
 
-export type { SerializedTicket, SerializedVisitLog, SampleMode, FieldVisitStatus, TicketAction } from "@/lib/fieldVisitTypes";
-export { SAMPLE_MODES, SAMPLE_MODE_LABELS, SAMPLE_APPROVAL_LABELS, STATUS_LABELS } from "@/lib/fieldVisitTypes";
+export type { SerializedTicket, SerializedVisitLog, SampleMode, FieldVisitStatus, TicketAction, VisitKind } from "@/lib/fieldVisitTypes";
+export { SAMPLE_MODES, SAMPLE_MODE_LABELS, SAMPLE_APPROVAL_LABELS, STATUS_LABELS, VISIT_KIND_LABELS } from "@/lib/fieldVisitTypes";
+
+/** Aslam & Ahtisham — market audit visits (store availability / facing). */
+export const MARKET_VISIT_REP_USERNAMES = ["aslam", "ahtisham"] as const;
 
 /** Nouman, Javeria, Aslam & Ahtisham — field visit / sample ticket workflow. */
 export const FIELD_VISIT_USERNAMES = ["nouman", "javeria", "aslam", "ahtisham"] as const;
 
-/** Nouman & Javeria share one visit list and can edit each other's tickets. */
-export const SHARED_FIELD_VISIT_USERNAMES = ["nouman", "javeria"] as const;
+/** Nouman & Javeria — shared list and may edit each other's tickets. */
+export const SHARED_FIELD_VISIT_EDIT_USERNAMES = ["nouman", "javeria"] as const;
+
+/** @deprecated Use field visit view/edit pool helpers. */
+export const SHARED_FIELD_VISIT_USERNAMES = SHARED_FIELD_VISIT_EDIT_USERNAMES;
+
+/** Aslam & Ahtisham — shared list (read-only on each other's tickets). */
+export const SHARED_FIELD_VISIT_VIEW_ONLY_USERNAMES = ["aslam", "ahtisham"] as const;
+
+const FIELD_VISIT_VIEW_POOLS: ReadonlyArray<readonly string[]> = [
+  SHARED_FIELD_VISIT_EDIT_USERNAMES,
+  SHARED_FIELD_VISIT_VIEW_ONLY_USERNAMES,
+];
+
+const FIELD_VISIT_EDIT_POOLS: ReadonlyArray<readonly string[]> = [SHARED_FIELD_VISIT_EDIT_USERNAMES];
 
 export const POINTS_WON = 10;
 export const POINTS_LOST = -5;
@@ -34,36 +59,126 @@ function normalizeUsername(username: string | undefined | null): string {
   return username?.toLowerCase().trim() ?? "";
 }
 
+export function isMarketVisitRep(username: string | undefined | null): boolean {
+  return (MARKET_VISIT_REP_USERNAMES as readonly string[]).includes(normalizeUsername(username));
+}
+
+export function defaultVisitKindForUser(username: string | undefined | null): VisitKind {
+  return isMarketVisitRep(username) ? "market_audit" : "sales";
+}
+
+export function parseVisitKind(v: unknown): VisitKind {
+  if (v === "market_audit") return "market_audit";
+  return "sales";
+}
+
+export function shouldUseMarketVisitForm(ticket: {
+  visitKind?: string | null;
+  marketVisitDate?: Date | string | null;
+  createdByUsername?: string | null;
+  placeName?: string | null;
+  customerName?: string | null;
+  visitLogs?: unknown[] | null;
+  sampleMode?: string | null;
+}): boolean {
+  if (parseVisitKind(ticket.visitKind) === "market_audit") return true;
+  if (ticket.marketVisitDate) return true;
+  if (!isMarketVisitRep(ticket.createdByUsername)) return false;
+  const hasSalesContent =
+    Boolean(ticket.placeName?.trim()) ||
+    Boolean(ticket.customerName?.trim()) ||
+    (Array.isArray(ticket.visitLogs) && ticket.visitLogs.length > 0) ||
+    (ticket.sampleMode && ticket.sampleMode !== "none");
+  return !hasSalesContent;
+}
+
 export function isFieldVisitRep(username: string | undefined | null): boolean {
   return (FIELD_VISIT_USERNAMES as readonly string[]).includes(normalizeUsername(username));
 }
 
 export function isSharedFieldVisitRep(username: string | undefined | null): boolean {
-  return (SHARED_FIELD_VISIT_USERNAMES as readonly string[]).includes(normalizeUsername(username));
+  return fieldVisitViewPool(username) !== null;
 }
 
-/** True when viewer and ticket owner are both in the Nouman/Javeria shared pool. */
+function fieldVisitPoolForUsername(
+  username: string | undefined | null,
+  pools: ReadonlyArray<readonly string[]>,
+): readonly string[] | null {
+  const u = normalizeUsername(username);
+  if (!u) return null;
+  for (const pool of pools) {
+    if ((pool as readonly string[]).includes(u)) return pool;
+  }
+  return null;
+}
+
+export function fieldVisitViewPool(username: string | undefined | null): readonly string[] | null {
+  return fieldVisitPoolForUsername(username, FIELD_VISIT_VIEW_POOLS);
+}
+
+export function fieldVisitEditPool(username: string | undefined | null): readonly string[] | null {
+  return fieldVisitPoolForUsername(username, FIELD_VISIT_EDIT_POOLS);
+}
+
+/** True when viewer and ticket owner share an edit pool (Nouman/Javeria). */
+export function sharesFieldVisitEditPool(
+  viewerUsername: string | undefined | null,
+  ticketCreatedByUsername: string | undefined | null,
+): boolean {
+  const viewerPool = fieldVisitEditPool(viewerUsername);
+  if (!viewerPool) return false;
+  return viewerPool.includes(normalizeUsername(ticketCreatedByUsername));
+}
+
+/** @deprecated Use sharesFieldVisitEditPool */
 export function sharesFieldVisitPool(
   viewerUsername: string | undefined | null,
   ticketCreatedByUsername: string | undefined | null,
 ): boolean {
-  if (!isSharedFieldVisitRep(viewerUsername)) return false;
-  return (SHARED_FIELD_VISIT_USERNAMES as readonly string[]).includes(
-    normalizeUsername(ticketCreatedByUsername),
-  );
+  return sharesFieldVisitEditPool(viewerUsername, ticketCreatedByUsername);
+}
+
+function ticketOwnerMatchesViewer(
+  viewerUsername: string | undefined | null,
+  userId: string,
+  ticket: { createdByUserId: mongoose.Types.ObjectId | string; createdByUsername?: string },
+): boolean {
+  const ownerId =
+    typeof ticket.createdByUserId === "string"
+      ? ticket.createdByUserId
+      : ticket.createdByUserId.toString();
+  if (ownerId === userId) return true;
+  const u = normalizeUsername(viewerUsername);
+  const ticketUser = normalizeUsername(ticket.createdByUsername);
+  return ticketUser === u || ticketUser === "";
 }
 
 /** Mongo filter for listing visits visible to this rep. */
 export function fieldVisitsMongoFilter(username: string | undefined | null): Record<string, unknown> {
-  const u = normalizeUsername(username);
-  if (isSharedFieldVisitRep(u)) {
-    return { createdByUsername: { $in: [...SHARED_FIELD_VISIT_USERNAMES] } };
-  }
-  return { createdByUsername: u };
+  const pool = fieldVisitViewPool(username);
+  if (pool) return { createdByUsername: { $in: [...pool] } };
+  return { createdByUsername: normalizeUsername(username) };
+}
+
+export function canViewFieldVisit(
+  role: string | null,
+  username: string | undefined | null,
+  ticket: { createdByUserId: mongoose.Types.ObjectId | string; createdByUsername?: string },
+  userId: string,
+): boolean {
+  if (role === "admin") return true;
+  if (!isFieldVisitRep(username)) return false;
+
+  const ticketUser = normalizeUsername(ticket.createdByUsername);
+  const viewPool = fieldVisitViewPool(username);
+  if (viewPool?.includes(ticketUser)) return true;
+
+  return ticketOwnerMatchesViewer(username, userId, ticket);
 }
 
 /** Blank tickets from accidental "New visit" — hide from lists. */
 export function isEmptyFieldVisitDraft(ticket: {
+  visitKind?: string | null;
   placeName?: string | null;
   customerName?: string | null;
   visitLogCount?: number;
@@ -71,7 +186,12 @@ export function isEmptyFieldVisitDraft(ticket: {
   sampleMode?: string | null;
   finalConclusion?: string | null;
   notes?: string | null;
+  marketVisitRows?: unknown[] | null;
+  marketVisitRemarks?: string | null;
 }): boolean {
+  if (parseVisitKind(ticket.visitKind) === "market_audit") {
+    return false;
+  }
   if (ticket.placeName?.trim() || ticket.customerName?.trim()) return false;
   const logCount =
     ticket.visitLogCount ?? (Array.isArray(ticket.visitLogs) ? ticket.visitLogs.length : 0);
@@ -96,16 +216,9 @@ export function canEditFieldVisit(
   if (role === "admin") return true;
   if (!isFieldVisitRep(username)) return false;
 
-  if (sharesFieldVisitPool(username, ticket.createdByUsername)) return true;
+  if (sharesFieldVisitEditPool(username, ticket.createdByUsername)) return true;
 
-  const ownerId =
-    typeof ticket.createdByUserId === "string"
-      ? ticket.createdByUserId
-      : ticket.createdByUserId.toString();
-  if (ownerId !== userId) return false;
-  const u = normalizeUsername(username);
-  const ticketUser = normalizeUsername(ticket.createdByUsername);
-  return ticketUser === u || ticketUser === "";
+  return ticketOwnerMatchesViewer(username, userId, ticket);
 }
 
 export function normalizeTicketStatus(status: unknown): FieldVisitStatus {
@@ -176,8 +289,31 @@ export function effectiveSampleApprovalStatus(ticket: {
   return "none";
 }
 
-export function pendingFieldVisitSampleMongoFilter() {
-  return { sampleApprovalStatus: "pending" as const };
+export function pendingFieldVisitSampleMongoFilter(): Record<string, unknown> {
+  return {
+    sampleApprovalStatus: "pending" as const,
+    $or: [{ visitKind: "sales" as const }, { visitKind: { $exists: false } }],
+  };
+}
+
+function serializeMarketVisitRowsFromDoc(
+  rows: FieldVisitTicketDoc["marketVisitRows"],
+): MarketVisitRow[] {
+  if (!Array.isArray(rows)) return [];
+  return rows.map((row) => ({
+    storeName: row.storeName ?? "",
+    location: row.location ?? "",
+    availability: parseAvailabilityRecord(row.availability),
+    facingUnits: parseFacingUnitsRecord(row.facingUnits),
+    remarks: row.remarks ?? "",
+  }));
+}
+
+export function marketVisitAllowedActions(ticket: {
+  marketVisitSubmittedAt?: Date | null;
+}): TicketAction[] {
+  if (ticket.marketVisitSubmittedAt) return [];
+  return ["update_market_visit", "submit_market_visit"];
 }
 
 export function visitLogCount(ticket: { visitLogs?: unknown[] | null }): number {
@@ -241,6 +377,7 @@ export function assertActionAllowed(
 }
 
 export function serializeTicket(doc: FieldVisitTicketDoc): SerializedTicket {
+  const visitKind = parseVisitKind(doc.visitKind);
   const sampleMode = parseSampleMode(doc.sampleMode) ?? "none";
   const status = normalizeTicketStatus(doc.status);
   const logs = (doc.visitLogs ?? []).map((log) => ({
@@ -252,9 +389,28 @@ export function serializeTicket(doc: FieldVisitTicketDoc): SerializedTicket {
   }));
   const count = logs.length;
   const sampleApprovalStatus = effectiveSampleApprovalStatus(doc);
+  const marketVisitRows = serializeMarketVisitRowsFromDoc(doc.marketVisitRows).map(
+    serializeMarketVisitRow,
+  );
+
+  const allowed =
+    visitKind === "market_audit"
+      ? marketVisitAllowedActions(doc)
+      : allowedActions(status, {
+          sampleMode,
+          visitLogCount: count,
+          sampleApprovalStatus,
+        });
 
   return {
     id: doc._id.toString(),
+    visitKind,
+    marketVisitDate: doc.marketVisitDate ? new Date(doc.marketVisitDate).toISOString() : null,
+    marketVisitRemarks: doc.marketVisitRemarks ?? "",
+    marketVisitRows,
+    marketVisitSubmittedAt: doc.marketVisitSubmittedAt
+      ? new Date(doc.marketVisitSubmittedAt).toISOString()
+      : null,
     placeName: doc.placeName ?? "",
     customerName: doc.customerName ?? "",
     city: doc.city ?? "",
@@ -297,12 +453,8 @@ export function serializeTicket(doc: FieldVisitTicketDoc): SerializedTicket {
     sampleApprovedAt: doc.sampleApprovedAt ? new Date(doc.sampleApprovedAt).toISOString() : null,
     sampleApprovedByName: doc.sampleApprovedByName ?? "",
     sampleRejectionNote: doc.sampleRejectionNote ?? "",
-    needsFollowUp: needsFollowUpReminder({ ...doc, sampleMode, status }),
-    allowedActions: allowedActions(status, {
-      sampleMode,
-      visitLogCount: count,
-      sampleApprovalStatus,
-    }),
+    needsFollowUp: visitKind === "sales" && needsFollowUpReminder({ ...doc, sampleMode, status }),
+    allowedActions: allowed,
     createdAt: doc.createdAt ? new Date(doc.createdAt).toISOString() : "",
     updatedAt: doc.updatedAt ? new Date(doc.updatedAt).toISOString() : "",
   };
@@ -371,4 +523,39 @@ export function parseSampleProducts(raw: unknown): { productName: string; notes:
     sampleProducts.push({ productName: pn, notes, bottles });
   }
   return sampleProducts;
+}
+
+export function validateMarketVisitPayload(rows: MarketVisitRow[]): Record<string, string> {
+  const errors: Record<string, string> = {};
+  const filled = rows.filter(rowHasMarketData);
+  if (filled.length === 0) {
+    errors.marketVisitRows = "Add at least one store row with a store name.";
+    return errors;
+  }
+  for (let i = 0; i < filled.length; i++) {
+    const row = filled[i];
+    if (!row.storeName.trim()) {
+      errors[`row_${i}_storeName`] = "Store name is required when other fields are filled.";
+    }
+  }
+  return errors;
+}
+
+export function persistMarketVisitRows(
+  ticket: HydratedDocument<FieldVisitTicketDoc>,
+  rows: MarketVisitRow[],
+): void {
+  ticket.set(
+    "marketVisitRows",
+    rows.map((row) => ({
+      storeName: row.storeName,
+      location: row.location,
+      availability: row.availability,
+      facingUnits: Object.fromEntries(
+        Object.entries(row.facingUnits).map(([k, v]) => [k, v == null ? undefined : v]),
+      ),
+      remarks: row.remarks,
+    })),
+  );
+  ticket.markModified("marketVisitRows");
 }

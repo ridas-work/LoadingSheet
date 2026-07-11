@@ -6,6 +6,7 @@ import { ProductionBatchRowActions } from "@/components/ProductionBatchRowAction
 import { ProductionBatchTabs } from "@/components/ProductionBatchTabs";
 import { auth } from "@/lib/auth";
 import { formatLiters } from "@/lib/batchVolume";
+import { formatDisplayDate } from "@/lib/dateOnly";
 import { connectToDatabase } from "@/lib/db";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { openProductionBatchMongoFilter } from "@/lib/productionBatchClose";
@@ -15,7 +16,6 @@ import {
   usageForProductionBatch,
   type ProductionBatchStatus,
 } from "@/lib/productionBatchStatus";
-import { inferNimraBatchKind } from "@/lib/nimraBatchProductLists";
 import {
   remainingSampleLitersForBatch,
   regularProductionBatchMongoFilter,
@@ -74,6 +74,7 @@ export default async function ProductionBatchesPage({ searchParams }: PageProps)
   return (
     <div className="space-y-6">
       <PageHeader
+        accent="esha"
         title="Production batches"
         description="Register regular production for customer POs, or sample production for field visit samples. Sample batches are not used on loading sheets."
         actions={
@@ -122,7 +123,6 @@ export default async function ProductionBatchesPage({ searchParams }: PageProps)
                 <th>Batch no</th>
                 <th>Product</th>
                 <th>Purpose</th>
-                <th>Type</th>
                 <th>Date</th>
                 <th>Status</th>
                 <th>pH</th>
@@ -151,7 +151,7 @@ export default async function ProductionBatchesPage({ searchParams }: PageProps)
                         locked: false,
                       }
                     : usageForProductionBatch(b, usedMap, catalog);
-                  const batchKind = inferNimraBatchKind(b);
+                  const hasDrum = Boolean(b.drum?.trim());
                   const label = isSample
                     ? sampleRemaining && sampleRemaining > 0
                       ? `Sample (${formatLiters(sampleRemaining)} L left)`
@@ -167,7 +167,14 @@ export default async function ProductionBatchesPage({ searchParams }: PageProps)
                           {b.batchNo}
                         </Link>
                       </td>
-                      <td>{b.productName}</td>
+                      <td>
+                        {b.productName}
+                        {hasDrum ? (
+                          <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-900">
+                            Drum
+                          </span>
+                        ) : null}
+                      </td>
                       <td>
                         <span
                           className={
@@ -179,8 +186,7 @@ export default async function ProductionBatchesPage({ searchParams }: PageProps)
                           {isSample ? "Sample" : "Regular"}
                         </span>
                       </td>
-                      <td>{batchKind === "custom_box" ? "Custom box" : "Standard"}</td>
-                      <td>{new Date(b.preparedAt).toLocaleDateString()}</td>
+                      <td>{formatDisplayDate(b.preparedAt)}</td>
                       <td>
                         <StatusBadge status={usage.status} label={label} />
                       </td>

@@ -37,10 +37,10 @@ export function RashidDailyPlanList() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Link href={`/admin/rashid-daily-plan/new?date=${today}`} className={ui.btnPrimary}>
+        <Link href={`/admin/rashid-daily-plan/create?date=${today}`} className={ui.btnPrimary}>
           New plan for today
         </Link>
-        <Link href={`/admin/rashid-daily-plan/new`} className={ui.btnSecondary}>
+        <Link href={`/admin/rashid-daily-plan/create`} className={ui.btnSecondary}>
           New plan (pick date)
         </Link>
       </div>

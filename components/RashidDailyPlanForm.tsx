@@ -161,7 +161,10 @@ export function RashidDailyPlanForm({ initialDate, cancelHref }: Props) {
     setMetaError("");
     const [empRes, prodRes] = await Promise.all([
       fetch("/api/admin/production-employees", { credentials: "same-origin" }),
-      fetch("/api/admin/rashid-daily-plan/products", { credentials: "same-origin" }),
+      fetch("/api/admin/rashid-daily-plan/products", {
+        credentials: "same-origin",
+        cache: "no-store",
+      }),
     ]);
     if (empRes.ok) {
       const data = (await empRes.json()) as { employees?: Employee[] };
@@ -305,6 +308,18 @@ export function RashidDailyPlanForm({ initialDate, cancelHref }: Props) {
     setManualRows((prev) => prev.filter((_, i) => i !== index));
   }
 
+  function handleEmployeeAdded(employee: Employee) {
+    setEmployees((prev) => {
+      if (prev.some((e) => e.id === employee.id)) return prev;
+      return [...prev, employee].sort((a, b) => a.name.localeCompare(b.name));
+    });
+  }
+
+  const employeePickerProps = {
+    allowAddNew: true as const,
+    onEmployeeAdded: handleEmployeeAdded,
+  };
+
   function buildWorkRowsPayload() {
     const rows: Array<{
       employeeIds: string[];
@@ -412,6 +427,7 @@ export function RashidDailyPlanForm({ initialDate, cancelHref }: Props) {
             onChange={setHelperEmployeeIds}
             placeholder="Select one or more helpers…"
             error={errors.helperName}
+            {...employeePickerProps}
           />
         </div>
       </div>
@@ -503,6 +519,7 @@ export function RashidDailyPlanForm({ initialDate, cancelHref }: Props) {
                             updateProductTask(block.blockId, task.taskCode, { employeeIds })
                           }
                           placeholder="Assign people…"
+                          {...employeePickerProps}
                         />
                         <div className="flex items-center gap-2">
                           <input
@@ -541,6 +558,7 @@ export function RashidDailyPlanForm({ initialDate, cancelHref }: Props) {
                     value={row.employeeIds}
                     onChange={(employeeIds) => updateManualRow(index, { employeeIds })}
                     placeholder="Assign people…"
+                    {...employeePickerProps}
                   />
                   <input
                     value={row.duty}
@@ -584,6 +602,7 @@ export function RashidDailyPlanForm({ initialDate, cancelHref }: Props) {
             onChange={(employeeIds) => setDuties((prev) => ({ ...prev, [key]: employeeIds }))}
             placeholder="Select people…"
             error={errors[key]}
+            {...employeePickerProps}
           />
         ))}
       </div>

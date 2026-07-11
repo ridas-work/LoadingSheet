@@ -34,6 +34,16 @@ export type CustomerOrderRow = {
   totalCartons: number;
 };
 
+export type CustomerProductSummaryRow = {
+  productCode: string;
+  productName: string;
+  summaryLabel: string;
+  cartons: number;
+  bottles: number;
+  orderCount: number;
+  isUnmapped?: boolean;
+};
+
 export type DispersionRow = {
   customerName: string;
   cartons: number;
@@ -52,11 +62,37 @@ export type BatchBottleLineRow = {
   totalBottles: number;
 };
 
+export type BatchDestinationRow = {
+  batchNo: string;
+  productCode: string;
+  productName: string;
+  orderId: string;
+  poNumber: string;
+  customerName: string;
+  gateDeliveryStatus: string;
+  createdAt: string;
+  deliveredAt: string;
+  vehicleNo: string;
+  dcNo: string;
+  boxNo: number;
+  bottles: number;
+  liters: number;
+};
+
 export type BatchBottlesReport = {
   batchQuery: string;
   batchNumbers: string[];
   rows: BatchBottleLineRow[];
-  totals: { filledBottles: number; orderBottles: number; totalBottles: number };
+  destinationRows: BatchDestinationRow[];
+  totals: {
+    filledBottles: number;
+    orderBottles: number;
+    totalBottles: number;
+    destinationBottles: number;
+    destinationLiters: number;
+    destinationOrders: number;
+    destinationCustomers: number;
+  };
   grandTotals: GrandTotals;
 };
 
@@ -70,6 +106,7 @@ export type ProductTotalsReport = {
 export type CustomerOrdersReport = {
   customerQuery: string;
   orders: CustomerOrderRow[];
+  productTotals: CustomerProductSummaryRow[];
   customerNames: string[];
   grandTotals: GrandTotals;
   productCode?: string;

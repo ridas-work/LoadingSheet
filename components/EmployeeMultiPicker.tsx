@@ -56,9 +56,7 @@ export function EmployeeMultiPicker({
     }
   }
 
-  async function addNewPerson(e: React.FormEvent) {
-    e.preventDefault();
-    e.stopPropagation();
+  async function addNewPerson() {
     const trimmed = newName.trim();
     if (trimmed.length < 2) {
       setAddError("Enter at least 2 characters.");
@@ -146,10 +144,7 @@ export function EmployeeMultiPicker({
             })
           )}
           {allowAddNew ? (
-            <form
-              onSubmit={addNewPerson}
-              className="sticky bottom-0 border-t border-zinc-200 bg-white p-2"
-            >
+            <div className="sticky bottom-0 border-t border-zinc-200 bg-white p-2">
               <label htmlFor={inputId} className="sr-only">
                 Add new person
               </label>
@@ -162,19 +157,27 @@ export function EmployeeMultiPicker({
                     setNewName(e.target.value);
                     setAddError("");
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void addNewPerson();
+                    }
+                  }}
                   placeholder="New person name"
                   className="min-w-0 flex-1 rounded border border-zinc-200 px-2 py-1.5 text-sm"
                 />
                 <button
-                  type="submit"
+                  type="button"
                   disabled={adding}
+                  onClick={() => void addNewPerson()}
                   className="shrink-0 rounded bg-zinc-900 px-2.5 py-1.5 text-xs font-medium text-white disabled:opacity-50"
                 >
                   {adding ? "…" : "Add"}
                 </button>
               </div>
               {addError ? <p className="mt-1 text-xs text-red-700">{addError}</p> : null}
-            </form>
+            </div>
           ) : null}
         </div>
       ) : null}

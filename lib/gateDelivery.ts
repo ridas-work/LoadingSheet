@@ -34,12 +34,22 @@ export function assertGateTransition(from: GateDeliveryStatus, to: GateDeliveryS
   return null;
 }
 
-export function parseGateDeliveryPatchBody(raw: unknown):
-  | { ok: true; status: GateDeliveryStatus }
-  | { ok: false; error: string } {
+import type { DeliveryClosurePayload } from "@/lib/gateDeliveryClosure";
+
+export type GateDeliveryPatchResult =
+  | { ok: true; status: GateDeliveryStatus; closure?: DeliveryClosurePayload; lateReturn?: true }
+  | { ok: false; error: string; errors?: Record<string, string> };
+
+export function parseGateDeliveryPatchBody(raw: unknown): GateDeliveryPatchResult {
   if (!raw || typeof raw !== "object") {
     return { ok: false, error: "Body must be a JSON object" };
   }
+
+  const action = (raw as { action?: unknown }).action;
+  if (action === "record_late_return") {
+    return { ok: true, status: "delivered", lateReturn: true };
+  }
+
   const status = (raw as { status?: unknown }).status;
   if (!isGateDeliveryStatus(status)) {
     return {
@@ -50,6 +60,29 @@ export function parseGateDeliveryPatchBody(raw: unknown):
   if (status === "none") {
     return { ok: false, error: "Cannot set status back to none from the gate screen" };
   }
+
+  if (status === "delivered") {
+    const closure = (raw as { closure?: unknown }).closure;
+    if (!closure || typeof closure !== "object") {
+      return {
+        ok: false,
+        error: "Closing delivery requires closure details (full or partial).",
+      };
+    }
+    const outcome = (closure as { outcome?: unknown }).outcome;
+    if (outcome !== "full" && outcome !== "partial") {
+      return { ok: false, error: 'closure.outcome must be "full" or "partial".' };
+    }
+    return {
+      ok: true,
+      status,
+      closure: {
+        outcome,
+        lines: [],
+      },
+    };
+  }
+
   return { ok: true, status };
 }
 
@@ -99,6 +132,8 @@ export function rashidActiveOrdersMongoFilter() {
   return {
     gateDeliveryStatus: { $nin: RASHID_INACTIVE_GATE_STATUSES },
     discardedAt: null,
+    // Field sample orders live in the separate sample dispatch pipeline.
+    orderKind: { $ne: "field_sample" as const },
   };
 }
 

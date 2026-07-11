@@ -1,5 +1,6 @@
+import type { DeliveryClosureLine, LateReturnLine } from "@/lib/gateDeliveryClosure";
 import { bottlesPerProductFromSheetLines } from "@/lib/bottlesFromSheetLines";
-import { isDrumContainerProduct } from "@/lib/customBottleSizes";
+import { isDrumContainerProduct, isJarOnlyContainerLine } from "@/lib/customBottleSizes";
 import type { DeductionPacking, DeductionSheetLine } from "@/lib/packagingDeduction";
 import {
   familyFromStockCode,
@@ -137,7 +138,9 @@ export async function deductReadyBottlesForDelivered(args: {
   audit: { userId: string; userName: string };
 }): Promise<{ error: string | null; summary: ReadyDeductionSummaryLine[] }> {
   const { missingProducts } = bottlesPerProductFromSheetLines(args.sheetLines, args.catalog);
-  const blockingMissing = missingProducts.filter((name) => !isDrumContainerProduct(name));
+  const blockingMissing = missingProducts.filter(
+    (name) => !isDrumContainerProduct(name) && !isJarOnlyContainerLine(name),
+  );
   if (blockingMissing.length > 0) {
     return {
       error: `Cannot deduct ready stock — unknown products: ${blockingMissing.join(", ")}`,
@@ -260,4 +263,151 @@ export function compareReadyStockToNeeds(
     }
   }
   return { ok: shortfalls.length === 0, shortfalls };
+}
+
+function findSummaryRow(
+  productCode: string,
+  summary: ReadyDeductionSummaryLine[],
+): ReadyDeductionSummaryLine | undefined {
+  const code = productCode.trim().toLowerCase();
+  return summary.find((s) => s.productCode.trim().toLowerCase() === code);
+}
+
+async function restoreBottlesForProduct(args: {
+  productCode: string;
+  productName: string;
+  bottles: number;
+  summaryRow: ReadyDeductionSummaryLine | undefined;
+  orderId: string;
+  poNumber: string;
+  note: string;
+  audit: { userId: string; userName: string };
+  allowExceedDeducted?: boolean;
+}): Promise<string | null> {
+  if (args.bottles <= 0) return null;
+
+  if (
+    !args.allowExceedDeducted &&
+    args.summaryRow &&
+    args.bottles > args.summaryRow.bottles
+  ) {
+    return `Cannot restore ${args.bottles} bottles for ${args.productName} — only ${args.summaryRow.bottles} were deducted on this PO.`;
+  }
+
+  let remaining = args.bottles;
+  const lots = args.summaryRow?.lots ?? [];
+
+  if (lots.length > 0 && args.summaryRow) {
+    const totalInLots = lots.reduce((s, l) => s + l.bottles, 0);
+    for (const lot of lots) {
+      if (remaining <= 0) break;
+      const share =
+        totalInLots > 0
+          ? Math.min(remaining, Math.round((args.bottles * lot.bottles) / totalInLots))
+          : 0;
+      const take = Math.min(share, lot.bottles, remaining);
+      if (take <= 0) continue;
+      const err = await applyReadyBatchLotDelta({
+        batchNo: lot.batchNo,
+        productCode: args.productCode,
+        productName: args.productName,
+        delta: take,
+        note: args.note,
+        audit: args.audit,
+      });
+      if (err) return err;
+      remaining -= take;
+    }
+  }
+
+  if (remaining > 0) {
+    const err = await applyReadyBottleDelta({
+      productCode: args.productCode,
+      productName: args.productName,
+      delta: remaining,
+      reason: "delivery_return",
+      note: args.note,
+      orderId: args.orderId,
+      poNumber: args.poNumber,
+      audit: args.audit,
+    });
+    if (err) return err;
+  }
+
+  return null;
+}
+
+/** After full dispatch deduct, restore good-returned bottles from a partial close. */
+export async function restoreGoodReturnsAfterPartialDelivery(args: {
+  orderId: string;
+  poNumber: string;
+  closureLines: DeliveryClosureLine[];
+  deductionSummary: ReadyDeductionSummaryLine[];
+  audit: { userId: string; userName: string };
+}): Promise<string | null> {
+  for (const line of args.closureLines) {
+    if (line.returnedBottles <= 0) continue;
+    const summaryRow = findSummaryRow(line.productCode, args.deductionSummary);
+    const err = await restoreBottlesForProduct({
+      productCode: line.productCode,
+      productName: line.productName,
+      bottles: line.returnedBottles,
+      summaryRow,
+      orderId: args.orderId,
+      poNumber: args.poNumber,
+      note: `PO ${args.poNumber} partial close — ${line.returnedBottles} good returned to Rashid stock`,
+      audit: args.audit,
+      allowExceedDeducted: true,
+    });
+    if (err) return err;
+  }
+  return null;
+}
+
+export async function applyDeliveryClosureStock(args: {
+  orderId: string;
+  poNumber: string;
+  outcome: "full" | "partial";
+  closureLines: DeliveryClosureLine[];
+  deductionSummary: ReadyDeductionSummaryLine[];
+  audit: { userId: string; userName: string };
+}): Promise<string | null> {
+  if (args.outcome === "full") return null;
+  const hasReturns = args.closureLines.some((l) => l.returnedBottles > 0);
+  if (!hasReturns) return null;
+  return restoreGoodReturnsAfterPartialDelivery({
+    orderId: args.orderId,
+    poNumber: args.poNumber,
+    closureLines: args.closureLines,
+    deductionSummary: args.deductionSummary,
+    audit: args.audit,
+  });
+}
+
+/** Late returns from past deliveries — no cap vs original dispatched qty; good bottles re-enter Rashid stock. */
+export async function applyLateReturnStock(args: {
+  orderId: string;
+  poNumber: string;
+  lines: LateReturnLine[];
+  note: string;
+  audit: { userId: string; userName: string };
+}): Promise<string | null> {
+  const noteSuffix = args.note ? ` — ${args.note}` : "";
+  for (const line of args.lines) {
+    if (line.returnedBottles > 0) {
+      const err = await applyReadyBottleDelta({
+        productCode: line.productCode,
+        productName: line.productName,
+        delta: line.returnedBottles,
+        reason: "delivery_return",
+        note: `PO ${args.poNumber} late return — ${line.returnedBottles} good${noteSuffix}`,
+        orderId: args.orderId,
+        poNumber: args.poNumber,
+        audit: args.audit,
+      });
+      if (err) return err;
+    }
+    // damagedBottles: recorded on order only; no stock credit (write-off)
+  }
+  return null;
 }

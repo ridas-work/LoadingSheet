@@ -1,46 +1,32 @@
 # Project State
 
-Phase **45 complete** — print timestamp, Ali trip control, and chemical accessories
+Phase **53 complete** — Market visit N alerts (Aslam & Ahtisham)
 
 ## Current position
-- **Phase:** 45 of 45 (`45-print-trip-accessory-stock`)
+- **Phase:** 53 of 53 (`53-market-visit-no-alerts`)
 - **Plan:** 04 of 04 complete
-- **Status:** Phase complete
-- **Last activity:** 2026-07-04 — Completed `04-PLAN.md`
-- **Progress:** Phase 45 `████` 4/4 plans complete
+- **Status:** Phase complete (`npm run build` passes)
+- **Last activity:** 2026-07-11 — Phase 53 executed (red N alerts + cross-visit persistence)
+- **Progress:** Phase 53 `████` 4/4 plans complete
 
 ## Last completed
-- **Phase 45 Plan 04** — Esha accessory stock UI, Ramazan optional accessory request UI/history, and Waleed accessory shortage display
-- **Phase 45 Plan 03** — Chemical request accessory stock data model, request API snapshots, and combined Waleed approval shortage guard
-- **Phase 45 Plan 02** — Ali/admin-only dispatch trip create/edit/discard, with Rashid preserved for batch assignment and loading sheet work
-- **Phase 45 Plan 01** — Real printed-at timestamp on loading sheets, updated on print button clicks and browser print shortcuts
-- **Phase 44** — Esha `/production/chemical-intake` (upsert catalog by name), Ramazan read-only stock, Waleed approve with shortage guard + stock movement ledger
+- **Phase 53** — N availability turns cells red; open alerts persist per store+SKU until Y on a later visit
+- **Phase 52** — Unified Esha batch form (one product dropdown)
+- **Phase 51** — Required `customBoxCode` on custom cartons; outer box picker with product-family boxes
+- **Phase 50** — Market visit form for Aslam/Ahtisham
+- **Phase 49** — Portal hero images and colorful UI
 
 ## Next planned
-- Phase 45 is complete.
-- Human UAT remains for print preview timing and authenticated role workflows.
+- Phase 39 (Glim bulk fill) remains on roadmap if needed.
 
 ## Decisions
-- Print timestamp is local client metadata only and is not persisted to order data.
-- Loading sheet order `Date:` remains the original `createdDate`; print time is shown separately as `Printed:`.
-- Print button timestamp updates are flushed before `window.print()` so print preview sees the current click time.
-- Admin remains allowed to create, edit, and discard dispatch trips; Ali is the only non-admin trip planner.
-- Dispatch trip discard is blocked once any linked PO is no longer active for Rashid's factory queue.
-- Accessory stock reuses `ChemicalRawMaterial` with `kind: chemical | accessory` instead of a separate collection.
-- Supported accessory request codes are fixed to `shoppers`, `drums`, and `seals`, each using `pcs`.
-- Accessory request snapshots require existing `kind: accessory` stock rows before request creation.
-- Approval validation aggregates chemical and accessory stock lines by code before conditional deduction.
-- Accessory stock maintenance UI lives on Esha's `/production/chemical-intake` page, not the broad chemical inventory editor.
-- Esha can create/update only fixed accessory stock rows: Shoppers, Drums, and Seals.
-- Ramazan's material table stays chemical-only; accessories are optional fields on chemical requests.
-- Waleed's approval UI compares loaded chemical and accessory stock before enabling approval, while the API remains authoritative.
+- **Phase 53:** `MarketVisitStoreAlert` registry; store key = normalized name + location; N opens alert, Y resolves; red UI on N and carried-over open alerts.
 
 ## Concerns / blockers
-- No automated Phase 45 code gaps found. Verifier status is `human_needed` for browser print preview and live role-flow checks.
-- `npm run lint` currently fails on pre-existing repository-wide React hook and TypeScript lint issues outside the plan 02 touched files.
-- Full ESLint still reports existing `react-hooks/set-state-in-effect` patterns in touched chemical UI components when that repository-wide rule is enabled.
+- Phase 52 factory UAT: Esha creates HAND SANITIZER batch → Rashid assigns on matching PO line name.
+- `npm run lint` may fail on pre-existing repository-wide issues.
 
 ## Session continuity
-- **Last session:** 2026-07-04T08:04:03Z
-- **Stopped at:** Completed `04-PLAN.md`
+- **Last session:** 2026-07-09
+- **Stopped at:** Completed Phase 52 `04-PLAN.md`
 - **Resume file:** None

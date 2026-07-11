@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { employeeById } from "@/lib/productionEmployees";
+import { syncProductionEmployeesFromDisk } from "@/lib/productionEmployeesStore";
 import { RashidDailyPlan } from "@/lib/models/RashidDailyPlan";
 import {
   applyStatusUpdates,
@@ -96,6 +97,7 @@ export async function PUT(req: Request) {
   }
 
   await connectToDatabase();
+  syncProductionEmployeesFromDisk();
   const existing = await findPlanByIsoDate(isoDate);
   if (existing?.dayStatus === "closed") {
     return NextResponse.json(
@@ -106,8 +108,14 @@ export async function PUT(req: Request) {
 
   const errors: Record<string, string> = {};
 
-  const helperEmployeeId =
+  const helperEmployeeIdRaw =
     typeof body.helperEmployeeId === "string" ? body.helperEmployeeId.trim() : "";
+  const helperEmployeeIds = Array.isArray(body.helperEmployeeIds)
+    ? body.helperEmployeeIds.filter(
+        (x): x is string => typeof x === "string" && x.trim().length > 0,
+      )
+    : [];
+  const helperEmployeeId = helperEmployeeIdRaw || helperEmployeeIds[0]?.trim() || "";
   const helper = employeeById(helperEmployeeId);
   if (!helper) {
     errors.helperEmployeeId = "Helper of the day is required.";

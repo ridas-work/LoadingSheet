@@ -86,10 +86,10 @@ export default async function DispatchTripDetailPage(props: PageProps) {
   const [orderDocs, linkedOrders, fleetOptions] = await Promise.all([
     Order.find(pickerQuery)
       .sort({ createdAt: -1 })
-      .select({ poNumber: 1, customerName: 1, dispatchTripId: 1 })
+      .select({ poNumber: 1, customerName: 1, dispatchTripId: 1, "dispatch.dcNo": 1 })
       .lean(),
     Order.find({ _id: { $in: tripOrderIds } })
-      .select({ poNumber: 1, customerName: 1, sheetLines: 1, gateDeliveryStatus: 1 })
+      .select({ poNumber: 1, customerName: 1, sheetLines: 1, gateDeliveryStatus: 1, "dispatch.dcNo": 1 })
       .lean(),
     loadDispatchFleetOptions(),
   ]);
@@ -99,6 +99,7 @@ export default async function DispatchTripDetailPage(props: PageProps) {
     poNumber: o.poNumber,
     customerName: o.customerName,
     dispatchTripId: o.dispatchTripId ? o.dispatchTripId.toString() : null,
+    dcNo: (o as { dispatch?: { dcNo?: string } }).dispatch?.dcNo?.trim() ?? "",
   }));
 
   const initialDispatch: DispatchFields = {
@@ -113,6 +114,20 @@ export default async function DispatchTripDetailPage(props: PageProps) {
   };
 
   const initialOrderIds = (trip.orderIds ?? []).map((oid) => oid.toString());
+  const tripChallanMap = new Map(
+    ((trip as { orderChallans?: Array<{ orderId: { toString(): string }; dcNo?: string }> }).orderChallans ?? [])
+      .map((row) => [row.orderId.toString(), row.dcNo?.trim() ?? ""]),
+  );
+  const dispatchDcByOrderId = new Map(
+    linkedOrders.map((order) => [
+      order._id.toString(),
+      (order as { dispatch?: { dcNo?: string } }).dispatch?.dcNo?.trim() ?? "",
+    ]),
+  );
+  const initialOrderChallans = initialOrderIds.map((orderId) => ({
+    orderId,
+    dcNo: tripChallanMap.get(orderId) || dispatchDcByOrderId.get(orderId) || initialDispatch.dcNo,
+  }));
 
   return (
     <div className="space-y-8">
@@ -127,7 +142,25 @@ export default async function DispatchTripDetailPage(props: PageProps) {
 
       {linkedOrders.length > 0 ? (
         <div>
-          <h2 className="text-lg font-semibold text-zinc-900">Loading sheets</h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold text-zinc-900">Loading sheets</h2>
+            <div className="flex flex-wrap gap-2">
+              {canAssignBatches ? (
+                <Link
+                  href={`/dispatch/trips/${id}/loading-sheet?dispatch=1`}
+                  className="rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white"
+                >
+                  Assign batches for this vehicle
+                </Link>
+              ) : null}
+              <Link
+                href={`/dispatch/trips/${id}/loading-sheet`}
+                className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white"
+              >
+                Combined loading sheet
+              </Link>
+            </div>
+          </div>
           <ul className="mt-2 space-y-2">
             {linkedOrders.map((o) => {
               const oid = o._id.toString();
@@ -149,33 +182,38 @@ export default async function DispatchTripDetailPage(props: PageProps) {
                         : total > 0
                           ? `${filled}/${total} batches assigned`
                           : "No carton rows"}
+                      {initialOrderChallans.find((row) => row.orderId === oid)?.dcNo
+                        ? ` · Challan ${initialOrderChallans.find((row) => row.orderId === oid)?.dcNo}`
+                        : ""}
                       {!rashidActive ? ` · ${GATE_STATUS_LABELS[gateStatus]}` : ""}
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {canAssignBatches && rashidActive && !complete ? (
+                  {!canAssignBatches ? (
+                    <div className="flex flex-wrap gap-2">
+                      {canAssignBatches && rashidActive && !complete ? (
+                        <Link
+                          href={`/orders/${oid}/loading-sheet?dispatch=1`}
+                          className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white"
+                        >
+                          Assign batches
+                        </Link>
+                      ) : canAssignBatches && rashidActive && complete ? (
+                        <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
+                          Batches assigned
+                        </span>
+                      ) : !rashidActive ? (
+                        <span className="rounded-lg bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200">
+                          {GATE_STATUS_LABELS[gateStatus]}
+                        </span>
+                      ) : null}
                       <Link
-                        href={`/orders/${oid}/loading-sheet?dispatch=1`}
-                        className="rounded-lg bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white"
+                        href={`/orders/${oid}/loading-sheet`}
+                        className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
                       >
-                        Assign batches
+                        View / print
                       </Link>
-                    ) : canAssignBatches && rashidActive && complete ? (
-                      <span className="rounded-lg bg-emerald-50 px-3 py-1.5 text-sm font-medium text-emerald-800 ring-1 ring-emerald-200">
-                        Batches assigned
-                      </span>
-                    ) : !rashidActive ? (
-                      <span className="rounded-lg bg-zinc-100 px-3 py-1.5 text-sm font-medium text-zinc-700 ring-1 ring-zinc-200">
-                        {GATE_STATUS_LABELS[gateStatus]}
-                      </span>
-                    ) : null}
-                    <Link
-                      href={`/orders/${oid}/loading-sheet`}
-                      className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
-                    >
-                      View / print
-                    </Link>
-                  </div>
+                    </div>
+                  ) : null}
                 </li>
               );
             })}
@@ -189,6 +227,7 @@ export default async function DispatchTripDetailPage(props: PageProps) {
           initialOrderIds={initialOrderIds}
           orders={orders}
           initialDispatch={initialDispatch}
+          initialOrderChallans={initialOrderChallans}
           vehicleOptions={fleetOptions.vehicles}
           driverOptions={fleetOptions.drivers}
         />

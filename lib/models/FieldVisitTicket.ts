@@ -22,6 +22,20 @@ export type SampleMode = (typeof SAMPLE_MODES)[number];
 export const SAMPLE_FEEDBACK_VALUES = ["pending", "liked", "disliked", "neutral"] as const;
 export type SampleFeedback = (typeof SAMPLE_FEEDBACK_VALUES)[number];
 
+export const VISIT_KINDS = ["sales", "market_audit"] as const;
+export type VisitKindStored = (typeof VISIT_KINDS)[number];
+
+const MarketVisitRowSchema = new mongoose.Schema(
+  {
+    storeName: { type: String, required: false, default: "", trim: true },
+    location: { type: String, required: false, default: "", trim: true },
+    availability: { type: Map, of: String, required: false, default: () => new Map() },
+    facingUnits: { type: Map, of: Number, required: false, default: () => new Map() },
+    remarks: { type: String, required: false, default: "", trim: true },
+  },
+  { _id: false },
+);
+
 const SampleProductSchema = new mongoose.Schema(
   {
     productName: { type: String, required: true, trim: true },
@@ -43,6 +57,17 @@ const VisitLogSchema = new mongoose.Schema(
 
 const FieldVisitTicketSchema = new mongoose.Schema(
   {
+    visitKind: {
+      type: String,
+      required: false,
+      enum: VISIT_KINDS,
+      default: "sales",
+    },
+    marketVisitDate: { type: Date, required: false, default: null },
+    marketVisitRemarks: { type: String, required: false, default: "", trim: true },
+    marketVisitRows: { type: [MarketVisitRowSchema], required: false, default: [] },
+    marketVisitSubmittedAt: { type: Date, required: false, default: null },
+
     placeName: { type: String, required: false, default: "", trim: true },
     customerName: { type: String, required: false, default: "", trim: true },
     city: { type: String, required: false, default: "", trim: true },
@@ -104,6 +129,20 @@ const FieldVisitTicketSchema = new mongoose.Schema(
     pointsAwarded: { type: Number, required: false, default: 0 },
     linkedOrderId: { type: mongoose.Schema.Types.ObjectId, ref: "Order", required: false, default: null },
     linkedPoNumber: { type: String, required: false, default: "", trim: true },
+
+    /** Sample dispatch pipeline — set when Waleed approves an outgoing sample. */
+    sampleDispatchOrderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Order",
+      required: false,
+      default: null,
+    },
+    sampleDispatchStatus: {
+      type: String,
+      enum: ["none", "awaiting_batches", "batched", "dispatched"],
+      required: false,
+      default: "none",
+    },
 
     createdByUserId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     createdByName: { type: String, required: true, trim: true },

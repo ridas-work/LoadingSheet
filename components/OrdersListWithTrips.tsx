@@ -9,6 +9,7 @@ import {
   isRashidActiveGateStatus,
   type GateDeliveryStatus,
 } from "@/lib/gateDelivery";
+import { formatDisplayDate } from "@/lib/dateOnly";
 
 type OrderRow = {
   id: string;
@@ -31,7 +32,13 @@ type Props = {
   canEditOrders?: boolean;
   /** Admin oversight — show gate delivery status on every row. */
   showGateStatus?: boolean;
+  loadingSheetLabel?: string;
 };
+
+function orderProgressLabel(gateStatus: GateDeliveryStatus, batchesLocked: boolean): string {
+  if (gateStatus === "none" && !batchesLocked) return "Pending production";
+  return GATE_STATUS_LABELS[gateStatus];
+}
 
 export function OrdersListWithTrips({
   orders,
@@ -40,6 +47,7 @@ export function OrdersListWithTrips({
   showEnteredBy = false,
   canEditOrders = false,
   showGateStatus = false,
+  loadingSheetLabel = "View loading sheet",
 }: Props) {
   const [selected, setSelected] = useState<string[]>([]);
 
@@ -95,7 +103,7 @@ export function OrdersListWithTrips({
                     <p className="font-medium text-zinc-900">{o.poNumber}</p>
                     <p className="text-sm text-zinc-600">{o.customerName}</p>
                     <p className="text-xs text-zinc-500">
-                      {new Date(o.createdAt).toLocaleDateString()} · {o.filled}/{o.total} batches
+                      {formatDisplayDate(o.createdAt)} · {o.filled}/{o.total} batches
                       {showEnteredBy && o.createdByName ? ` · Entered by ${o.createdByName}` : ""}
                     </p>
                     {onTrip ? (
@@ -118,7 +126,7 @@ export function OrdersListWithTrips({
                               : "text-zinc-600"
                         }`}
                       >
-                        {GATE_STATUS_LABELS[gateStatus]}
+                        {orderProgressLabel(gateStatus, batchesLocked)}
                       </p>
                     ) : null}
                   </div>
@@ -136,7 +144,7 @@ export function OrdersListWithTrips({
                     href={`/orders/${o.id}/loading-sheet`}
                     className="rounded-lg bg-zinc-900 px-3 py-2 text-sm font-medium text-white"
                   >
-                    View loading sheet
+                    {loadingSheetLabel}
                   </Link>
                   {showAssignBatches ? (
                     <Link

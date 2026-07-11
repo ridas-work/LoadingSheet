@@ -7,7 +7,9 @@ import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { Order } from "@/lib/models/Order";
 import { isOrderLockedAfterDelivery, normalizeGateStatus } from "@/lib/gateDelivery";
-import { canEditOrders, roleFromSession } from "@/lib/roles";
+import { dateOnlyInputValue } from "@/lib/dateOnly";
+import { canEditOwnOrder } from "@/lib/orderAccess";
+import { canViewAdminOrdersList, isAdmin, roleFromSession } from "@/lib/roles";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -16,9 +18,8 @@ type PageProps = {
 export default async function EditOrderPage({ params }: PageProps) {
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
-  if (!canEditOrders(role)) {
-    redirect("/orders");
-  }
+  const username = (session?.user as { username?: string })?.username;
+  const userId = (session?.user as { id?: string })?.id;
 
   const { id } = await params;
   if (!mongoose.Types.ObjectId.isValid(id)) notFound();
@@ -26,6 +27,10 @@ export default async function EditOrderPage({ params }: PageProps) {
   await connectToDatabase();
   const order = await Order.findById(id).lean();
   if (!order) notFound();
+
+  if (!canEditOwnOrder(role, userId, order)) {
+    redirect(isAdmin(role) || canViewAdminOrdersList(role, username) ? "/admin/orders" : "/orders");
+  }
 
   const lines = order.sheetLines ?? [];
   const hasBatchAssignments = lines.some((l) => {
@@ -35,10 +40,7 @@ export default async function EditOrderPage({ params }: PageProps) {
     return Boolean(l.batchNo?.trim());
   });
 
-  const deadline =
-    order.deadlineDate && !Number.isNaN(new Date(order.deadlineDate).getTime())
-      ? new Date(order.deadlineDate).toISOString().slice(0, 10)
-      : "";
+  const deadline = dateOnlyInputValue(order.deadlineDate);
 
   const customCartonsRaw = (order as { customCartons?: unknown }).customCartons;
   const customCartons = Array.isArray(customCartonsRaw)
@@ -54,11 +56,12 @@ export default async function EditOrderPage({ params }: PageProps) {
     (order as { gateDeliveryStatus?: unknown }).gateDeliveryStatus,
   );
   const lockedAfterDelivery = isOrderLockedAfterDelivery(gateDeliveryStatus);
+  const ordersListHref = isAdmin(role) || canViewAdminOrdersList(role, username) ? "/admin/orders" : "/orders";
 
   if (lockedAfterDelivery) {
     return (
       <div className="space-y-4">
-        <Link href="/orders" className="text-sm font-medium text-zinc-700 underline">
+        <Link href={ordersListHref} className="text-sm font-medium text-zinc-700 underline">
           ← Orders
         </Link>
         <div className="rounded-xl border border-green-200 bg-green-50 p-6">
@@ -100,7 +103,7 @@ export default async function EditOrderPage({ params }: PageProps) {
 
   return (
     <div className="space-y-4">
-      <Link href="/orders" className="text-sm font-medium text-zinc-700 underline">
+      <Link href={ordersListHref} className="text-sm font-medium text-zinc-700 underline">
         ← Orders
       </Link>
       <AdminOrderEditForm initial={initial} />

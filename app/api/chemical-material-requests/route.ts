@@ -127,10 +127,9 @@ export async function POST(req: Request) {
   const material = await ChemicalRawMaterial.findOne({
     code: materialCode,
     active: true,
-    kind: { $ne: "accessory" },
   }).lean();
   if (!material) {
-    return NextResponse.json({ error: "Chemical material not found." }, { status: 404 });
+    return NextResponse.json({ error: "Material not found." }, { status: 404 });
   }
 
   const accessoryCodes = parsedAccessories.accessories.map((item) => item.itemCode);

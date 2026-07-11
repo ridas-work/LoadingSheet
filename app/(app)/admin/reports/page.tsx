@@ -7,7 +7,8 @@ import { canViewAdminReports, roleFromSession } from "@/lib/roles";
 export default async function AdminReportsPage() {
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
-  if (!canViewAdminReports(role)) {
+  const username = (session?.user as { username?: string })?.username;
+  if (!canViewAdminReports(role, username)) {
     redirect("/admin");
   }
 

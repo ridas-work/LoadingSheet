@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 
 import { OrderPoDetailPanel } from "@/components/OrderPoDetailPanel";
+import { TrackedPrintButton } from "@/components/TrackedPrintButton";
 import type { AdminOrderSummary, SummaryRow } from "@/lib/adminOrderSummary";
 import { ui } from "@/lib/ui";
 
@@ -196,9 +197,16 @@ export function AdminSummaryDashboard() {
           />
           Hide delivered
         </label>
-        <button type="button" onClick={() => window.print()} className={ui.btnSecondarySm}>
+        <TrackedPrintButton
+          printLog={{
+            documentType: "admin_summary",
+            documentTitle: "Admin order summary",
+            referencePath: "/admin",
+          }}
+          className={ui.btnSecondarySm}
+        >
           Print
-        </button>
+        </TrackedPrintButton>
       </div>
 
       <div className="overflow-x-auto">

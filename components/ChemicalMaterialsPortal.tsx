@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  CHEMICAL_ACCESSORY_CATEGORIES,
   CHEMICAL_ACCESSORIES,
+  chemicalAccessoriesByCategory,
   type ChemicalRequestAccessory,
   type SerializedChemicalMaterial,
   type SerializedChemicalRequest,
 } from "@/lib/chemicalMaterials";
+import { formatDisplayDate } from "@/lib/dateOnly";
 import { ui } from "@/lib/ui";
 
 type Props = {
@@ -28,6 +31,28 @@ function formatAccessorySummary(accessories: ChemicalRequestAccessory[]) {
     .filter((item) => item.quantityRequested > 0)
     .map((item) => `${fmt(item.quantityRequested)} ${item.itemName || item.itemCode}`);
   return summary.length > 0 ? summary.join(", ") : "";
+}
+
+function ModalCloseButton({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-full border border-zinc-300 bg-white text-zinc-700 shadow-sm hover:bg-zinc-100 hover:text-zinc-900"
+    >
+      <svg
+        aria-hidden
+        viewBox="0 0 24 24"
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+      </svg>
+    </button>
+  );
 }
 
 export function ChemicalMaterialsPortal({
@@ -53,6 +78,22 @@ export function ChemicalMaterialsPortal({
   const [addOnHand, setAddOnHand] = useState("");
   const [addError, setAddError] = useState("");
   const [addSaving, setAddSaving] = useState(false);
+
+  const closeAddModal = useCallback(() => {
+    setAddOpen(false);
+    setAddName("");
+    setAddUnit("kg");
+    setAddOnHand("");
+    setAddError("");
+  }, []);
+
+  const closeRequestModal = useCallback(() => {
+    setRequestModal(null);
+    setRequestQty("");
+    setRequestAccessories({});
+    setRequestNote("");
+    setRequestError("");
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,6 +124,17 @@ export function ChemicalMaterialsPortal({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!addOpen && !requestModal) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (addOpen) closeAddModal();
+      else if (requestModal) closeRequestModal();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [addOpen, closeAddModal, closeRequestModal, requestModal]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -135,10 +187,7 @@ export function ChemicalMaterialsPortal({
         setAddError(data.error ?? "Could not add material.");
         return;
       }
-      setAddOpen(false);
-      setAddName("");
-      setAddUnit("kg");
-      setAddOnHand("");
+      closeAddModal();
       await load();
     } finally {
       setAddSaving(false);
@@ -170,10 +219,7 @@ export function ChemicalMaterialsPortal({
         setRequestError(data.error ?? "Could not submit request.");
         return;
       }
-      setRequestModal(null);
-      setRequestQty("");
-      setRequestAccessories({});
-      setRequestNote("");
+      closeRequestModal();
       await load();
     } finally {
       setRequestSaving(false);
@@ -316,7 +362,7 @@ export function ChemicalMaterialsPortal({
                     </td>
                     <td className="py-2 pr-2 capitalize">{r.status}</td>
                     <td className="py-2 text-zinc-600">
-                      {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "—"}
+                      {r.createdAt ? formatDisplayDate(r.createdAt) : "—"}
                     </td>
                   </tr>
                 ))}
@@ -327,12 +373,18 @@ export function ChemicalMaterialsPortal({
       ) : null}
 
       {addOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={closeAddModal}
+          role="presentation"
+        >
           <form
             onSubmit={submitAddMaterial}
-            className={`${ui.card} w-full max-w-md space-y-4 p-4`}
+            onClick={(e) => e.stopPropagation()}
+            className={`${ui.cardVisible} relative w-full max-w-md space-y-4 p-4`}
           >
-            <h3 className="text-base font-semibold text-zinc-900">Add material</h3>
+            <ModalCloseButton onClick={closeAddModal} label="Close add material dialog" />
+            <h3 className="pr-10 text-base font-semibold text-zinc-900">Add material</h3>
             <div>
               <label className={ui.label} htmlFor="add-name">
                 Material name
@@ -378,7 +430,7 @@ export function ChemicalMaterialsPortal({
               <button type="submit" disabled={addSaving} className={ui.btnPrimary}>
                 {addSaving ? "Adding…" : "Add to catalog"}
               </button>
-              <button type="button" onClick={() => setAddOpen(false)} className={ui.btnGhost}>
+              <button type="button" onClick={closeAddModal} className={ui.btnSecondarySm}>
                 Cancel
               </button>
             </div>
@@ -387,12 +439,18 @@ export function ChemicalMaterialsPortal({
       ) : null}
 
       {requestModal ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={closeRequestModal}
+          role="presentation"
+        >
           <form
             onSubmit={submitRequest}
-            className={`${ui.card} w-full max-w-md space-y-4 p-4`}
+            onClick={(e) => e.stopPropagation()}
+            className={`${ui.cardVisible} relative w-full max-w-2xl space-y-4 p-4`}
           >
-            <h3 className="text-base font-semibold text-zinc-900">Request material</h3>
+            <ModalCloseButton onClick={closeRequestModal} label="Close request dialog" />
+            <h3 className="pr-10 text-base font-semibold text-zinc-900">Request material</h3>
             <p className="text-sm text-zinc-700">
               <strong>{requestModal.name}</strong> — stock now: {fmt(requestModal.onHand)}{" "}
               {requestModal.unit}
@@ -425,35 +483,44 @@ export function ChemicalMaterialsPortal({
               />
             </div>
             <fieldset className="space-y-3 rounded-lg border border-zinc-200 p-3">
-              <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-zinc-600">
-                Optional packing/accessories
+              <legend className="px-1 text-sm font-medium text-zinc-900">
+                Optional packing / accessories
               </legend>
               <p className="text-xs text-zinc-500">
                 Only fill these if needed for this chemical request.
               </p>
-              <div className="grid gap-3 sm:grid-cols-3">
-                {CHEMICAL_ACCESSORIES.map((item) => (
-                  <div key={item.code}>
-                    <label className={ui.label} htmlFor={`req-accessory-${item.code}`}>
-                      {item.name}
-                    </label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <input
-                        id={`req-accessory-${item.code}`}
-                        type="number"
-                        min={0}
-                        step="1"
-                        value={requestAccessories[item.code] ?? ""}
-                        onChange={(e) =>
-                          setRequestAccessories((prev) => ({
-                            ...prev,
-                            [item.code]: e.target.value,
-                          }))
-                        }
-                        className={ui.input}
-                        placeholder="0"
-                      />
-                      <span className="text-xs text-zinc-500">{item.unit}</span>
+              <div className="space-y-4">
+                {CHEMICAL_ACCESSORY_CATEGORIES.map((category) => (
+                  <div key={category.id}>
+                    <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                      {category.label}
+                    </h4>
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      {chemicalAccessoriesByCategory(category.id).map((item) => (
+                        <div key={item.code}>
+                          <label className={ui.label} htmlFor={`req-accessory-${item.code}`}>
+                            {item.name}
+                          </label>
+                          <div className="mt-1 flex items-center gap-2">
+                            <input
+                              id={`req-accessory-${item.code}`}
+                              type="number"
+                              min={0}
+                              step="1"
+                              value={requestAccessories[item.code] ?? ""}
+                              onChange={(e) =>
+                                setRequestAccessories((prev) => ({
+                                  ...prev,
+                                  [item.code]: e.target.value,
+                                }))
+                              }
+                              className={ui.input}
+                              placeholder="0"
+                            />
+                            <span className="text-xs text-zinc-500">{item.unit}</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -464,11 +531,7 @@ export function ChemicalMaterialsPortal({
               <button type="submit" disabled={requestSaving} className={ui.btnPrimary}>
                 {requestSaving ? "Sending…" : "Send to Waleed"}
               </button>
-              <button
-                type="button"
-                onClick={() => setRequestModal(null)}
-                className={ui.btnGhost}
-              >
+              <button type="button" onClick={closeRequestModal} className={ui.btnSecondarySm}>
                 Cancel
               </button>
             </div>

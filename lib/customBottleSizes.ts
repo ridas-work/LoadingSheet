@@ -75,17 +75,79 @@ export function litersForBottleSizeCode(code: string): number | null {
   return hit.litersPerBottle;
 }
 
-const DRUM_BOTTLE_SIZE_CODES = new Set<CustomBottleSizeCode>(["120l-drum", "150l-drum", "200l-drum"]);
+const DRUM_BOTTLE_SIZE_CODES = new Set<CustomBottleSizeCode>([
+  "25l-can",
+  "120l-drum",
+  "150l-drum",
+  "200l-drum",
+]);
+
+/** Container sizes where delivery deducts only the matching jar/box SKU × bottle qty — no BOM. */
+const JAR_ONLY_DEDUCTION_SIZE_CODES = new Set<CustomBottleSizeCode>([
+  "5l-jar",
+  "1l",
+  "500ml",
+  "750ml",
+  "250ml",
+  "100ml",
+]);
+
+const JAR_PACKAGING_BY_SIZE: Partial<Record<CustomBottleSizeCode, string>> = {
+  "5l-jar": "custom-box-5l-jar",
+  "1l": "custom-box-1l",
+  "500ml": "custom-box-500ml",
+  "750ml": "custom-box-750ml",
+  "250ml": "custom-box-250ml",
+  "100ml": "custom-box-100ml",
+};
+
+export function isJarOnlyDeductionBottleSize(code: string | null | undefined): boolean {
+  return JAR_ONLY_DEDUCTION_SIZE_CODES.has(normalizeBottleSizeCode(code) as CustomBottleSizeCode);
+}
+
+/** Bulk drums/cans ship without packaging inventory deduction. */
+export function isNoPackagingDeductionBottleSize(code: string | null | undefined): boolean {
+  return isDrumBottleSizeCode(code);
+}
+
+export function jarPackagingCodeForBottleSize(code: string | null | undefined): string | null {
+  const normalized = normalizeBottleSizeCode(code);
+  return JAR_PACKAGING_BY_SIZE[normalized as CustomBottleSizeCode] ?? null;
+}
+
+/** Jar-only deduction for a sheet line or mixed row (infers size from name when needed). */
+export function jarPackagingDeductionForLine(args: {
+  productName: string;
+  bottleSizeCode?: string | null;
+  bottleCount: number;
+}): { jarCode: string; quantity: number } | null {
+  const sizeCode = inferBottleSizeCodeFromSavedLine(
+    args.productName,
+    undefined,
+    args.bottleSizeCode,
+  );
+  if (!isJarOnlyDeductionBottleSize(sizeCode)) return null;
+  const jarCode = jarPackagingCodeForBottleSize(sizeCode);
+  if (!jarCode || args.bottleCount <= 0) return null;
+  return { jarCode, quantity: args.bottleCount };
+}
+
+export function isJarOnlyContainerLine(
+  productName: string,
+  bottleSizeCode?: string | null,
+): boolean {
+  return Boolean(jarPackagingDeductionForLine({ productName, bottleSizeCode, bottleCount: 1 }));
+}
 
 export function isDrumBottleSizeCode(code: string | null | undefined): boolean {
   const normalized = normalizeBottleSizeCode(code);
   return DRUM_BOTTLE_SIZE_CODES.has(normalized as CustomBottleSizeCode);
 }
 
-/** Bulk drums are filled at customer — no bottle/cap/carton stock on delivery. */
+/** Bulk drums/cans are filled at customer — no bottle/cap/carton stock on delivery. */
 export function isDrumContainerProduct(productName: string, bottleSizeCode?: string | null): boolean {
-  if (isDrumBottleSizeCode(bottleSizeCode)) return true;
-  if (isDrumBottleSizeCode(inferBottleSizeCodeFromSavedLine(productName))) return true;
+  if (isNoPackagingDeductionBottleSize(bottleSizeCode)) return true;
+  if (isNoPackagingDeductionBottleSize(inferBottleSizeCodeFromSavedLine(productName))) return true;
   return /\d+\s*(?: litre)?\s*drum\b/i.test(productName.trim());
 }
 

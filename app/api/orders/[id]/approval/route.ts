@@ -55,6 +55,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
+  if (order.discardedAt && parsed.action === "approve") {
+    return NextResponse.json({ error: "This order was discarded." }, { status: 400 });
+  }
+
   const current = normalizeApprovalStatus(order.approvalStatus);
   const now = new Date();
   const userName = session.user.name ?? "";
@@ -72,6 +76,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       return NextResponse.json({ error: "Order is already approved" }, { status: 400 });
     }
     for (const target of targets) {
+      if (target.discardedAt) {
+        return NextResponse.json({ error: "This order was discarded." }, { status: 400 });
+      }
       target.approvalStatus = "approved";
       target.approvedAt = now;
       target.approvedByUserId = userId;
@@ -92,6 +99,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       target.rejectedByUserId = userId;
       target.rejectedByName = userName;
       target.rejectionNote = parsed.note;
+
+      // Boss subtraction pending POs are "discarded" permanently on reject.
+      if (target.subtractedFromOrderId) {
+        target.discardedAt = now;
+        target.discardedByUserId = userId;
+        target.discardedByName = userName;
+      }
       await target.save();
     }
   }

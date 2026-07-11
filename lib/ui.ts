@@ -19,6 +19,7 @@ export const ui = {
   cardVisible: "app-card app-card-visible",
   cardPadded: "app-card app-card-padded",
   cardMuted: "app-card app-card-muted",
+  cardAccent: "app-card app-card-accent",
   alertWarning: "app-alert app-alert-warning",
   alertInfo: "app-alert app-alert-info",
   alertDanger: "app-alert app-alert-danger",

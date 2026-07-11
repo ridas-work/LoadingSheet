@@ -1,5 +1,6 @@
 import {
   batchUsageKey,
+  formatLiters,
   inferLitersPerBottleFromName,
   normalizeBatchNo,
   productsMatch,
@@ -150,4 +151,76 @@ export function batchPickerOptionsForComponent(
   }
 
   return [...byBatch.values()].sort((a, b) => b.batchNo.localeCompare(a.batchNo));
+}
+
+export function remainingLitersForPickerOption(args: {
+  option: BatchPickerOption;
+  usedElsewhereLiters: number;
+  usedOnSheetLiters: number;
+  excludeLitersOnSheet: number;
+}): number {
+  const onSheet = Math.max(0, args.usedOnSheetLiters - args.excludeLitersOnSheet);
+  return roundLiters(Math.max(0, args.option.totalLiters - args.usedElsewhereLiters - onSheet));
+}
+
+export function formatBatchPickerOptionLabel(
+  option: BatchPickerOption,
+  remainingLiters: number,
+): string {
+  if (option.readyBottles > 0) {
+    const tail = option.fromReadyOnly ? "" : `, ${formatLiters(remainingLiters)} L left`;
+    return `${option.batchNo} (${option.readyBottles} ready${tail})`;
+  }
+  return `${option.batchNo} (${formatLiters(remainingLiters)} L left)`;
+}
+
+export function isBatchPickerOptionSelectable(
+  remainingLiters: number,
+  litersNeeded: number,
+  optionBatchNo: string,
+  selectedBatchNo: string,
+): boolean {
+  const selected = normalizeBatchNo(selectedBatchNo);
+  const option = normalizeBatchNo(optionBatchNo);
+  if (selected && selected === option) return true;
+  if (litersNeeded <= 1e-9) return remainingLiters > 1e-9;
+  return remainingLiters + 1e-9 >= litersNeeded;
+}
+
+/** Dropdown options with batches that still have enough liters for this row. */
+export function buildSelectableBatchPickerOptions(args: {
+  productName: string;
+  options: BatchPickerOption[];
+  catalog: PackingCatalogRow[];
+  usedElsewhereMap: Map<string, number>;
+  usedOnSheetMap: Map<string, number>;
+  litersNeeded: number;
+  selectedBatchNo: string;
+}): Array<{ batchNo: string; label: string }> {
+  const selectedNorm = normalizeBatchNo(args.selectedBatchNo);
+  return args.options
+    .map((option) => {
+      const key = batchUsageKey(option.batchNo, args.productName, args.catalog);
+      const excludeLiters =
+        selectedNorm && selectedNorm === normalizeBatchNo(option.batchNo) ? args.litersNeeded : 0;
+      const remaining = remainingLitersForPickerOption({
+        option,
+        usedElsewhereLiters: args.usedElsewhereMap.get(key) ?? 0,
+        usedOnSheetLiters: args.usedOnSheetMap.get(key) ?? 0,
+        excludeLitersOnSheet: excludeLiters,
+      });
+      return { option, remaining };
+    })
+    .filter(({ option, remaining }) =>
+      isBatchPickerOptionSelectable(
+        remaining,
+        args.litersNeeded,
+        option.batchNo,
+        args.selectedBatchNo,
+      ),
+    )
+    .map(({ option, remaining }) => ({
+      batchNo: option.batchNo,
+      label: formatBatchPickerOptionLabel(option, remaining),
+    }));
 }

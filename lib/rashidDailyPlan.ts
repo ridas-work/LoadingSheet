@@ -397,11 +397,21 @@ export function parseWorkRowInputs(raw: unknown): { rows?: WorkRowInput[]; error
     }
     const o = item as Record<string, unknown>;
     const employeeId = typeof o.employeeId === "string" ? o.employeeId.trim() : "";
+    const employeeIdsFromArray = Array.isArray(o.employeeIds)
+      ? o.employeeIds
+          .filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+          .map((x) => x.trim())
+      : [];
+    const employeeIds = employeeIdsFromArray.length > 0 ? employeeIdsFromArray : employeeId ? [employeeId] : [];
+
+    if (employeeIds.length === 0) errors[`workRows.${index}.employeeId`] = "Employee required.";
+
     const productCode = typeof o.productCode === "string" ? o.productCode.trim() : "";
     const taskCode = typeof o.taskCode === "string" ? o.taskCode.trim() : "";
     const duty = typeof o.duty === "string" ? o.duty.trim() : "";
-
-    if (!employeeId) errors[`workRows.${index}.employeeId`] = "Employee required.";
+    const baseTarget = typeof o.baseTarget === "number" ? o.baseTarget : Number(o.baseTarget) || 0;
+    const statusAchieved =
+      typeof o.statusAchieved === "number" ? o.statusAchieved : Number(o.statusAchieved) || 0;
 
     if (productCode && taskCode) {
       const err = validateProductTask(productCode, taskCode);
@@ -410,16 +420,29 @@ export function parseWorkRowInputs(raw: unknown): { rows?: WorkRowInput[]; error
       errors[`workRows.${index}.duty`] = "Duty required.";
     }
 
-    rows.push({
-      lineKey: typeof o.lineKey === "string" ? o.lineKey.trim() : undefined,
-      employeeId,
-      productCode: productCode || undefined,
-      taskCode: taskCode || undefined,
-      duty: duty || (productCode && taskCode ? "pending" : ""),
-      baseTarget: typeof o.baseTarget === "number" ? o.baseTarget : Number(o.baseTarget) || 0,
-      statusAchieved:
-        typeof o.statusAchieved === "number" ? o.statusAchieved : Number(o.statusAchieved) || 0,
-    });
+    for (const eid of employeeIds) {
+      rows.push({
+        lineKey: typeof o.lineKey === "string" ? o.lineKey.trim() : undefined,
+        employeeId: eid,
+        productCode: productCode || undefined,
+        taskCode: taskCode || undefined,
+        duty: duty || (productCode && taskCode ? "pending" : ""),
+        baseTarget,
+        statusAchieved,
+      });
+    }
+
+    if (employeeIds.length === 0) {
+      rows.push({
+        lineKey: typeof o.lineKey === "string" ? o.lineKey.trim() : undefined,
+        employeeId: "",
+        productCode: productCode || undefined,
+        taskCode: taskCode || undefined,
+        duty: duty || (productCode && taskCode ? "pending" : ""),
+        baseTarget,
+        statusAchieved,
+      });
+    }
   });
   if (Object.keys(errors).length > 0) return { errors };
   return { rows };

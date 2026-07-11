@@ -26,6 +26,9 @@ const PackagingStockMovementSchema = new mongoose.Schema(
   { timestamps: { createdAt: true, updatedAt: false } },
 );
 
+PackagingStockMovementSchema.index({ createdAt: -1 });
+PackagingStockMovementSchema.index({ itemCode: 1, createdAt: -1 });
+
 export type PackagingStockMovementDoc = InferSchemaType<typeof PackagingStockMovementSchema> & {
   _id: mongoose.Types.ObjectId;
 };

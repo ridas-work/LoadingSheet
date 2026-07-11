@@ -9,21 +9,22 @@ import { PrintCartonLabelsButton } from "@/components/PrintCartonLabelsButton";
 import {
   augmentPoolWithReadyBatches,
   batchPickerOptionsForComponent,
+  buildSelectableBatchPickerOptions,
   type ReadyLotLike,
 } from "@/lib/readyBatchPool";
 import { PrintSheetButton } from "@/components/PrintSheetButton";
 import { ReadyStockCheck } from "@/components/ReadyStockCheck";
+import { usePrintAuditLog } from "@/lib/logPrintClient";
 import { cartonLabelsFromSheetLines } from "@/lib/cartonLabels";
 import {
-  batchUsageKey,
   effectiveBatchDefsForOrder,
-  formatLiters,
   normalizeBatchNo,
   poolToBatchDefs,
   type ProductionBatchPoolItem,
 } from "@/lib/batchVolume";
 import {
   isBundleProduct,
+  lineLitersForProduct,
   resolveBundleParts,
   usageLitersByBatchFromSheetLines,
   validateSheetBatchAllocations,
@@ -33,6 +34,7 @@ import {
 } from "@/lib/bundleCatalog";
 import { isMixedSampleLine, resolveMixedSampleParts } from "@/lib/mixedSampleBox";
 import type { DeductionPacking, DeductionSheetLine } from "@/lib/packagingDeduction";
+import { formatDisplayDateTime } from "@/lib/dateOnly";
 import {
   allocateReadyStockToLines,
   formatReadyAwareBatchDisplay,
@@ -154,23 +156,8 @@ function FooterField({
   );
 }
 
-const printTimestampFormatter = new Intl.DateTimeFormat("en-GB", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
-  hour12: true,
-});
-
 function formatPrintedAt(date: Date) {
-  const parts = Object.fromEntries(
-    printTimestampFormatter.formatToParts(date).map((part) => [part.type, part.value]),
-  );
-  const dayPeriod = parts.dayPeriod ? ` ${parts.dayPeriod.toUpperCase()}` : "";
-
-  return `${parts.weekday}, ${parts.day} ${parts.month} ${parts.year}, ${parts.hour}:${parts.minute}${dayPeriod}`;
+  return formatDisplayDateTime(date);
 }
 
 export function LoadingSheetBatchEditor({
@@ -365,11 +352,11 @@ export function LoadingSheetBatchEditor({
     (productName: string) =>
       batchPickerOptionsForComponent(
         productName,
-        productionBatches,
+        augmentedProductionBatches,
         readyBatchLots as ReadyLotLike[],
         catalog,
       ),
-    [catalog, productionBatches, readyBatchLots],
+    [augmentedProductionBatches, catalog, readyBatchLots],
   );
 
   const canSaveDispatch = validation.ok && !saving;
@@ -509,6 +496,26 @@ export function LoadingSheetBatchEditor({
   const showVehicleInputs = showDispatchInputs && !onTrip && !batchesLocked;
   const showBatchInputs = showDispatchInputs && !batchesLocked;
   const showWeightInputs = showDispatchInputs;
+  const printLog = useMemo(
+    () => ({
+      documentType: "order_loading_sheet" as const,
+      documentTitle: `PO ${poNumber} — ${customerName}`,
+      referenceId: orderId,
+      referencePath: `/orders/${orderId}/loading-sheet`,
+      metadata: { poNumber, customerName, cartonCount: sheetLines.length },
+    }),
+    [orderId, poNumber, customerName, sheetLines.length],
+  );
+  const cartonLabelsPrintLog = useMemo(
+    () => ({
+      documentType: "carton_labels" as const,
+      documentTitle: `Carton labels — PO ${poNumber}`,
+      referenceId: orderId,
+      referencePath: `/orders/${orderId}/loading-sheet`,
+      metadata: { poNumber, customerName, labelCount: printableCartonLabels.length },
+    }),
+    [orderId, poNumber, customerName, printableCartonLabels.length],
+  );
   const updatePrintedAt = useCallback(() => {
     flushSync(() => {
       setPrintedAt(new Date());
@@ -522,6 +529,8 @@ export function LoadingSheetBatchEditor({
       window.removeEventListener("beforeprint", updatePrintedAt);
     };
   }, [updatePrintedAt]);
+
+  usePrintAuditLog(printLog);
 
   return (
     <div className="space-y-4">
@@ -570,8 +579,9 @@ export function LoadingSheetBatchEditor({
             poNumber={poNumber}
             customerName={customerName}
             labels={printableCartonLabels}
+            printLog={cartonLabelsPrintLog}
           />
-          <PrintSheetButton onBeforePrint={updatePrintedAt} />
+          <PrintSheetButton onBeforePrint={updatePrintedAt} printLog={printLog} />
         </div>
       </div>
 
@@ -776,23 +786,31 @@ export function LoadingSheetBatchEditor({
                                     className="w-full min-w-[5rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
                                   >
                                     <option value="">— assign batch</option>
-                                    {options.map((pb) => {
-                                      const key = batchUsageKey(pb.batchNo, part.productName, catalog);
-                                      const elsewhere = usedElsewhereMap.get(key) ?? 0;
-                                      const onThisOrder = currentOrderUsedByBatch.get(key) ?? 0;
-                                      const remaining = Math.max(
-                                        0,
-                                        pb.totalLiters - elsewhere - onThisOrder,
-                                      );
-                                      const label = pb.readyBottles
-                                        ? `${pb.batchNo} (${pb.readyBottles} ready${pb.fromReadyOnly ? "" : `, ${formatLiters(remaining)} L left`})`
-                                        : `${pb.batchNo} (${formatLiters(remaining)} L left)`;
-                                      return (
-                                        <option key={pb.batchNo} value={pb.batchNo}>
-                                          {label}
-                                        </option>
-                                      );
-                                    })}
+                                    {buildSelectableBatchPickerOptions({
+                                      productName: part.productName,
+                                      options: options,
+                                      catalog,
+                                      usedElsewhereMap,
+                                      usedOnSheetMap: currentOrderUsedByBatch,
+                                      litersNeeded: lineLitersForProduct(
+                                        workingLines.find((line) => line.boxNo === row.boxNo) ?? {
+                                          boxNo: row.boxNo,
+                                          productName: row.productName,
+                                          bottlesPerBox: row.bottlesPerBox,
+                                          lineKind: row.lineKind,
+                                          mixedContents: row.mixedContents,
+                                          batchNo: "",
+                                          componentBatches: [],
+                                        },
+                                        part.productName,
+                                        catalog,
+                                      ),
+                                      selectedBatchNo: value,
+                                    }).map((option) => (
+                                      <option key={option.batchNo} value={option.batchNo}>
+                                        {option.label}
+                                      </option>
+                                    ))}
                                   </select>
                                 </div>
                               );
@@ -815,20 +833,31 @@ export function LoadingSheetBatchEditor({
                                 className="w-full min-w-[5rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
                               >
                                 <option value="">— assign batch</option>
-                                {batchesForRow(row.productName).map((pb) => {
-                                  const key = batchUsageKey(pb.batchNo, row.productName, catalog);
-                                  const elsewhere = usedElsewhereMap.get(key) ?? 0;
-                                  const onThisOrder = currentOrderUsedByBatch.get(key) ?? 0;
-                                  const remaining = Math.max(0, pb.totalLiters - elsewhere - onThisOrder);
-                                  const label = pb.readyBottles
-                                    ? `${pb.batchNo} (${pb.readyBottles} ready${pb.fromReadyOnly ? "" : `, ${formatLiters(remaining)} L left`})`
-                                    : `${pb.batchNo} (${formatLiters(remaining)} L left)`;
-                                  return (
-                                    <option key={pb.batchNo} value={pb.batchNo}>
-                                      {label}
-                                    </option>
-                                  );
-                                })}
+                                {buildSelectableBatchPickerOptions({
+                                  productName: row.productName,
+                                  options: batchesForRow(row.productName),
+                                  catalog,
+                                  usedElsewhereMap,
+                                  usedOnSheetMap: currentOrderUsedByBatch,
+                                  litersNeeded: lineLitersForProduct(
+                                    workingLines.find((line) => line.boxNo === row.boxNo) ?? {
+                                      boxNo: row.boxNo,
+                                      productName: row.productName,
+                                      bottlesPerBox: row.bottlesPerBox,
+                                      lineKind: row.lineKind,
+                                      mixedContents: row.mixedContents,
+                                      batchNo: batches[row.boxNo] ?? "",
+                                      componentBatches: [],
+                                    },
+                                    row.productName,
+                                    catalog,
+                                  ),
+                                  selectedBatchNo: batches[row.boxNo] ?? "",
+                                }).map((option) => (
+                                  <option key={option.batchNo} value={option.batchNo}>
+                                    {option.label}
+                                  </option>
+                                ))}
                               </select>
                             </>
                           )}

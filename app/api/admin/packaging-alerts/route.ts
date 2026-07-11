@@ -4,7 +4,7 @@ import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { PackagingItem } from "@/lib/models/PackagingItem";
 import { buildPackagingReorderAlerts } from "@/lib/packagingReorderAlerts";
-import { isAdmin, roleFromSession } from "@/lib/roles";
+import { canViewPackagingAlerts, roleFromSession } from "@/lib/roles";
 
 export async function GET() {
   const session = await auth();
@@ -12,7 +12,8 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const role = roleFromSession(session.user as { role?: string });
-  if (!isAdmin(role)) {
+  const username = (session.user as { username?: string })?.username;
+  if (!canViewPackagingAlerts(role, username)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

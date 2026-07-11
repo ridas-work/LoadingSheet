@@ -6,17 +6,18 @@ import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
-import { canEditDispatch, homePathForRole, isAdmin, roleFromSession } from "@/lib/roles";
+import { canViewDispatchReadyStock, homePathForRole, isAdmin, isAdminSummaryViewer, roleFromSession } from "@/lib/roles";
 
 export default async function ReadyStockPage() {
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
+  const username = (session?.user as { username?: string })?.username;
 
-  if (!canEditDispatch(role) && !isAdmin(role)) {
-    redirect(role ? homePathForRole(role) : "/login");
+  if (!canViewDispatchReadyStock(role, username)) {
+    redirect(role ? homePathForRole(role, username) : "/login");
   }
 
-  const readOnly = isAdmin(role);
+  const readOnly = isAdmin(role) || isAdminSummaryViewer(role, username);
 
   await connectToDatabase();
 

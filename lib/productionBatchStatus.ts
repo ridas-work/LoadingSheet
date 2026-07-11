@@ -3,13 +3,15 @@ import {
   formatLiters,
   inferLitersPerBottleFromName,
   normalizeBatchNo,
+  productsMatch,
   roundLiters,
   type CatalogProduct,
 } from "@/lib/batchVolume";
 import {
-  accumulateBatchUsageFromSheetLines,
   findPackingByName,
+  lineBatchAllocations,
   type PackingCatalogRow,
+  type SheetLineLike,
 } from "@/lib/bundleCatalog";
 import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
@@ -19,6 +21,14 @@ import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
 import { ReadyBottleBatchLot } from "@/lib/models/ReadyBottleBatchLot";
 import { isBatchClosed } from "@/lib/productionBatchClose";
+import { getReadyStockMap } from "@/lib/readyBottleLedger";
+import {
+  allocateReadyStockToLines,
+  createReadyAllocationSharedState,
+  type LineReadySplit,
+  type ReadyBatchLotInput,
+} from "@/lib/readyStockAllocation";
+import type { DeductionSheetLine } from "@/lib/packagingDeduction";
 
 export type ProductionBatchStatus = "available" | "in_use" | "empty";
 
@@ -69,24 +79,125 @@ export async function loadCatalogForBatchUsage(): Promise<CatalogProduct[]> {
   }));
 }
 
+function sheetLinesToDeductionLines(lines: SheetLineLike[]): DeductionSheetLine[] {
+  return lines.map((line) => ({
+    boxNo: line.boxNo,
+    productName: line.productName,
+    bottlesPerBox: line.bottlesPerBox,
+    lineKind: line.lineKind,
+    mixedContents: line.mixedContents,
+  }));
+}
+
+function litersFromSheetAllocation(
+  line: SheetLineLike,
+  split: LineReadySplit | undefined,
+  catalog: PackingCatalogRow[],
+): Array<{ batchNo: string; productName: string; liters: number }> {
+  const allocations = lineBatchAllocations(line, catalog);
+  const result: Array<{ batchNo: string; productName: string; liters: number }> = [];
+
+  for (const alloc of allocations) {
+    let litersToCount = alloc.liters;
+    if (split) {
+      if (split.components?.length) {
+        const comp =
+          split.components.find((c) => c.productName.trim() === alloc.productName.trim()) ??
+          split.components.find((c) => productsMatch(c.productName, alloc.productName, catalog));
+        if (comp) {
+          if (comp.bottlesNeedingBatch <= 0) continue;
+          if (comp.bottles > 0) {
+            litersToCount = roundLiters(alloc.liters * (comp.bottlesNeedingBatch / comp.bottles));
+          }
+        }
+      } else {
+        const total = split.bottlesFromReady + split.bottlesNeedingBatch;
+        if (split.bottlesNeedingBatch <= 0) continue;
+        if (total > 0) {
+          litersToCount = roundLiters(alloc.liters * (split.bottlesNeedingBatch / total));
+        }
+      }
+    }
+    if (litersToCount <= 0) continue;
+    result.push({ batchNo: alloc.batchNo, productName: alloc.productName, liters: litersToCount });
+  }
+
+  return result;
+}
+
+/**
+ * Loading-sheet batch rows that draw from Rashid's ready shelf already consumed Esha
+ * liters when the bottles were added to ready stock — count only cartons still needing batch.
+ */
+export async function accumulateBatchUsageFromSheetLinesForPool(
+  orders: Array<{ sheetLines?: SheetLineLike[]; createdAt?: Date | string | null }>,
+  catalog: PackingCatalogRow[],
+): Promise<Map<string, number>> {
+  const readyLotDocs = await ReadyBottleBatchLot.find({ nimraLinked: true, bottles: { $gt: 0 } })
+    .select({ batchNo: 1, productCode: 1, bottles: 1, createdAt: 1 })
+    .lean();
+  const batchLots: ReadyBatchLotInput[] = readyLotDocs.map((lot) => ({
+    batchNo: lot.batchNo,
+    productCode: lot.productCode,
+    bottles: lot.bottles,
+    createdAt: lot.createdAt ? new Date(lot.createdAt).toISOString() : null,
+  }));
+  const onHand = await getReadyStockMap();
+  const sharedState = createReadyAllocationSharedState(onHand, batchLots, catalog);
+  const used = new Map<string, number>();
+
+  const sortedOrders = [...orders].sort((a, b) => {
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return ta - tb;
+  });
+
+  for (const order of sortedOrders) {
+    const lines = order.sheetLines ?? [];
+    if (lines.length === 0) continue;
+
+    const { byBoxNo } = allocateReadyStockToLines(
+      sheetLinesToDeductionLines(lines),
+      catalog,
+      onHand,
+      batchLots,
+      sharedState,
+    );
+
+    for (const line of lines) {
+      const split = byBoxNo.get(line.boxNo);
+      for (const alloc of litersFromSheetAllocation(line, split, catalog)) {
+        const key = batchUsageKey(alloc.batchNo, alloc.productName, catalog);
+        if (!key) continue;
+        used.set(key, roundLiters((used.get(key) ?? 0) + alloc.liters));
+      }
+    }
+  }
+
+  return used;
+}
+
 export async function loadBatchUsageMap(catalog: PackingCatalogRow[]) {
   await connectToDatabase();
-  const orders = await Order.find({}).select({ sheetLines: 1 }).lean();
-  const fromSheets = accumulateBatchUsageFromSheetLines(orders, catalog);
+  const orders = await Order.find({}).select({ sheetLines: 1, createdAt: 1 }).lean();
+  const fromSheets = await accumulateBatchUsageFromSheetLinesForPool(orders, catalog);
   const fromReady = await accumulateBatchUsageFromReadyLots(catalog);
   const fromFilling = await accumulateBatchUsageFromFillingEntries(catalog);
 
-  const batchesWithFilling = new Set(fromFilling.keys());
+  // Ready lots (Rashid shelf stock) always consume Esha batch liters. Daily filling
+  // "filled today" only counts when no ready lots exist for that batch key — avoids
+  // double-counting when filling sync also created nimra-linked ready lots.
+  const batchesWithReadyLots = new Set(fromReady.keys());
   const merged = new Map<string, number>();
 
   for (const [key, liters] of fromSheets) {
     merged.set(key, roundLiters(liters));
   }
-  for (const [key, liters] of fromFilling) {
+  for (const [key, liters] of fromReady) {
     merged.set(key, roundLiters((merged.get(key) ?? 0) + liters));
   }
-  for (const [key, liters] of fromReady) {
-    if (batchesWithFilling.has(key)) continue;
+  for (const [key, liters] of fromFilling) {
+    if (batchesWithReadyLots.has(key)) continue;
     merged.set(key, roundLiters((merged.get(key) ?? 0) + liters));
   }
 

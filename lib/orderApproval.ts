@@ -45,24 +45,32 @@ export function pendingApprovalMongoFilter() {
   return { approvalStatus: "pending" as const, discardedAt: null };
 }
 
-/** One row per PO number — keep the newest pending submission if duplicates exist. */
+/** One row per PO number — keep the newest pending submission if duplicates exist. Subtraction POs always show. */
 export function dedupePendingApprovalsByPoNumber<
-  T extends { poNumber: string; createdAt?: Date | string | null },
+  T extends {
+    poNumber: string;
+    createdAt?: Date | string | null;
+    subtractedFromOrderId?: string | null;
+    _id?: { toString(): string };
+  },
 >(orders: T[]): T[] {
-  const byPo = new Map<string, T>();
+  const byKey = new Map<string, T>();
   for (const order of orders) {
-    const key = order.poNumber.trim().toLowerCase();
+    const subFrom = order.subtractedFromOrderId?.trim();
+    const key = subFrom
+      ? `sub:${order._id?.toString() ?? order.poNumber}`
+      : order.poNumber.trim().toLowerCase();
     if (!key) continue;
-    const prev = byPo.get(key);
+    const prev = byKey.get(key);
     if (!prev) {
-      byPo.set(key, order);
+      byKey.set(key, order);
       continue;
     }
     const prevAt = prev.createdAt ? new Date(prev.createdAt).getTime() : 0;
     const nextAt = order.createdAt ? new Date(order.createdAt).getTime() : 0;
-    if (nextAt >= prevAt) byPo.set(key, order);
+    if (nextAt >= prevAt) byKey.set(key, order);
   }
-  return [...byPo.values()];
+  return [...byKey.values()];
 }
 
 /** Human label for PO type on Waleed sample-approval screen. */

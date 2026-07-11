@@ -1,14 +1,17 @@
 import { OrdersListWithTrips } from "@/components/OrdersListWithTrips";
 import { PageHeader } from "@/components/PageHeader";
+import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { mergeOrderFilter } from "@/lib/customerAccountAccess";
 import { connectToDatabase } from "@/lib/db";
 import { normalizeGateStatus, rashidActiveOrdersMongoFilter } from "@/lib/gateDelivery";
 import { Order } from "@/lib/models/Order";
+import { poCreatorOrdersMongoFilter } from "@/lib/orderAccess";
+import { batchProgress } from "@/lib/orderBatchStatus";
 import { tripPlannerOrdersMongoFilter } from "@/lib/orderApproval";
 import { notDiscardedOrdersMongoFilter } from "@/lib/orderDiscard";
 import {
   canAssignDispatchBatches,
-  canEditOrders,
   isAdmin,
   isDispatchTripPlanner,
   roleFromSession,
@@ -20,17 +23,27 @@ export default async function OrdersPage() {
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
   const username = (session?.user as { username?: string })?.username;
+  const userId = (session?.user as { id?: string })?.id;
+
+  if (isAdmin(role)) {
+    redirect("/admin/orders");
+  }
+
   const isDispatchEditor = role === "dispatch_editor";
   const isTripPlanner = isDispatchTripPlanner(role, username);
   const canAssignBatches = canAssignDispatchBatches(role, username);
   const showEnteredBy = isAdmin(role);
-  const editOrders = canEditOrders(role, username);
+  const editOrders = role === "po_creator";
 
-  const query = isTripPlanner
-    ? tripPlannerOrdersMongoFilter()
-    : isDispatchEditor
-      ? rashidActiveOrdersMongoFilter()
-      : notDiscardedOrdersMongoFilter();
+  const query = await mergeOrderFilter(
+    isTripPlanner
+      ? tripPlannerOrdersMongoFilter()
+      : isDispatchEditor
+        ? rashidActiveOrdersMongoFilter()
+        : role === "po_creator" && userId
+          ? poCreatorOrdersMongoFilter(userId)
+          : notDiscardedOrdersMongoFilter(),
+  );
 
   const orders = await Order.find(query)
     .sort({ createdAt: -1 })
@@ -42,8 +55,7 @@ export default async function OrdersPage() {
   const rows = orders.map((o) => {
     const id = o._id.toString();
     const lines = o.sheetLines ?? [];
-    const total = lines.length;
-    const filled = lines.filter((l) => typeof l.batchNo === "string" && l.batchNo.trim().length > 0).length;
+    const progress = batchProgress(lines);
     const dispatch = (o as { dispatch?: { vehicleNo?: string } }).dispatch;
 
     return {
@@ -52,8 +64,8 @@ export default async function OrdersPage() {
       customerName: o.customerName,
       createdAt: o.createdAt ? new Date(o.createdAt).toISOString() : "",
       createdByName: (o as { createdByName?: string }).createdByName?.trim() ?? "",
-      filled,
-      total,
+      filled: progress.filled,
+      total: progress.total,
       dispatchTripId: o.dispatchTripId ? o.dispatchTripId.toString() : null,
       vehicleNo: dispatch?.vehicleNo?.trim() ?? "",
       gateDeliveryStatus: normalizeGateStatus(
@@ -65,6 +77,7 @@ export default async function OrdersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
+        accent="ali"
         title="Orders"
         description={
           isTripPlanner

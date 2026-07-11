@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { TrackedPrintButton } from "@/components/TrackedPrintButton";
+
 import type {
   BatchBottlesReport,
   CustomerOrdersReport,
@@ -12,6 +14,7 @@ import type {
   ProductTotalsReport,
   ReportScope,
 } from "@/lib/adminOperationsReports.types";
+import { formatDisplayDate } from "@/lib/dateOnly";
 import { ui } from "@/lib/ui";
 
 type ReportView = "products" | "customers" | "dispersion" | "batches";
@@ -30,6 +33,10 @@ function fmt(n: number): string {
   return n.toLocaleString();
 }
 
+function fmtAmount(n: number): string {
+  return n.toLocaleString(undefined, { maximumFractionDigits: 3 });
+}
+
 function gateLabel(status: string): string {
   switch (status) {
     case "delivered":
@@ -45,9 +52,8 @@ function gateLabel(status: string): string {
 
 function formatDate(iso: string): string {
   if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString();
+  const formatted = formatDisplayDate(iso);
+  return formatted || "—";
 }
 
 function resolveReportView(filters: {
@@ -322,9 +328,17 @@ export function AdminReportsHub() {
             One overview — use filters to drill into customers, products, or batches.
           </p>
         </div>
-        <button type="button" onClick={() => window.print()} className={ui.btnPrimary}>
+        <TrackedPrintButton
+          printLog={{
+            documentType: "admin_report",
+            documentTitle: `Operations report — ${activeView}`,
+            referencePath: "/admin/reports",
+            metadata: { scope, activeView },
+          }}
+          className={ui.btnPrimary}
+        >
           Print
-        </button>
+        </TrackedPrintButton>
       </div>
 
       <div className={`${ui.card} flex flex-wrap items-end gap-4 p-4 print:hidden`}>
@@ -446,60 +460,71 @@ export function AdminReportsHub() {
 
           {activeView === "customers" ? (
             applied.customer && customers ? (
-              <table className={reportTableClass}>
-                <colgroup>
-                  <col className="w-[14%]" />
-                  <col className="w-[12%]" />
-                  <col className="w-[16%]" />
-                  <col className="w-[34%]" />
-                  <col className="w-[12%]" />
-                  <col className="w-[12%]" />
-                </colgroup>
-                <thead>
-                  <tr className="bg-zinc-100 print:bg-transparent">
-                    <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">PO no</th>
-                    <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">Date</th>
-                    <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">Status</th>
-                    <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">Products</th>
-                    <th className="border border-zinc-300 px-3 py-2 text-right font-semibold">Cartons</th>
-                    <th className="border border-zinc-300 px-3 py-2 text-right font-semibold">Bottles</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {customers.orders.length === 0 ? (
-                    <tr>
-                      <td
-                        colSpan={6}
-                        className="border border-zinc-300 px-3 py-6 text-center text-zinc-600"
-                      >
-                        No orders for this customer in the selected scope.
-                      </td>
+              <>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  Customer product totals
+                </h3>
+                <div className="mb-5">
+                  <ProductsTable products={customers.productTotals} showFooter={false} />
+                </div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                  PO history
+                </h3>
+                <table className={reportTableClass}>
+                  <colgroup>
+                    <col className="w-[14%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[34%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                  </colgroup>
+                  <thead>
+                    <tr className="bg-zinc-100 print:bg-transparent">
+                      <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">PO no</th>
+                      <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">Date</th>
+                      <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">Status</th>
+                      <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">Products</th>
+                      <th className="border border-zinc-300 px-3 py-2 text-right font-semibold">Cartons</th>
+                      <th className="border border-zinc-300 px-3 py-2 text-right font-semibold">Bottles</th>
                     </tr>
-                  ) : (
-                    customers.orders.map((row) => (
-                      <tr key={row.orderId} className="even:bg-zinc-50/60">
-                        <td className="border border-zinc-300 px-3 py-2">
-                          <Link
-                            href={`/orders/${row.orderId}/loading-sheet`}
-                            className="text-teal-800 underline"
-                          >
-                            {row.poNumber}
-                          </Link>
-                        </td>
-                        <td className="border border-zinc-300 px-3 py-2">{formatDate(row.createdAt)}</td>
-                        <td className="border border-zinc-300 px-3 py-2">{gateLabel(row.gateDeliveryStatus)}</td>
-                        <td className="border border-zinc-300 px-3 py-2">{row.productsSummary || "—"}</td>
-                        <td className="border border-zinc-300 px-3 py-2 text-right tabular-nums">
-                          {fmt(row.totalCartons)}
-                        </td>
-                        <td className="border border-zinc-300 px-3 py-2 text-right tabular-nums">
-                          {fmt(row.totalBottles)}
+                  </thead>
+                  <tbody>
+                    {customers.orders.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="border border-zinc-300 px-3 py-6 text-center text-zinc-600"
+                        >
+                          No orders for this customer in the selected scope.
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      customers.orders.map((row) => (
+                        <tr key={row.orderId} className="even:bg-zinc-50/60">
+                          <td className="border border-zinc-300 px-3 py-2">
+                            <Link
+                              href={`/orders/${row.orderId}/loading-sheet`}
+                              className="text-teal-800 underline"
+                            >
+                              {row.poNumber}
+                            </Link>
+                          </td>
+                          <td className="border border-zinc-300 px-3 py-2">{formatDate(row.createdAt)}</td>
+                          <td className="border border-zinc-300 px-3 py-2">{gateLabel(row.gateDeliveryStatus)}</td>
+                          <td className="border border-zinc-300 px-3 py-2">{row.productsSummary || "—"}</td>
+                          <td className="border border-zinc-300 px-3 py-2 text-right tabular-nums">
+                            {fmt(row.totalCartons)}
+                          </td>
+                          <td className="border border-zinc-300 px-3 py-2 text-right tabular-nums">
+                            {fmt(row.totalBottles)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </>
             ) : (
               <p className="text-sm text-zinc-600">Enter a customer and click Apply to see their PO history.</p>
             )
@@ -645,6 +670,92 @@ export function AdminReportsHub() {
                       </td>
                       <td className="border border-zinc-300 px-3 py-2 text-right tabular-nums">
                         {fmt(batchBottles.totals.totalBottles)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                ) : null}
+              </table>
+              <h3 className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                Where this batch went
+              </h3>
+              <p className="mb-3 text-sm text-zinc-600">
+                Trace from loading sheet batch assignments to PO, customer, vehicle, and challan/DC.
+              </p>
+              <table className={reportTableClass}>
+                <colgroup>
+                  <col className="w-[11%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[18%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[7%]" />
+                  <col className="w-[7%]" />
+                </colgroup>
+                <thead>
+                  <tr className="bg-zinc-100 print:bg-transparent">
+                    <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">Batch no</th>
+                    <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">Product</th>
+                    <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">PO no</th>
+                    <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">Customer</th>
+                    <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">Vehicle</th>
+                    <th className="border border-zinc-300 px-3 py-2 text-left font-semibold">DC</th>
+                    <th className="border border-zinc-300 px-3 py-2 text-right font-semibold">Box</th>
+                    <th className="border border-zinc-300 px-3 py-2 text-right font-semibold">Bottles</th>
+                    <th className="border border-zinc-300 px-3 py-2 text-right font-semibold">Liters</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batchBottles.destinationRows.length === 0 ? (
+                    <tr>
+                      <td
+                        colSpan={9}
+                        className="border border-zinc-300 px-3 py-6 text-center text-zinc-600"
+                      >
+                        No loading sheet destinations for this batch in the selected scope.
+                      </td>
+                    </tr>
+                  ) : (
+                    batchBottles.destinationRows.map((row) => (
+                      <tr
+                        key={`${row.batchNo}-${row.orderId}-${row.boxNo}-${row.productCode}`}
+                        className="even:bg-zinc-50/60"
+                      >
+                        <td className="border border-zinc-300 px-3 py-2">{row.batchNo}</td>
+                        <td className="border border-zinc-300 px-3 py-2">{row.productName}</td>
+                        <td className="border border-zinc-300 px-3 py-2">
+                          <Link href={`/orders/${row.orderId}/loading-sheet`} className="text-teal-800 underline">
+                            {row.poNumber}
+                          </Link>
+                        </td>
+                        <td className="border border-zinc-300 px-3 py-2">{row.customerName}</td>
+                        <td className="border border-zinc-300 px-3 py-2">{row.vehicleNo || "—"}</td>
+                        <td className="border border-zinc-300 px-3 py-2">{row.dcNo || "—"}</td>
+                        <td className="border border-zinc-300 px-3 py-2 text-right tabular-nums">
+                          {row.boxNo}
+                        </td>
+                        <td className="border border-zinc-300 px-3 py-2 text-right tabular-nums">
+                          {fmt(row.bottles)}
+                        </td>
+                        <td className="border border-zinc-300 px-3 py-2 text-right tabular-nums">
+                          {fmtAmount(row.liters)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {batchBottles.destinationRows.length > 0 ? (
+                  <tfoot>
+                    <tr className="bg-zinc-100 font-semibold print:bg-transparent">
+                      <td colSpan={7} className="border border-zinc-300 px-3 py-2">
+                        Destination total
+                      </td>
+                      <td className="border border-zinc-300 px-3 py-2 text-right tabular-nums">
+                        {fmt(batchBottles.totals.destinationBottles)}
+                      </td>
+                      <td className="border border-zinc-300 px-3 py-2 text-right tabular-nums">
+                        {fmtAmount(batchBottles.totals.destinationLiters)}
                       </td>
                     </tr>
                   </tfoot>

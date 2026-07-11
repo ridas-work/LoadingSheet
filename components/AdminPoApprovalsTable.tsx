@@ -19,6 +19,7 @@ export type PendingApprovalRow = {
   cartonCount: number;
   orderKind: string;
   requestTypeLabel: string;
+  isSubtractionRequest?: boolean;
   detail: OrderPoDetail;
 };
 
@@ -35,9 +36,12 @@ export function AdminPoApprovalsTable({ orders: initialOrders }: Props) {
   async function act(id: string, action: "approve" | "reject") {
     const row = orders.find((o) => o.id === id);
     const poNumber = row?.poNumber.trim() ?? "";
+    const isSubtraction = Boolean(row?.isSubtractionRequest);
     let note = "";
     if (action === "reject") {
-      const input = window.prompt("Rejection note (optional):");
+      const input = window.prompt(
+        isSubtraction ? "Discard note (optional):" : "Rejection note (optional):",
+      );
       if (input === null) return;
       note = input.trim();
     }
@@ -74,7 +78,7 @@ export function AdminPoApprovalsTable({ orders: initialOrders }: Props) {
   if (orders.length === 0) {
     return (
       <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
-        No sample requests waiting for approval.
+        No order requests waiting for approval.
       </p>
     );
   }
@@ -92,8 +96,13 @@ export function AdminPoApprovalsTable({ orders: initialOrders }: Props) {
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3">
               <div className="min-w-0 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
+                  {o.isSubtractionRequest ? (
+                    <span className="rounded-full bg-sky-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-sky-900">
+                      Subtracted items
+                    </span>
+                  ) : null}
                   <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-900">
-                    Sample request
+                    Order request
                   </span>
                   {sampleStyle ? (
                     <span className="rounded-full bg-violet-100 px-2.5 py-0.5 text-xs font-medium text-violet-900">
@@ -134,7 +143,7 @@ export function AdminPoApprovalsTable({ orders: initialOrders }: Props) {
                   onClick={() => void act(o.id, "reject")}
                   className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-red-800 ring-1 ring-red-200 disabled:opacity-50"
                 >
-                  Reject
+                  {o.isSubtractionRequest ? "Discard" : "Reject"}
                 </button>
               </div>
             </div>

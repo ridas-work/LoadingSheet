@@ -14,6 +14,7 @@ import {
   type CustomCartonDraft,
 } from "@/components/CustomCartonBuilder";
 import { catalogForCustomCartonBuilder } from "@/lib/customCartonProducts";
+import { assertValidCustomBoxCode } from "@/lib/customCartonBoxes";
 import {
   NewOrderProductGrid,
   defaultGridRow,
@@ -248,6 +249,8 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
             next[`customCartons.${ci}.rows.${ri}.bottleSizeCode`] = "Invalid container size.";
           }
         });
+        const boxErr = assertValidCustomBoxCode(c.customBoxCode);
+        if (boxErr) next[`customCartons.${ci}.customBoxCode`] = boxErr;
       });
     }
 
@@ -351,7 +354,12 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
         return;
       }
 
-      router.push(`/orders/${initial.orderId}/loading-sheet`);
+      const pendingId = (data as { pendingSubtractionOrderId?: string | null } | null)?.pendingSubtractionOrderId ?? null;
+      if (pendingId) {
+        router.push("/admin/approvals?subtractionQueued=1#po-order-approval");
+      } else {
+        router.push(`/orders/${initial.orderId}/loading-sheet`);
+      }
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -361,6 +369,22 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
   const customPayloadLen = useMemo(
     () => buildCustomCartonsPayload(customCartons, customBoxCatalog).length,
     [customBoxCatalog, customCartons],
+  );
+
+  const legacyCustomCartonMissingOuterBox = useMemo(
+    () =>
+      !isMixed &&
+      customCartons.some((c) => {
+        const bc = Number(c.boxCount);
+        if (!c.boxCount.trim() || !Number.isInteger(bc) || bc < 1) return false;
+        const hasContents = c.rows.some((r) => {
+          const pn = resolvedCustomRowProductName(r, customBoxCatalog);
+          const b = Number(r.bottles);
+          return Boolean(pn && Number.isInteger(b) && b >= 1);
+        });
+        return hasContents && !c.customBoxCode.trim();
+      }),
+    [customBoxCatalog, customCartons, isMixed],
   );
 
   const gridHandlers = {
@@ -537,6 +561,12 @@ export function AdminOrderEditForm({ initial }: { initial: AdminOrderInitial }) 
 
         {!isMixed && customCartons.length > 0 ? (
           <>
+            {legacyCustomCartonMissingOuterBox ? (
+              <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                One or more custom cartons are missing an outer box size. Select outer box size before the next
+                delivery.
+              </p>
+            ) : null}
             <CustomCartonBuilder
               cartons={customCartons}
               onChange={setCustomCartons}

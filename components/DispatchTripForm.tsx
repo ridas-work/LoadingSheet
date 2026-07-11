@@ -15,46 +15,14 @@ type Props = {
   initialOrderIds: string[];
   orders: PickerOrder[];
   initialDispatch: DispatchFields;
+  initialOrderChallans?: Array<{ orderId: string; dcNo: string }>;
   vehicleOptions: string[];
   driverOptions: string[];
+  /** "regular" (default) or "sample" — keeps sample dispatch separate from PO trips. */
+  tripKind?: "regular" | "sample";
+  /** Base route for redirects and links, e.g. "/dispatch/trips" or "/dispatch/sample-trips". */
+  basePath?: string;
 };
-
-function SelectField({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (v: string) => void;
-}) {
-  const mergedOptions = useMemo(() => {
-    const set = new Set(options);
-    const trimmed = value.trim();
-    if (trimmed) set.add(trimmed);
-    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-  }, [options, value]);
-
-  return (
-    <label className="block text-sm">
-      <span className="font-medium text-zinc-700">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900"
-      >
-        <option value="">Select…</option>
-        {mergedOptions.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
 
 function Field({
   label,
@@ -78,25 +46,95 @@ function Field({
   );
 }
 
+/** Dropdown of existing options that also allows typing a brand-new value. */
+function ComboField({
+  label,
+  value,
+  options,
+  onChange,
+  placeholder,
+  listId,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+  placeholder?: string;
+  listId: string;
+}) {
+  const mergedOptions = useMemo(() => {
+    const set = new Set(options);
+    const trimmed = value.trim();
+    if (trimmed) set.add(trimmed);
+    return [...set].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+  }, [options, value]);
+
+  return (
+    <label className="block text-sm">
+      <span className="font-medium text-zinc-700">{label}</span>
+      <input
+        type="text"
+        list={listId}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="mt-1 w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900"
+      />
+      <datalist id={listId}>
+        {mergedOptions.map((opt) => (
+          <option key={opt} value={opt} />
+        ))}
+      </datalist>
+    </label>
+  );
+}
+
 export function DispatchTripForm({
   tripId,
   initialOrderIds,
   orders,
   initialDispatch,
+  initialOrderChallans = [],
   vehicleOptions,
   driverOptions,
+  tripKind = "regular",
+  basePath = "/dispatch/trips",
 }: Props) {
   const router = useRouter();
   const [orderIds, setOrderIds] = useState<string[]>(initialOrderIds);
   const [dispatch, setDispatch] = useState<DispatchFields>(initialDispatch);
+  const [challans, setChallans] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {};
+    for (const order of orders) {
+      if (order.dcNo?.trim()) initial[order.id] = order.dcNo.trim();
+    }
+    for (const row of initialOrderChallans) {
+      initial[row.orderId] = row.dcNo;
+    }
+    return initial;
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const orderById = useMemo(() => new Map(orders.map((order) => [order.id, order])), [orders]);
+  const selectedOrders = useMemo(
+    () => orderIds.map((id) => orderById.get(id)).filter((order): order is PickerOrder => Boolean(order)),
+    [orderById, orderIds],
+  );
 
   const onSave = async () => {
     setSaving(true);
     setError(null);
 
-    const body = { ...dispatch, orderIds };
+    const body = {
+      ...dispatch,
+      tripKind,
+      orderIds,
+      orderChallans: orderIds.map((orderId) => ({
+        orderId,
+        dcNo: challans[orderId]?.trim() || dispatch.dcNo.trim(),
+      })),
+    };
     const url = tripId ? `/api/dispatch-trips/${tripId}` : "/api/dispatch-trips";
     const method = tripId ? "PATCH" : "POST";
 
@@ -115,10 +153,10 @@ export function DispatchTripForm({
     }
 
     if (tripId) {
-      router.push(`/dispatch/trips/${tripId}`);
+      router.push(`${basePath}/${tripId}`);
     } else {
       const data = (await res.json()) as { id?: string };
-      router.push(data.id ? `/dispatch/trips/${data.id}` : "/dispatch/trips");
+      router.push(data.id ? `${basePath}/${data.id}` : basePath);
     }
     router.refresh();
   };
@@ -140,7 +178,7 @@ export function DispatchTripForm({
       setError((data as { error?: string }).error ?? "Discard failed");
       return;
     }
-    router.push("/dispatch/trips");
+    router.push(basePath);
     router.refresh();
   };
 
@@ -157,6 +195,35 @@ export function DispatchTripForm({
             currentTripId={tripId}
           />
         </div>
+        {selectedOrders.length > 0 ? (
+          <div className="mt-4 rounded-lg border border-zinc-200 bg-white p-3">
+            <h3 className="text-sm font-semibold text-zinc-900">Challan / DC number for each PO</h3>
+            <p className="mt-1 text-xs text-zinc-500">
+              These numbers print separately on the combined vehicle loading sheet.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {selectedOrders.map((order) => (
+                <label key={order.id} className="block text-sm">
+                  <span className="font-medium text-zinc-700">
+                    {order.poNumber} — {order.customerName}
+                  </span>
+                  <input
+                    type="text"
+                    value={challans[order.id] ?? ""}
+                    onChange={(e) =>
+                      setChallans((prev) => ({
+                        ...prev,
+                        [order.id]: e.target.value,
+                      }))
+                    }
+                    placeholder={dispatch.dcNo || "Challan / DC no"}
+                    className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-zinc-900"
+                  />
+                </label>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <div>
@@ -165,19 +232,27 @@ export function DispatchTripForm({
           Pick vehicle and driver from the fleet list. These fields sync to every selected PO&apos;s loading sheet.
         </p>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <SelectField
+          <ComboField
             label="Vehicle no"
             value={dispatch.vehicleNo}
             options={vehicleOptions}
             onChange={(v) => setDispatch((d) => ({ ...d, vehicleNo: v }))}
+            placeholder="Pick a vehicle or type a new plate"
+            listId="dispatch-vehicle-options"
           />
-          <SelectField
+          <ComboField
             label="Driver name"
             value={dispatch.driverName}
             options={driverOptions}
             onChange={(v) => setDispatch((d) => ({ ...d, driverName: v }))}
+            placeholder="Pick a driver or type a new name"
+            listId="dispatch-driver-options"
           />
-          <Field label="DC no" value={dispatch.dcNo} onChange={(v) => setDispatch((d) => ({ ...d, dcNo: v }))} />
+          <Field
+            label="Default challan / DC no"
+            value={dispatch.dcNo}
+            onChange={(v) => setDispatch((d) => ({ ...d, dcNo: v }))}
+          />
           <Field
             label="Helper name"
             value={dispatch.helperName}
@@ -213,7 +288,7 @@ export function DispatchTripForm({
           {saving ? "Saving…" : tripId ? "Save trip" : "Create trip"}
         </button>
         <Link
-          href="/dispatch/trips"
+          href={basePath}
           className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-zinc-900 shadow-sm ring-1 ring-zinc-200"
         >
           Cancel

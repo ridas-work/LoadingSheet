@@ -6,7 +6,6 @@ import { ProductionBatchForm } from "@/components/ProductionBatchForm";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
-import { inferNimraBatchKind } from "@/lib/nimraBatchProductLists";
 import { normalizeQcOutcome } from "@/lib/productionBatchQc";
 import { isBatchClosed } from "@/lib/productionBatchClose";
 import { loadBatchUsageContext, usageForBatchNo } from "@/lib/productionBatchStatus";
@@ -72,7 +71,6 @@ export default async function EditProductionBatchPage(props: PageProps) {
         <ProductionBatchForm
           batchId={id}
           lockedInUse={lockedForCorrection}
-          initialBatchKind={inferNimraBatchKind(batch)}
           initialBatchNo={batch.batchNo}
           initialProductName={batch.productName}
           initialPreparedAt={preparedAt}

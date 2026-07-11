@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { DispatchTripForm } from "@/components/DispatchTripForm";
 import type { PickerOrder } from "@/components/DispatchTripOrderPicker";
+import { mergeOrderFilter } from "@/lib/customerAccountAccess";
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { loadDispatchFleetOptions } from "@/lib/dispatchFleetOptions";
@@ -32,9 +33,9 @@ export default async function NewDispatchTripPage(props: PageProps) {
 
   await connectToDatabase();
   const [orderDocs, fleetOptions] = await Promise.all([
-    Order.find(tripPlannerOrdersMongoFilter())
+    Order.find(await mergeOrderFilter(tripPlannerOrdersMongoFilter()))
       .sort({ createdAt: -1 })
-      .select({ poNumber: 1, customerName: 1, dispatchTripId: 1 })
+      .select({ poNumber: 1, customerName: 1, dispatchTripId: 1, "dispatch.dcNo": 1 })
       .lean(),
     loadDispatchFleetOptions(),
   ]);
@@ -44,6 +45,7 @@ export default async function NewDispatchTripPage(props: PageProps) {
     poNumber: o.poNumber,
     customerName: o.customerName,
     dispatchTripId: o.dispatchTripId ? o.dispatchTripId.toString() : null,
+    dcNo: (o as { dispatch?: { dcNo?: string } }).dispatch?.dcNo?.trim() ?? "",
   }));
 
   return (

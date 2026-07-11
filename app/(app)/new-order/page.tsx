@@ -1,10 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-
-import type { SerializedTicket } from "@/lib/fieldVisitTickets";
 
 import { isCustomBottleSizeCode, normalizeBottleSizeCode } from "@/lib/customBottleSizes";
 import {
@@ -26,18 +23,18 @@ import {
   type OtherRow,
 } from "@/components/NewOrderProductGrid";
 import { catalogForCustomCartonBuilder } from "@/lib/customCartonProducts";
+import { assertValidCustomBoxCode } from "@/lib/customCartonBoxes";
 import { bottlesToStandardCartons } from "@/lib/poBottleEntry";
 
 type FieldErrors = Partial<Record<"poNumber" | "customerName" | "items", string>> &
   Record<string, string>;
 
+type DirectoryCustomer = { code: string; name: string; city?: string };
+
 export default function NewOrderPage() {
-  const searchParams = useSearchParams();
   const [poNumber, setPoNumber] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [city, setCity] = useState("");
-  const [visitTicketId, setVisitTicketId] = useState("");
-  const [visitTickets, setVisitTickets] = useState<SerializedTicket[]>([]);
   const [deadlineDate, setDeadlineDate] = useState("");
   const [grid, setGrid] = useState<GridState>({});
   const [otherRows, setOtherRows] = useState<OtherRow[]>([]);
@@ -47,36 +44,9 @@ export default function NewOrderPage() {
   const [successId, setSuccessId] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogProduct[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
+  const [directory, setDirectory] = useState<DirectoryCustomer[]>([]);
   const customerRef = useRef<HTMLInputElement | null>(null);
   const firstGridInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    const qVisit = searchParams.get("visitTicketId") ?? "";
-    const qCustomer = searchParams.get("customerName") ?? "";
-    const qCity = searchParams.get("city") ?? "";
-    if (qVisit) setVisitTicketId(qVisit);
-    if (qCustomer) setCustomerName(decodeURIComponent(qCustomer));
-    if (qCity) setCity(decodeURIComponent(qCity));
-  }, [searchParams]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/field-visits", { credentials: "same-origin" });
-        if (res.ok) {
-          const data = (await res.json()) as { tickets?: SerializedTicket[] };
-          const awaiting = (data.tickets ?? []).filter((t) => t.status === "visit_concluded");
-          if (!cancelled) setVisitTickets(awaiting);
-        }
-      } catch {
-        if (!cancelled) setVisitTickets([]);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +83,29 @@ export default function NewOrderPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/customer-directory", { credentials: "same-origin" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { customers?: DirectoryCustomer[] };
+        if (!cancelled) setDirectory(Array.isArray(data.customers) ? data.customers : []);
+      } catch {
+        if (!cancelled) setDirectory([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function onCustomerNameChange(value: string) {
+    setCustomerName(value);
+    const match = directory.find((c) => c.name.toLowerCase() === value.trim().toLowerCase());
+    if (match?.city && !city.trim()) setCity(match.city);
+  }
 
   const catalogByCode = useMemo(
     () => new Map(catalog.map((p) => [p.code, p])),
@@ -193,6 +186,10 @@ export default function NewOrderPage() {
         if (!any) {
           return `Custom carton ${ci + 1}: add at least one product with bottles.`;
         }
+        const boxErr = assertValidCustomBoxCode(c.customBoxCode);
+        if (boxErr) {
+          return `Custom carton ${ci + 1}: ${boxErr}`;
+        }
       }
     }
     return null;
@@ -213,6 +210,14 @@ export default function NewOrderPage() {
     const next: FieldErrors = {};
     if (!poNumber.trim()) next.poNumber = "PO number is required.";
     if (!customerName.trim()) next.customerName = "Customer name is required.";
+    else if (directory.length > 0) {
+      const key = customerName.trim().toLowerCase();
+      const approved = directory.some((c) => c.name.trim().toLowerCase() === key);
+      if (!approved) {
+        next.customerName =
+          "Pick a customer from the approved list only. New accounts must be opened and approved first.";
+      }
+    }
 
     let validCount = 0;
     for (const p of catalog) {
@@ -314,6 +319,8 @@ export default function NewOrderPage() {
             next[`customCartons.${ci}.rows.${ri}.bottleSizeCode`] = "Invalid container size.";
           }
         });
+        const boxErr = assertValidCustomBoxCode(c.customBoxCode);
+        if (boxErr) next[`customCartons.${ci}.customBoxCode`] = boxErr;
       });
     }
 
@@ -429,6 +436,11 @@ export default function NewOrderPage() {
       const row = carton?.rows[0];
       return row ? document.getElementById(`cc-row-${row.id}-pick`) : null;
     }
+    const ccOuter = /^customCartons\.(\d+)\.customBoxCode$/.exec(key);
+    if (ccOuter) {
+      const carton = customCartons[Number(ccOuter[1])];
+      return carton ? document.getElementById(`cc-${carton.id}-outer`) : null;
+    }
     return null;
   }
 
@@ -481,7 +493,6 @@ export default function NewOrderPage() {
           customerName: customerName.trim(),
           city: city.trim(),
           deadlineDate: deadlineDate.trim() || undefined,
-          ...(visitTicketId.trim() ? { visitTicketId: visitTicketId.trim() } : {}),
         }),
       });
 
@@ -507,7 +518,6 @@ export default function NewOrderPage() {
       }
 
       setSuccessId(String(data?.id ?? ""));
-      setVisitTicketId("");
       setPoNumber("");
       setCustomerName("");
       setCity("");
@@ -564,41 +574,6 @@ export default function NewOrderPage() {
       </p>
 
       <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-        {visitTickets.length > 0 ? (
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-            <label className="block text-sm font-medium text-emerald-950" htmlFor="visitTicket">
-              Link to field visit (optional)
-            </label>
-            <p className="mt-0.5 text-xs text-emerald-800">
-              Concluded visits only — saving the PO closes the ticket with +10 points.
-            </p>
-            <select
-              id="visitTicket"
-              value={visitTicketId}
-              onChange={(e) => {
-                const id = e.target.value;
-                setVisitTicketId(id);
-                const t = visitTickets.find((v) => v.id === id);
-                if (t) {
-                  setCustomerName(t.customerName);
-                  setCity(t.city);
-                }
-              }}
-              className="mt-2 w-full rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm"
-            >
-              <option value="">— No visit link —</option>
-              {visitTickets.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.placeName} — {t.customerName}
-                  {t.city ? ` (${t.city})` : ""}
-                </option>
-              ))}
-            </select>
-            {errors.visitTicketId ? (
-              <p className="mt-1 text-sm text-red-700">{errors.visitTicketId}</p>
-            ) : null}
-          </div>
-        ) : null}
         <div>
           <label className="block text-sm font-medium text-zinc-800" htmlFor="poNumber">
             PO number
@@ -622,13 +597,23 @@ export default function NewOrderPage() {
           <input
             id="customerName"
             ref={customerRef}
+            list="customer-directory-options"
             value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
+            onChange={(e) => onCustomerNameChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") firstGridInputRef.current?.focus();
             }}
             className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm outline-none focus:border-zinc-400"
           />
+          <datalist id="customer-directory-options">
+            {directory.map((c) => (
+              <option key={c.code} value={c.name} />
+            ))}
+          </datalist>
+          <p className="mt-1 text-xs text-zinc-500">
+            Choose from the list only — new customers must be opened as an account and approved by
+            admin before use.
+          </p>
           {errors.customerName ? (
             <div className="mt-1 text-sm text-red-700">{errors.customerName}</div>
           ) : null}

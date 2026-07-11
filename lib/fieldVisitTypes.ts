@@ -38,7 +38,19 @@ export type TicketAction =
   | "record_sample_event"
   | "add_visit"
   | "final_conclude"
-  | "close_lost";
+  | "close_lost"
+  | "update_market_visit"
+  | "submit_market_visit";
+
+export type VisitKind = "sales" | "market_audit";
+
+export type SerializedMarketVisitRow = {
+  storeName: string;
+  location: string;
+  availability: Record<string, "yes" | "no" | "">;
+  facingUnits: Record<string, number | null>;
+  remarks: string;
+};
 
 export const SAMPLE_APPROVAL_STATUSES = ["none", "pending", "approved", "rejected"] as const;
 export type SampleApprovalStatus = (typeof SAMPLE_APPROVAL_STATUSES)[number];
@@ -58,8 +70,18 @@ export type SerializedVisitLog = {
   recordedByName: string;
 };
 
+export const VISIT_KIND_LABELS: Record<VisitKind, string> = {
+  sales: "Sales visit",
+  market_audit: "Market visit",
+};
+
 export type SerializedTicket = {
   id: string;
+  visitKind: VisitKind;
+  marketVisitDate: string | null;
+  marketVisitRemarks: string;
+  marketVisitRows: SerializedMarketVisitRow[];
+  marketVisitSubmittedAt: string | null;
   placeName: string;
   customerName: string;
   city: string;

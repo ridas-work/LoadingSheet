@@ -3,9 +3,16 @@ import mongoose from "mongoose";
 
 import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
-import { effectiveSampleApprovalStatus, serializeTicket } from "@/lib/fieldVisitTickets";
+import {
+  effectiveSampleApprovalStatus,
+  parseSampleMode,
+  serializeTicket,
+} from "@/lib/fieldVisitTickets";
 import { FieldVisitTicket } from "@/lib/models/FieldVisitTicket";
+import { Order } from "@/lib/models/Order";
 import { isAdmin, roleFromSession } from "@/lib/roles";
+import { restoreSampleProductionForVisit } from "@/lib/sampleProductionStock";
+import { buildSampleOrderFromVisit } from "@/lib/sampleOrderFromVisit";
 
 type RouteCtx = { params: Promise<{ id: string }> };
 
@@ -50,7 +57,49 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
     ticket.sampleApprovedAt = now;
     ticket.sampleApprovedByName = reviewer;
     ticket.sampleRejectionNote = "";
+
+    // Outgoing samples become a dispatch order for Rashid — separate from regular POs.
+    if (parseSampleMode(ticket.sampleMode) === "outgoing") {
+      const alreadyLinked =
+        ticket.sampleDispatchOrderId &&
+        (await Order.exists({ _id: ticket.sampleDispatchOrderId }));
+      if (!alreadyLinked) {
+        const payload = buildSampleOrderFromVisit(ticket);
+        if (payload.items.length > 0) {
+          const order = await Order.create({
+            poNumber: payload.poNumber,
+            customerName: payload.customerName,
+            city: payload.city,
+            orderKind: payload.orderKind,
+            fieldVisitTicketId: payload.fieldVisitTicketId,
+            sampleRepName: payload.sampleRepName,
+            items: payload.items,
+            sheetLines: payload.sheetLines,
+            approvalStatus: "approved",
+            approvedAt: now,
+            approvedByName: reviewer,
+            createdByName: payload.sampleRepName || reviewer,
+          });
+          ticket.sampleDispatchOrderId = order._id;
+          ticket.linkedOrderId = order._id;
+          ticket.linkedPoNumber = order.poNumber;
+          ticket.sampleDispatchStatus = "awaiting_batches";
+        }
+      }
+    }
   } else {
+    // Reject — drop the pending sample order if batches were never assigned.
+    if (ticket.sampleDispatchOrderId) {
+      const linked = await Order.findById(ticket.sampleDispatchOrderId);
+      if (linked && !linked.sampleStockDeductedAt) {
+        await linked.deleteOne();
+        ticket.sampleDispatchOrderId = null;
+        ticket.sampleDispatchStatus = "none";
+      }
+    }
+    if (parseSampleMode(ticket.sampleMode) === "outgoing") {
+      await restoreSampleProductionForVisit(ticket._id.toString());
+    }
     ticket.sampleApprovalStatus = "rejected";
     ticket.sampleRejectionNote = note;
     ticket.sampleApprovedAt = null;

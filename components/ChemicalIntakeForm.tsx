@@ -3,10 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
+  CHEMICAL_ACCESSORY_CATEGORIES,
   CHEMICAL_ACCESSORIES,
+  chemicalAccessoriesByCategory,
   type SerializedChemicalIntake,
   type SerializedChemicalMaterial,
 } from "@/lib/chemicalMaterials";
+import { formatDisplayDate } from "@/lib/dateOnly";
 import type { QcOutcomeInput } from "@/lib/productionBatchQc";
 import { ui } from "@/lib/ui";
 
@@ -416,7 +419,13 @@ export function AccessoryStockCard() {
         body: JSON.stringify(
           existing
             ? { onHand, note: "Accessory stock update" }
-            : { name: item.name, kind: "accessory", unit: item.unit, onHand },
+            : {
+                materialCode: item.code,
+                name: item.name,
+                kind: "accessory",
+                unit: item.unit,
+                onHand,
+              },
         ),
       },
     );
@@ -450,62 +459,69 @@ export function AccessoryStockCard() {
       <div>
         <h2 className="text-sm font-semibold text-zinc-900">Accessory stock</h2>
         <p className="mt-1 text-sm text-zinc-600">
-          Update Shoppers, Drums, and Seals stock for chemical requests. Unit: pcs.
+          Update drums, shoppers, and seals stock for chemical requests. Unit: pcs.
         </p>
       </div>
 
       {loading ? (
         <p className="text-sm text-zinc-600">Loading accessory stock…</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[520px] border-collapse text-sm">
-            <thead>
-              <tr className="bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
-                <th className="border-b border-zinc-200 px-3 py-2">Item</th>
-                <th className="border-b border-zinc-200 px-3 py-2 text-right">Stock now</th>
-                <th className="border-b border-zinc-200 px-3 py-2 w-16">Unit</th>
-                <th className="border-b border-zinc-200 px-3 py-2 w-24" />
-              </tr>
-            </thead>
-            <tbody>
-              {CHEMICAL_ACCESSORIES.map((item) => {
-                const material = materialByCode.get(item.code);
-                return (
-                  <tr key={item.code} className="border-b border-zinc-100">
-                    <td className="px-3 py-2 font-medium text-zinc-900">{item.name}</td>
-                    <td className="px-3 py-2 text-right">
-                      <input
-                        type="number"
-                        min={0}
-                        step="1"
-                        value={stockDraft[item.code] ?? ""}
-                        onChange={(e) =>
-                          setStockDraft((prev) => ({ ...prev, [item.code]: e.target.value }))
-                        }
-                        onBlur={() => saveAccessoryStock(item)}
-                        className="w-28 rounded border border-zinc-200 px-2 py-1 text-right text-sm tabular-nums"
-                        placeholder={material ? undefined : "0"}
-                      />
-                      {stockStatus[item.code] === "saved" ? (
-                        <span className="ml-1 text-xs text-emerald-700">✓</span>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-2 text-zinc-600">{item.unit}</td>
-                    <td className="px-3 py-2">
-                      <button
-                        type="button"
-                        onClick={() => saveAccessoryStock(item)}
-                        disabled={stockStatus[item.code] === "saving"}
-                        className={ui.btnSecondarySm}
-                      >
-                        Save
-                      </button>
-                    </td>
+        <div className="space-y-5">
+          {CHEMICAL_ACCESSORY_CATEGORIES.map((category) => (
+            <div key={category.id} className="overflow-x-auto">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                {category.label}
+              </h3>
+              <table className="w-full min-w-[520px] border-collapse text-sm">
+                <thead>
+                  <tr className="bg-zinc-50 text-left text-xs font-semibold uppercase tracking-wide text-zinc-600">
+                    <th className="border-b border-zinc-200 px-3 py-2">Item</th>
+                    <th className="border-b border-zinc-200 px-3 py-2 text-right">Stock now</th>
+                    <th className="border-b border-zinc-200 px-3 py-2 w-16">Unit</th>
+                    <th className="border-b border-zinc-200 px-3 py-2 w-24" />
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {chemicalAccessoriesByCategory(category.id).map((item) => {
+                    const material = materialByCode.get(item.code);
+                    return (
+                      <tr key={item.code} className="border-b border-zinc-100">
+                        <td className="px-3 py-2 font-medium text-zinc-900">{item.name}</td>
+                        <td className="px-3 py-2 text-right">
+                          <input
+                            type="number"
+                            min={0}
+                            step="1"
+                            value={stockDraft[item.code] ?? ""}
+                            onChange={(e) =>
+                              setStockDraft((prev) => ({ ...prev, [item.code]: e.target.value }))
+                            }
+                            onBlur={() => saveAccessoryStock(item)}
+                            className="w-28 rounded border border-zinc-200 px-2 py-1 text-right text-sm tabular-nums"
+                            placeholder={material ? undefined : "0"}
+                          />
+                          {stockStatus[item.code] === "saved" ? (
+                            <span className="ml-1 text-xs text-emerald-700">✓</span>
+                          ) : null}
+                        </td>
+                        <td className="px-3 py-2 text-zinc-600">{item.unit}</td>
+                        <td className="px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => saveAccessoryStock(item)}
+                            disabled={stockStatus[item.code] === "saving"}
+                            className={ui.btnSecondarySm}
+                          >
+                            Save
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
         </div>
       )}
       {error ? <p className="text-sm text-red-700">{error}</p> : null}
@@ -559,7 +575,7 @@ export function ChemicalIntakeHistory() {
           {intakes.map((i) => (
             <tr key={i.id} className="border-b border-zinc-100">
               <td className="px-3 py-2 text-zinc-600">
-                {i.receivedAt ? new Date(i.receivedAt).toLocaleDateString() : "—"}
+                {i.receivedAt ? formatDisplayDate(i.receivedAt) : "—"}
               </td>
               <td className="px-3 py-2 font-medium">{i.materialName}</td>
               <td className="px-3 py-2 text-zinc-600">{i.lotNo || "—"}</td>

@@ -8,8 +8,9 @@ export default function GateOrdersPage() {
         <p className="mt-1 text-sm text-zinc-600">
           Only orders that are <strong>ready to leave</strong> are listed (on a dispatch trip with vehicle, driver,
           and DC filled). When a vehicle leaves, mark <strong>Out for delivery</strong>. When the customer has
-          received the goods, mark <strong>Delivered</strong>; this automatically deducts mapped packaging stock.
-          If goods return on the vehicle, mark <strong>Pending redelivery</strong> for a later trip.
+          received the goods, use <strong>Close delivery</strong> — choose full or partial; good returned bottles go
+          back to Rashid&apos;s stock and damaged bottles are written off. On already-delivered POs, use{' '}
+          <strong>Late return</strong> for bottles that come back weeks or months later (no limit on quantity).
         </p>
       </div>
       <GateOrdersTable />

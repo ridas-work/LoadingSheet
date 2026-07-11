@@ -6,16 +6,14 @@
     { "id": "rhino-750ml", "kind": "product_any_component", "productCode": "rhino-750ml", "threshold": 3000, "label": "Rhino 750 ml" },
     { "id": "brighten-1l", "kind": "product_any_component", "productCode": "brighten-liquid-laundry-detergent", "threshold": 1000, "label": "Brighten 1 L" },
     { "id": "fabrito-1l", "kind": "product_any_component", "productCode": "fabrito-fabric-softener", "threshold": 500, "label": "Fabrito 1 L" },
-    { "id": "power-wash", "kind": "product_any_component", "productCode": "power-wash", "threshold": 1000, "label": "Power Wash" },
-    { "id": "degrease-spray", "kind": "product_any_component", "productCode": "degrease-spray", "threshold": 1000, "label": "Degrease Spray" },
+    { "id": "power-wash", "kind": "product_any_component", "productCode": "power-wash", "threshold": 1000, "label": "Power Wash 500ml" },
+    { "id": "degrease-spray", "kind": "product_any_component", "productCode": "degrease-spray", "threshold": 1000, "label": "Degrease Spray 750ml" },
     { "id": "glim", "kind": "product_any_component", "productCode": "glim", "threshold": 200, "label": "Glim" },
     { "id": "titan-500g", "kind": "product_any_component", "productCode": "titan-500g", "threshold": 200, "label": "Titan 500 g" },
     { "id": "titan-1250g", "kind": "product_any_component", "productCode": "titan-1250g", "threshold": 200, "label": "Titan 1.25 kg" },
     { "id": "washout-floral", "kind": "product_any_component", "productCode": "washout-floral", "threshold": 1500, "label": "Washout Floral" },
     { "id": "washout-ocean", "kind": "product_any_component", "productCode": "washout-ocean", "threshold": 1500, "label": "Washout Ocean" },
     { "id": "washout-lemon", "kind": "product_any_component", "productCode": "washout-lemon", "threshold": 1500, "label": "Washout Lemon" },
-    { "id": "shared-bf-lids", "kind": "shared_pool", "packagingItemCode": "brighten-fabrito-lids", "threshold": 1500, "label": "Brighten & Fabrito shared lids" },
-    { "id": "shared-bf-boxes", "kind": "shared_pool", "packagingItemCode": "brighten-fabrito-boxes", "threshold": 1500, "label": "Brighten & Fabrito shared boxes" },
     { "id": "sticker-save-rs-65", "kind": "item_threshold", "packagingItemCode": "sticker-save-rs-65", "threshold": 500, "label": "Save Rs. 65 sticker" },
     { "id": "sticker-save-rs-50", "kind": "item_threshold", "packagingItemCode": "sticker-save-rs-50", "threshold": 500, "label": "Save Rs. 50 sticker" },
     { "id": "sticker-save-rs-60", "kind": "item_threshold", "packagingItemCode": "sticker-save-rs-60", "threshold": 500, "label": "Save Rs. 60 sticker" },
@@ -23,7 +21,11 @@
     { "id": "sticker-save-rs-95", "kind": "item_threshold", "packagingItemCode": "sticker-save-rs-95", "threshold": 1000, "label": "Save Rs. 95 sticker" },
     { "id": "sticker-save-rs-105", "kind": "item_threshold", "packagingItemCode": "sticker-save-rs-105", "threshold": 1000, "label": "Save Rs. 105 sticker" },
     { "id": "power-wash-pouches", "kind": "item_threshold", "packagingItemCode": "power-wash-pouches", "threshold": 2000, "label": "Power Wash pouches" },
-    { "id": "brighten-pouches", "kind": "item_threshold", "packagingItemCode": "brighten-pouches", "threshold": 2000, "label": "Brighten pouches" },
-    { "id": "fabrito-pouches", "kind": "item_threshold", "packagingItemCode": "fabrito-pouches", "threshold": 2000, "label": "Fabrito pouches" }
+    { "id": "brighten-pouches", "kind": "item_threshold", "packagingItemCode": "brighten-pouches", "threshold": 2000, "label": "Brighten Pouch" },
+    { "id": "fabrito-pouches", "kind": "item_threshold", "packagingItemCode": "fabrito-pouches", "threshold": 2000, "label": "Fabrito Pouch" },
+    { "id": "cpl-55ml", "kind": "product_any_component", "productCode": "cpl-55ml", "threshold": 500, "label": "CPL 55 ml" },
+    { "id": "cpm-55ml", "kind": "product_any_component", "productCode": "cpm-55ml", "threshold": 500, "label": "CPM 55 ml" },
+    { "id": "cpl-210ml", "kind": "product_any_component", "productCode": "cpl-210ml", "threshold": 200, "label": "CPL 210 ml" },
+    { "id": "cpm-210ml", "kind": "product_any_component", "productCode": "cpm-210ml", "threshold": 200, "label": "CPM 210 ml" }
   ]
 }

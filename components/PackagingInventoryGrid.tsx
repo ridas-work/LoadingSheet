@@ -66,8 +66,6 @@ function statesEqual(a: RowState, b: RowState) {
 const inputClass =
   "w-full min-w-[4.5rem] rounded border border-zinc-200 bg-white px-2 py-1 text-right text-sm tabular-nums focus:border-zinc-400 focus:outline-none focus:ring-1 focus:ring-zinc-300";
 
-type CategoryFilter = "all" | string;
-
 function matchesSearch(item: PackagingItemRow, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
@@ -84,34 +82,14 @@ function matchesSearch(item: PackagingItemRow, query: string): boolean {
 export function PackagingInventoryGrid({ items, readOnly }: Props) {
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [saved, setSaved] = useState<Record<string, RowState>>({});
   const [status, setStatus] = useState<Record<string, SaveStatus>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const categoryOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const item of items) {
-      const cat = item.category?.trim().toLowerCase() || "other";
-      counts.set(cat, (counts.get(cat) ?? 0) + 1);
-    }
-    return [...counts.entries()]
-      .sort((a, b) => (CATEGORY_LABELS[a[0]] ?? a[0]).localeCompare(CATEGORY_LABELS[b[0]] ?? b[0]))
-      .map(([code, count]) => ({
-        code,
-        label: CATEGORY_LABELS[code] ?? code,
-        count,
-      }));
-  }, [items]);
-
   const filteredItems = useMemo(
-    () =>
-      items.filter((item) => {
-        if (categoryFilter !== "all" && (item.category ?? "other") !== categoryFilter) return false;
-        return matchesSearch(item, search);
-      }),
-    [items, categoryFilter, search],
+    () => items.filter((item) => matchesSearch(item, search)),
+    [items, search],
   );
 
   useEffect(() => {
@@ -236,35 +214,6 @@ export function PackagingInventoryGrid({ items, readOnly }: Props) {
           placeholder="Search by name, code, or type (e.g. Brighten, bottle, 3 LTR)…"
           className="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400"
         />
-        {categoryOptions.length > 1 ? (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setCategoryFilter("all")}
-              className={`rounded-lg px-3 py-1 text-xs font-medium ${
-                categoryFilter === "all"
-                  ? "bg-zinc-900 text-white"
-                  : "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-100"
-              }`}
-            >
-              All ({items.length})
-            </button>
-            {categoryOptions.map((opt) => (
-              <button
-                key={opt.code}
-                type="button"
-                onClick={() => setCategoryFilter(opt.code)}
-                className={`rounded-lg px-3 py-1 text-xs font-medium ${
-                  categoryFilter === opt.code
-                    ? "bg-zinc-900 text-white"
-                    : "bg-zinc-50 text-zinc-700 ring-1 ring-zinc-200 hover:bg-zinc-100"
-                }`}
-              >
-                {opt.label} ({opt.count})
-              </button>
-            ))}
-          </div>
-        ) : null}
         <p className="mt-2 text-xs text-zinc-500">
           Showing {filteredItems.length} of {items.length} materials
         </p>
@@ -272,7 +221,7 @@ export function PackagingInventoryGrid({ items, readOnly }: Props) {
 
       {filteredItems.length === 0 ? (
         <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
-          No materials match your search. Try a different name or clear the filters.
+          No materials match your search.
         </p>
       ) : (
     <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">

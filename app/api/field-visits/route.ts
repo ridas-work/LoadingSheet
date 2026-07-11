@@ -5,9 +5,11 @@ import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import {
   canAccessFieldVisits,
+  defaultVisitKindForUser,
   fieldVisitsMongoFilter,
   isEmptyFieldVisitDraft,
   isFieldVisitRep,
+  parseVisitKind,
   POINTS_LOST,
   POINTS_WON,
   serializeTicket,
@@ -98,12 +100,22 @@ export async function POST(req: Request) {
 
   await connectToDatabase();
 
+  const visitKind = defaultVisitKindForUser(username);
+
   const created = await FieldVisitTicket.create({
+    visitKind,
     placeName: "",
     customerName: "",
     status: "active",
     sampleMode: "none",
     visitLogs: [],
+    ...(visitKind === "market_audit"
+      ? {
+          marketVisitDate: new Date(),
+          marketVisitRows: [],
+          marketVisitRemarks: "",
+        }
+      : {}),
     createdByUserId: new mongoose.Types.ObjectId(userId),
     createdByName: name,
     createdByUsername: username.toLowerCase(),

@@ -8,7 +8,7 @@ import {
   parseProductionPurpose,
   parseQcBody,
   parseTotalLitersFromQuantity,
-  resolveBatchProduct,
+  resolveBatchProductWithKind,
   serializeProductionBatch,
   trimQcField,
 } from "@/lib/productionBatchApi";
@@ -111,20 +111,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Product is required" }, { status: 400 });
   }
 
-  const batchKind = parseBatchKind(body.batchKind);
+  const batchKindExplicit = body.batchKind !== undefined ? parseBatchKind(body.batchKind) : undefined;
   const productionPurpose = parseProductionPurpose(body.productionPurpose);
-  const resolvedProduct = await resolveBatchProduct(productInput, batchKind);
-  if (!resolvedProduct) {
+  const resolved = await resolveBatchProductWithKind(productInput, batchKindExplicit);
+  if (!resolved) {
     return NextResponse.json(
-      {
-        error:
-          batchKind === "custom_box"
-            ? "Product must be in the custom box list"
-            : "Product must exist in catalog",
-      },
+      { error: "Product must be in the batch product list" },
       { status: 400 },
     );
   }
+  const { product: resolvedProduct, batchKind } = resolved;
 
   const qc = parseQcBody(body, true, { productFamily: resolvedProduct, batchKind });
   if (!qc.ok) {

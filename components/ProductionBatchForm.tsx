@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { parseTotalLitersFromQuantity } from "@/lib/parseBatchQuantityLiters";
-import type { NimraBatchKind } from "@/lib/nimraBatchProductLists";
+import type { UnifiedBatchProductOption } from "@/lib/nimraBatchProductLists";
 import type { QcOutcomeInput } from "@/lib/productionBatchQc";
 import type { ProductionPurpose } from "@/lib/productionBatchApi";
 import {
@@ -14,7 +14,6 @@ import {
 
 type Props = {
   batchId?: string;
-  initialBatchKind?: NimraBatchKind;
   initialBatchNo?: string;
   initialProductName?: string;
   initialPreparedAt?: string;
@@ -69,7 +68,6 @@ function Field({
 
 export function ProductionBatchForm({
   batchId,
-  initialBatchKind = "standard",
   initialBatchNo = "",
   initialProductName = "",
   initialPreparedAt,
@@ -90,10 +88,8 @@ export function ProductionBatchForm({
 }: Props) {
   const router = useRouter();
   const isEdit = Boolean(batchId);
-  const [batchKind, setBatchKind] = useState<NimraBatchKind>(initialBatchKind);
   const [productionPurpose, setProductionPurpose] = useState<ProductionPurpose>(initialProductionPurpose);
-  const [standardFamilies, setStandardFamilies] = useState<string[]>([]);
-  const [customBoxProducts, setCustomBoxProducts] = useState<string[]>([]);
+  const [unifiedProducts, setUnifiedProducts] = useState<UnifiedBatchProductOption[]>([]);
   const [batchNo, setBatchNo] = useState(initialBatchNo);
   const [productName, setProductName] = useState(initialProductName);
   const [preparedAt, setPreparedAt] = useState(
@@ -116,9 +112,10 @@ export function ProductionBatchForm({
   const [submitting, setSubmitting] = useState(false);
   const [discarding, setDiscarding] = useState(false);
 
-  const isCustomBox = batchKind === "custom_box";
-  const showHcl = !isCustomBox && isRhinoBatchFamily(productName);
-  const showViscosity = !isCustomBox && isViscosityApplicableBatchFamily(productName);
+  const productGroup = unifiedProducts.find((p) => p.name === productName)?.group;
+  const isCustomProduct = productGroup === "custom";
+  const showHcl = !isCustomProduct && isRhinoBatchFamily(productName);
+  const showViscosity = !isCustomProduct && isViscosityApplicableBatchFamily(productName);
 
   useEffect(() => {
     if (!showHcl) setHcl("");
@@ -127,38 +124,16 @@ export function ProductionBatchForm({
   useEffect(() => {
     fetch("/api/products")
       .then((r) => r.json())
-      .then(
-        (data: {
-          batchFamilies?: Array<{ batchFamily: string }>;
-          customBoxProducts?: string[];
-        }) => {
-          const families = Array.isArray(data.batchFamilies)
-            ? data.batchFamilies.map((f) => f.batchFamily).filter(Boolean)
-            : [];
-          setStandardFamilies(families);
-          setCustomBoxProducts(
-            Array.isArray(data.customBoxProducts) ? data.customBoxProducts : [],
-          );
-        },
-      )
-      .catch(() => {
-        setStandardFamilies([]);
-        setCustomBoxProducts([]);
-      });
+      .then((data: { unifiedBatchProducts?: UnifiedBatchProductOption[] }) => {
+        setUnifiedProducts(
+          Array.isArray(data.unifiedBatchProducts) ? data.unifiedBatchProducts : [],
+        );
+      })
+      .catch(() => setUnifiedProducts([]));
   }, []);
 
-  function switchKind(next: NimraBatchKind) {
-    if (next === batchKind) return;
-    setBatchKind(next);
-    setProductName("");
-    setHcl("");
-    setViscosity("");
-    setDrum("");
-    setCustomer("");
-    setError(null);
-  }
-
-  const productOptions = isCustomBox ? customBoxProducts : standardFamilies;
+  const dispatchProducts = unifiedProducts.filter((p) => p.group === "dispatch");
+  const customProducts = unifiedProducts.filter((p) => p.group === "custom");
   const parsedLiters = useMemo(() => parseTotalLitersFromQuantity(quantity), [quantity]);
   const wasteLiters = parsedLiters ?? initialTotalLiters ?? 0;
 
@@ -179,14 +154,12 @@ export function ProductionBatchForm({
       qcOutcome != null;
     if (!base) return false;
     if (qcOutcome === "rejected" && !qcComment.trim()) return false;
-    if (isCustomBox) return drum.trim().length > 0;
-    return !showHcl || hcl.trim().length > 0;
+    if (showHcl && !hcl.trim()) return false;
+    return true;
   }, [
     appearance,
     batchNo,
-    drum,
     hcl,
-    isCustomBox,
     parsedLiters,
     ph,
     productName,
@@ -245,7 +218,6 @@ export function ProductionBatchForm({
     }
 
     const payload = {
-      batchKind,
       batchNo: batchNo.trim(),
       productName,
       totalLiters: liters,
@@ -257,8 +229,8 @@ export function ProductionBatchForm({
       hcl: showHcl ? hcl.trim() : "",
       viscosity: showViscosity ? viscosity.trim() : "",
       quantity: quantity.trim(),
-      drum: isCustomBox ? drum.trim() : "",
-      customer: isCustomBox ? customer.trim() : "",
+      drum: isCustomProduct ? drum.trim() : "",
+      customer: customer.trim(),
       qcOutcome,
       qcComment: qcOutcome === "rejected" ? qcComment.trim() : "",
       productionPurpose,
@@ -320,41 +292,6 @@ export function ProductionBatchForm({
 
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
-      {!isEdit ? (
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-zinc-800">Batch type</p>
-          <div className="grid grid-cols-2 gap-2 rounded-lg bg-zinc-100 p-1">
-            <button
-              type="button"
-              onClick={() => switchKind("standard")}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-                !isCustomBox ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"
-              }`}
-            >
-              Standard products
-            </button>
-            <button
-              type="button"
-              onClick={() => switchKind("custom_box")}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition ${
-                isCustomBox ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-600 hover:text-zinc-900"
-              }`}
-            >
-              Custom box / drums
-            </button>
-          </div>
-          <p className="text-xs text-zinc-500">
-            {isCustomBox
-              ? "Hand Sanitizer, Sequester, and other custom-box-only products — drum packing sheet."
-              : "Rhino, Brighten, Degrease, Power Wash, and other main dispatch families."}
-          </p>
-        </div>
-      ) : (
-        <p className="rounded-lg bg-zinc-50 px-3 py-2 text-sm text-zinc-700">
-          {isCustomBox ? "Custom box / drum batch" : "Standard dispatch batch"}
-        </p>
-      )}
-
       <div className="space-y-2">
         <p className="text-sm font-medium text-zinc-800">Production purpose</p>
         <div className="grid grid-cols-2 gap-2 rounded-lg bg-zinc-100 p-1">
@@ -418,12 +355,28 @@ export function ProductionBatchForm({
           className="mt-1 w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm"
         >
           <option value="">Select product…</option>
-          {productOptions.map((name) => (
-            <option key={name} value={name}>
-              {name}
-            </option>
-          ))}
+          {dispatchProducts.length > 0 ? (
+            <optgroup label="Dispatch families">
+              {dispatchProducts.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
+          {customProducts.length > 0 ? (
+            <optgroup label="Custom & drum products">
+              {customProducts.map((p) => (
+                <option key={p.name} value={p.name}>
+                  {p.name}
+                </option>
+              ))}
+            </optgroup>
+          ) : null}
         </select>
+        <p className="mt-1 text-xs text-zinc-500">
+          Rhino, Brighten, Power Wash, Hand Sanitizer, Sequester, GLIM, and all other products in one list.
+        </p>
       </div>
 
       <div>
@@ -439,13 +392,13 @@ export function ProductionBatchForm({
         />
       </div>
 
-      <Field id="ph" label="pH" value={ph} onChange={setPh} placeholder={isCustomBox ? "e.g. 7.5-8" : "e.g. 7 or 6.5-7"} />
+      <Field id="ph" label="pH" value={ph} onChange={setPh} placeholder={isCustomProduct ? "e.g. 7.5-8" : "e.g. 7 or 6.5-7"} />
       <Field
         id="solids"
         label="Solids"
         value={solids}
         onChange={setSolids}
-        placeholder={isCustomBox ? "e.g. 19%" : "e.g. 29-30% (sinking 17)"}
+        placeholder={isCustomProduct ? "e.g. 19%" : "e.g. 29-30% (sinking 17)"}
       />
       <Field
         id="appearance"
@@ -456,52 +409,40 @@ export function ProductionBatchForm({
       />
       <Field id="provider" label="Provider" value={provider} onChange={setProvider} placeholder="e.g. Ramzan" />
 
-      {isCustomBox ? (
-        <>
-          <Field id="drum" label="Drum" value={drum} onChange={setDrum} placeholder="e.g. 3*150" />
+      {showHcl ? (
+        <Field id="hcl" label="HCL" value={hcl} onChange={setHcl} placeholder="e.g. 12%" />
+      ) : null}
+      {showViscosity ? (
+        <div>
           <Field
-            id="quantity"
-            label="Quantity"
-            value={quantity}
-            onChange={setQuantity}
-            placeholder="e.g. 450 L or 1000L"
+            id="viscosity"
+            label="Viscosity (optional)"
+            value={viscosity}
+            onChange={setViscosity}
+            placeholder="e.g. 2500 cps"
           />
-          <Field
-            id="customer"
-            label="Customer (optional)"
-            value={customer}
-            onChange={setCustomer}
-            placeholder="Customer name if known"
-          />
-        </>
-      ) : (
-        <>
-          {showHcl ? (
-            <Field id="hcl" label="HCL" value={hcl} onChange={setHcl} placeholder="e.g. 12%" />
-          ) : null}
-          {showViscosity ? (
-            <div>
-              <Field
-                id="viscosity"
-                label="Viscosity (optional)"
-                value={viscosity}
-                onChange={setViscosity}
-                placeholder="e.g. 2500 cps"
-              />
-              <p className="mt-1 text-xs text-zinc-500">
-                For Rhino, Brighten, Power Wash batches. Leave blank if not measured.
-              </p>
-            </div>
-          ) : null}
-          <Field
-            id="quantity"
-            label="Quantity (liters)"
-            value={quantity}
-            onChange={setQuantity}
-            placeholder="e.g. 350 or 450L"
-          />
-        </>
-      )}
+          <p className="mt-1 text-xs text-zinc-500">
+            For Rhino, Brighten, Power Wash batches. Leave blank if not measured.
+          </p>
+        </div>
+      ) : null}
+      <Field
+        id="quantity"
+        label="Quantity (liters)"
+        value={quantity}
+        onChange={setQuantity}
+        placeholder="e.g. 350 or 450L"
+      />
+      {isCustomProduct ? (
+        <Field id="drum" label="Drum (optional)" value={drum} onChange={setDrum} placeholder="e.g. 3*150" />
+      ) : null}
+      <Field
+        id="customer"
+        label="Customer (optional)"
+        value={customer}
+        onChange={setCustomer}
+        placeholder="Customer name if known"
+      />
 
       <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
         <p className="text-sm font-semibold text-zinc-900">QC result</p>

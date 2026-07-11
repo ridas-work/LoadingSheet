@@ -6,6 +6,8 @@
 import type {
   BatchBottleLineRow,
   BatchBottlesReport,
+  BatchDestinationRow,
+  CustomerProductSummaryRow,
   CustomerOrderRow,
   CustomerOrdersReport,
   DispersionReport,
@@ -31,6 +33,8 @@ import {
 export type {
   BatchBottleLineRow,
   BatchBottlesReport,
+  BatchDestinationRow,
+  CustomerProductSummaryRow,
   CustomerOrdersReport,
   DispersionReport,
   GrandTotals,
@@ -48,6 +52,7 @@ export type ReportCatalogRow = {
   summaryLabel?: string;
   litersPerBottle?: number;
   bottlesPerCarton?: number;
+  batchFamily?: string;
 };
 
 export type ReportOrderInput = {
@@ -57,6 +62,8 @@ export type ReportOrderInput = {
   createdAt?: Date | string | null;
   gateDeliveryStatus?: string | null;
   gateDeliveredAt?: Date | string | null;
+  dispatchTripId?: unknown;
+  dispatch?: { vehicleNo?: string | null; dcNo?: string | null } | null;
   discardedAt?: Date | string | null;
   orderKind?: string | null;
   items?: Array<{ productName?: string; boxes?: number; bottlesPerBox?: number }>;
@@ -131,7 +138,7 @@ function packingCatalogRows(catalog: ReportCatalogRow[]): PackingCatalogRow[] {
     bottlesPerCarton: p.bottlesPerCarton ?? 1,
     litersPerBottle: p.litersPerBottle ?? 1,
     aliases: p.aliases ?? [],
-    batchFamily: p.name,
+    batchFamily: p.batchFamily?.trim() || p.name,
   }));
 }
 
@@ -495,6 +502,15 @@ export function buildCustomerOrdersReport(
     : [];
 
   const byCode = new Map(catalog.map((p) => [key(p.code), p]));
+  const productTotals: CustomerProductSummaryRow[] = (() => {
+    const { bottlesByCode, cartonsByCode, orderCountByCode, unmappedByName } =
+      aggregateProductMaps(matched, catalog);
+    const rows = [
+      ...productRowsFromMaps(catalog, bottlesByCode, cartonsByCode, orderCountByCode),
+      ...unmappedProductRows(unmappedByName),
+    ].sort((a, b) => b.bottles - a.bottles || a.productName.localeCompare(b.productName));
+    return productKey ? rows.filter((row) => key(row.productCode) === productKey) : rows;
+  })();
 
   const rows: CustomerOrderRow[] = [];
   for (const order of matched) {
@@ -550,6 +566,7 @@ export function buildCustomerOrdersReport(
   return {
     customerQuery: query,
     orders: rows,
+    productTotals,
     customerNames,
     grandTotals: grandTotalsFromCustomerRows(rows),
     productCode: productKey || undefined,
@@ -629,11 +646,17 @@ function batchBottleKey(batchNo: string, productCode: string): string {
   return `${normalizeBatchNo(batchNo).toLowerCase()}::${key(productCode)}`;
 }
 
+function toIsoString(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
 function lineBatchBottleAllocations(
   line: NonNullable<ReportOrderInput["sheetLines"]>[number],
   boxNo: number,
   catalog: PackingCatalogRow[],
-): Array<{ batchNo: string; productName: string; bottles: number }> {
+): Array<{ batchNo: string; productName: string; bottles: number; liters: number }> {
   const allocations = lineBatchAllocations(
     {
       boxNo,
@@ -654,7 +677,7 @@ function lineBatchBottleAllocations(
         ? inferLitersPerBottleFromName(packing.name, packing.litersPerBottle)
         : inferLitersPerBottleFromName(alloc.productName);
       const bottles = lp > 0 ? Math.round(alloc.liters / lp) : 0;
-      return { batchNo: alloc.batchNo, productName: alloc.productName, bottles };
+      return { batchNo: alloc.batchNo, productName: alloc.productName, bottles, liters: alloc.liters };
     })
     .filter((row) => row.bottles > 0);
 }
@@ -678,6 +701,7 @@ export function buildBatchBottlesReport(
   const productNameByKey = new Map<string, string>();
   const productCodeByKey = new Map<string, string>();
   const batchNoByKey = new Map<string, string>();
+  const destinationRowsAll: BatchDestinationRow[] = [];
 
   for (const entry of fillingEntries) {
     if (!entryInDateRange(entry.entryDate, options)) continue;
@@ -700,13 +724,30 @@ export function buildBatchBottlesReport(
     const lines = order.sheetLines ?? [];
     for (let index = 0; index < lines.length; index++) {
       const line = lines[index];
-      for (const alloc of lineBatchBottleAllocations(line, line.boxNo ?? index + 1, packingRows)) {
+      const boxNo = line.boxNo ?? index + 1;
+      for (const alloc of lineBatchBottleAllocations(line, boxNo, packingRows)) {
         const code = resolveCatalogCode(alloc.productName, catalog) ?? alloc.productName;
         const rowKey = batchBottleKey(alloc.batchNo, code);
         orderByKey.set(rowKey, (orderByKey.get(rowKey) ?? 0) + alloc.bottles);
         productNameByKey.set(rowKey, alloc.productName);
         productCodeByKey.set(rowKey, key(code));
         batchNoByKey.set(rowKey, alloc.batchNo);
+        destinationRowsAll.push({
+          batchNo: alloc.batchNo,
+          productCode: key(code),
+          productName: alloc.productName,
+          orderId: order.orderId,
+          poNumber: order.poNumber,
+          customerName: order.customerName,
+          gateDeliveryStatus: normalizeGateStatus(order.gateDeliveryStatus),
+          createdAt: toIsoString(order.createdAt),
+          deliveredAt: toIsoString(order.gateDeliveredAt),
+          vehicleNo: order.dispatch?.vehicleNo?.trim() ?? "",
+          dcNo: order.dispatch?.dcNo?.trim() ?? "",
+          boxNo,
+          bottles: alloc.bottles,
+          liters: Math.round(alloc.liters * 1000) / 1000,
+        });
       }
     }
   }
@@ -749,16 +790,32 @@ export function buildBatchBottlesReport(
       a.productName.localeCompare(b.productName),
   );
 
+  const destinationRows = destinationRowsAll
+    .filter((row) => {
+      const batchNorm = normalizeBatchNo(row.batchNo).toLowerCase();
+      if (query && !batchNorm.includes(query) && !row.batchNo.toLowerCase().includes(query)) return false;
+      if (productKey && key(row.productCode) !== productKey) return false;
+      return true;
+    })
+    .sort(
+      (a, b) =>
+        b.batchNo.localeCompare(a.batchNo) ||
+        a.customerName.localeCompare(b.customerName) ||
+        a.poNumber.localeCompare(b.poNumber) ||
+        a.boxNo - b.boxNo,
+    );
+
   const batchNumbers = [
     ...new Set([
       ...batches.map((b) => b.batchNo.trim()).filter(Boolean),
       ...fillingEntries.map((e) => e.batchNo.trim()).filter(Boolean),
+      ...destinationRowsAll.map((row) => row.batchNo.trim()).filter(Boolean),
     ]),
   ]
     .sort((a, b) => b.localeCompare(a))
     .slice(0, 500);
 
-  const totals = rows.reduce(
+  const bottleTotals = rows.reduce(
     (acc, row) => ({
       filledBottles: acc.filledBottles + row.filledBottles,
       orderBottles: acc.orderBottles + row.orderBottles,
@@ -766,15 +823,25 @@ export function buildBatchBottlesReport(
     }),
     { filledBottles: 0, orderBottles: 0, totalBottles: 0 },
   );
+  const destinationOrderIds = new Set(destinationRows.map((row) => row.orderId));
+  const destinationCustomers = new Set(destinationRows.map((row) => key(row.customerName)).filter(Boolean));
+  const totals = {
+    ...bottleTotals,
+    destinationBottles: destinationRows.reduce((sum, row) => sum + row.bottles, 0),
+    destinationLiters: Math.round(destinationRows.reduce((sum, row) => sum + row.liters, 0) * 1000) / 1000,
+    destinationOrders: destinationOrderIds.size,
+    destinationCustomers: destinationCustomers.size,
+  };
 
   return {
     batchQuery: batchQuery.trim(),
     batchNumbers,
     rows,
+    destinationRows,
     totals,
     grandTotals: {
-      orderCount: 0,
-      customerCount: 0,
+      orderCount: totals.destinationOrders,
+      customerCount: totals.destinationCustomers,
       totalCartons: 0,
       totalBottles: totals.totalBottles,
     },

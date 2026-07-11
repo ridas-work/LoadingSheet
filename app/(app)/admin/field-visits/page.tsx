@@ -11,8 +11,8 @@ export default function AdminFieldVisitsPage() {
         </Link>
         <h1 className="mt-2 text-2xl font-semibold text-zinc-900">Field visits</h1>
         <p className="mt-1 text-sm text-zinc-600">
-          All sample visit tickets — search by customer, place, city, phone, product, or notes.
-          Status, follow-up reminders, and rep points.
+          All field visit tickets — sales visits (Nouman/Javeria) and market visits (Aslam/Ahtisham).
+          Search by customer, store, place, city, phone, product, or notes.
         </p>
       </div>
       <FieldVisitList showRep />

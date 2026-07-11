@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { ProductionBatchTabs } from "@/components/ProductionBatchTabs";
 import { auth } from "@/lib/auth";
 import { formatLiters } from "@/lib/batchVolume";
+import { formatDisplayDate } from "@/lib/dateOnly";
 import { connectToDatabase } from "@/lib/db";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { closedProductionBatchMongoFilter } from "@/lib/productionBatchClose";
@@ -76,7 +77,7 @@ export default async function ClosedProductionBatchesPage() {
                       </span>
                     </td>
                     <td>
-                      {b.closedAt ? new Date(b.closedAt).toLocaleDateString() : "—"}
+                      {b.closedAt ? formatDisplayDate(b.closedAt) : "—"}
                     </td>
                     <td>{formatLiters(b.closureWasteLiters ?? 0)}</td>
                     <td>{b.closedByName?.trim() || "—"}</td>

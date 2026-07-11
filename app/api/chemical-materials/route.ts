@@ -44,6 +44,7 @@ export async function POST(req: Request) {
 
   const body = (await req.json().catch(() => null)) as {
     name?: unknown;
+    materialCode?: unknown;
     kind?: unknown;
     unit?: unknown;
     onHand?: unknown;
@@ -62,16 +63,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const materialCodeHint =
+    typeof body.materialCode === "string" ? body.materialCode.trim().toLowerCase() : "";
   const accessoryDefinition =
     kind === "accessory"
-      ? CHEMICAL_ACCESSORIES.find(
+      ? (materialCodeHint
+          ? CHEMICAL_ACCESSORIES.find((item) => item.code === materialCodeHint)
+          : null) ??
+        CHEMICAL_ACCESSORIES.find(
           (item) =>
             item.code === name.toLowerCase() || item.name.toLowerCase() === name.toLowerCase(),
         )
       : null;
   if (kind === "accessory" && !accessoryDefinition) {
     return NextResponse.json(
-      { error: "Only Shoppers, Drums, and Seals can be added as accessory stock." },
+      { error: "Unknown accessory. Use a drums, shoppers, or seals variant from the catalog." },
       { status: 400 },
     );
   }
@@ -87,7 +93,12 @@ export async function POST(req: Request) {
   }
 
   await connectToDatabase();
-  const { material, created } = await resolveOrCreateMaterial({ materialName, kind, unit });
+  const { material, created } = await resolveOrCreateMaterial({
+    materialCode: accessoryDefinition?.code,
+    materialName,
+    kind,
+    unit,
+  });
 
   const userId = (session.user as { id?: string })?.id ?? "";
   const userName = session.user.name ?? "User";

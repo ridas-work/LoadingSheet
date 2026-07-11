@@ -16,7 +16,16 @@ function resolveLoginUsername(username: string): string {
   return USERNAME_ALIASES[username] ?? username;
 }
 
+/** Secure cookies only work over HTTPS — allow `npm run start` on http://localhost. */
+function authUsesSecureCookies(): boolean {
+  const url = (process.env.NEXTAUTH_URL ?? "").trim().toLowerCase();
+  if (url.startsWith("https://")) return true;
+  if (url.startsWith("http://")) return false;
+  return process.env.NODE_ENV === "production";
+}
+
 const sessionMaxAge = Number(process.env.SESSION_MAX_AGE_SECONDS ?? 28800);
+const useSecureCookies = authUsesSecureCookies();
 
 export const authOptions: NextAuthOptions = {
   session: {
@@ -25,15 +34,14 @@ export const authOptions: NextAuthOptions = {
   },
   cookies: {
     sessionToken: {
-      name:
-        process.env.NODE_ENV === "production"
-          ? "__Secure-next-auth.session-token"
-          : "next-auth.session-token",
+      name: useSecureCookies
+        ? "__Secure-next-auth.session-token"
+        : "next-auth.session-token",
       options: {
         httpOnly: true,
         sameSite: "lax",
         path: "/",
-        secure: process.env.NODE_ENV === "production",
+        secure: useSecureCookies,
       },
     },
   },

@@ -1,4 +1,7 @@
-import productBomData from "@/data/product-packaging-bom.json";
+import {
+  expandBomPackagingCodes,
+  loadProductBom,
+} from "@/lib/packagingBom";
 import thresholdsData from "@/data/packaging-reorder-thresholds.json";
 import type { PackagingItemDoc } from "@/lib/models/PackagingItem";
 import { packagingBalance } from "@/lib/packagingInventory";
@@ -9,28 +12,13 @@ import type {
   PackagingReorderSeverity,
 } from "@/lib/packagingReorderAlerts.types";
 
-type BomLine = {
-  packagingItemCode: string;
-  qtyPerBottle?: number;
-  qtyPerCarton?: number;
-};
-
-type BomEntry = {
-  productCode: string;
-  lines?: BomLine[];
-  includes?: Array<{ productCode: string; bottlesPerUnit?: number }>;
-};
-
-const BOM = productBomData as BomEntry[];
 const RULES = (thresholdsData as { rules: PackagingReorderRule[] }).rules;
 
 function normCode(code: string): string {
   return code.trim().toLowerCase();
 }
 
-export function loadProductBom(): BomEntry[] {
-  return BOM;
-}
+export { expandBomPackagingCodes, loadProductBom };
 
 export function loadReorderRules(): PackagingReorderRule[] {
   return RULES;
@@ -42,23 +30,6 @@ export function thresholdsForProduct(productCode: string): number | null {
     (r) => r.kind === "product_any_component" && normCode(r.productCode ?? "") === code,
   );
   return rule?.threshold ?? null;
-}
-
-export function expandBomPackagingCodes(productCode: string): string[] {
-  const code = normCode(productCode);
-  const entry = BOM.find((b) => normCode(b.productCode) === code);
-  if (!entry) return [];
-
-  const codes = new Set<string>();
-  for (const line of entry.lines ?? []) {
-    codes.add(normCode(line.packagingItemCode));
-  }
-  for (const inc of entry.includes ?? []) {
-    for (const nested of expandBomPackagingCodes(inc.productCode)) {
-      codes.add(nested);
-    }
-  }
-  return [...codes];
 }
 
 function balanceForItem(
@@ -157,8 +128,3 @@ export function buildPackagingReorderAlerts(
     alerts,
   };
 }
-
-/*
- * Fixture: rhino-lids balance 400, brighten-fabrito-lids balance 1200
- * → Rhino 250 ml alert (threshold 500), Brighten 1 L alert (1000), shared lids alert (1500)
- */

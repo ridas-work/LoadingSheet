@@ -59,7 +59,10 @@ export function RashidDailyPlanView({
         fetch(`${apiBase}?date=${encodeURIComponent(planDate)}`, {
           credentials: "same-origin",
         }),
-        fetch("/api/admin/rashid-daily-plan/products", { credentials: "same-origin" }),
+        fetch("/api/admin/rashid-daily-plan/products", {
+          credentials: "same-origin",
+          cache: "no-store",
+        }),
       ]);
       const data = (await planRes.json()) as {
         plan?: SerializedRashidDailyPlan;
@@ -103,7 +106,7 @@ export function RashidDailyPlanView({
             : `No morning plan saved for ${planDate} yet.`}
         </p>
         {!isDispatch ? (
-          <Link href={`/admin/rashid-daily-plan/new?date=${planDate}`} className={ui.btnPrimary}>
+          <Link href={`/admin/rashid-daily-plan/create?date=${planDate}`} className={ui.btnPrimary}>
             Create morning plan
           </Link>
         ) : (

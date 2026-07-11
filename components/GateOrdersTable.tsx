@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { GateCloseDeliveryModal } from "@/components/GateCloseDeliveryModal";
+import { GateLateReturnModal } from "@/components/GateLateReturnModal";
 import {
   GATE_STATUS_LABELS,
   nextGateActions,
@@ -20,6 +22,10 @@ export type GateOrderRow = {
   vehicleNo: string;
   driverName: string;
   dcNo: string;
+  deliveryOutcome?: string | null;
+  deliveredBottles?: number;
+  damagedBottles?: number;
+  returnedBottles?: number;
 };
 
 type FilterKey = "active" | "all" | "out" | "pending" | "delivered";
@@ -34,7 +40,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 const ACTION_LABELS: Record<GateDeliveryStatus, string> = {
   out_for_delivery: "Mark out for delivery",
-  delivered: "Mark delivered",
+  delivered: "Close delivery",
   pending_redelivery: "Mark pending redelivery",
   none: "",
 };
@@ -55,6 +61,8 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<Record<string, string>>({});
   const [rowSuccess, setRowSuccess] = useState<Record<string, string>>({});
+  const [closeModal, setCloseModal] = useState<{ id: string; po: string } | null>(null);
+  const [lateModal, setLateModal] = useState<{ id: string; po: string } | null>(null);
 
   const load = useCallback(async (f: FilterKey) => {
     setLoading(true);
@@ -80,8 +88,24 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
     load(filter);
   }, [filter, load]);
 
-  async function setStatus(orderId: string, status: GateDeliveryStatus) {
+  function flashSuccess(orderId: string, message: string) {
+    setRowSuccess((prev) => ({ ...prev, [orderId]: message }));
+    setTimeout(() => {
+      setRowSuccess((p) => {
+        const next = { ...p };
+        delete next[orderId];
+        return next;
+      });
+    }, 6000);
+  }
+
+  async function setStatus(orderId: string, status: GateDeliveryStatus, poNumber: string) {
     if (readOnly) return;
+    if (status === "delivered") {
+      setCloseModal({ id: orderId, po: poNumber });
+      return;
+    }
+
     setBusyId(orderId);
     setRowError((prev) => {
       const next = { ...prev };
@@ -99,38 +123,10 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      const data = (await res.json().catch(() => ({}))) as {
-        error?: string;
-        packagingStockUpdated?: boolean;
-        packagingDeductionSummary?: Array<{ itemName?: string; quantity?: number }>;
-        readyBottleStockUpdated?: boolean;
-        readyBottleDeductionSummary?: Array<{ productName?: string; bottles?: number }>;
-      };
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
         setRowError((prev) => ({ ...prev, [orderId]: data.error || `Save failed (${res.status})` }));
         return;
-      }
-      if (status === "delivered" && (data.packagingStockUpdated || data.readyBottleStockUpdated)) {
-        const pkg = data.packagingDeductionSummary?.length ?? 0;
-        const ready = data.readyBottleDeductionSummary?.length ?? 0;
-        setRowSuccess((prev) => ({
-          ...prev,
-          [orderId]:
-            ready > 0 && pkg > 0
-              ? `Delivered — ready bottles (${ready} product${ready === 1 ? "" : "s"}) and packaging (${pkg} line${pkg === 1 ? "" : "s"}) updated.`
-              : ready > 0
-                ? `Delivered — ready bottle stock updated (${ready} product${ready === 1 ? "" : "s"}).`
-                : pkg > 0
-                  ? `Packaging stock updated (${pkg} line${pkg === 1 ? "" : "s"}).`
-                  : "Delivered.",
-        }));
-        setTimeout(() => {
-          setRowSuccess((p) => {
-            const next = { ...p };
-            delete next[orderId];
-            return next;
-          });
-        }, 5000);
       }
       await load(filter);
       router.refresh();
@@ -163,12 +159,12 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
         <p className="text-sm text-zinc-600">Loading orders…</p>
       ) : orders.length === 0 ? (
         <p className="rounded-xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600">
-          No orders match this filter. Orders appear here only when Rashid has put them on a **dispatch trip**
-          and filled **vehicle number, driver, and DC number** so the shipment is ready to leave the gate.
+          No orders match this filter. Orders appear here only when Rashid has put them on a dispatch trip
+          and filled vehicle number, driver, and DC number so the shipment is ready to leave the gate.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white">
-          <table className="w-full min-w-[40rem] text-sm">
+          <table className="w-full min-w-[48rem] text-sm">
             <thead>
               <tr className="border-b border-zinc-200 bg-zinc-50 text-left">
                 <th className="px-4 py-2 font-medium">PO</th>
@@ -176,6 +172,13 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
                 <th className="px-4 py-2 font-medium">City</th>
                 <th className="px-4 py-2 font-medium">Vehicle</th>
                 <th className="px-4 py-2 font-medium">Status</th>
+                {filter === "delivered" ? (
+                  <>
+                    <th className="px-4 py-2 font-medium">Delivered</th>
+                    <th className="px-4 py-2 font-medium">Damaged</th>
+                    <th className="px-4 py-2 font-medium">Returned</th>
+                  </>
+                ) : null}
                 {!readOnly ? <th className="px-4 py-2 font-medium">Actions</th> : null}
               </tr>
             </thead>
@@ -195,8 +198,16 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
                         className={`inline-block rounded-md px-2 py-0.5 text-xs font-medium ring-1 ${statusBadgeClass(o.gateDeliveryStatus)}`}
                       >
                         {GATE_STATUS_LABELS[o.gateDeliveryStatus]}
+                        {o.deliveryOutcome === "partial" ? " (partial)" : ""}
                       </span>
                     </td>
+                    {filter === "delivered" ? (
+                      <>
+                        <td className="px-4 py-2 text-zinc-700">{o.deliveredBottles ?? "—"}</td>
+                        <td className="px-4 py-2 text-zinc-700">{o.damagedBottles ?? "—"}</td>
+                        <td className="px-4 py-2 text-zinc-700">{o.returnedBottles ?? "—"}</td>
+                      </>
+                    ) : null}
                     {!readOnly ? (
                       <td className="px-4 py-2">
                         <div className="flex flex-wrap gap-2">
@@ -205,13 +216,23 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
                               key={action}
                               type="button"
                               disabled={busyId === o.id}
-                              onClick={() => setStatus(o.id, action)}
+                              onClick={() => setStatus(o.id, action, o.poNumber)}
                               className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
                             >
                               {ACTION_LABELS[action]}
                             </button>
                           ))}
-                          {actions.length === 0 ? (
+                          {o.gateDeliveryStatus === "delivered" ? (
+                            <button
+                              type="button"
+                              disabled={busyId === o.id}
+                              onClick={() => setLateModal({ id: o.id, po: o.poNumber })}
+                              className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-950 hover:bg-amber-100"
+                            >
+                              Late return
+                            </button>
+                          ) : null}
+                          {actions.length === 0 && o.gateDeliveryStatus !== "delivered" ? (
                             <span className="text-xs text-zinc-500">No further actions</span>
                           ) : null}
                         </div>
@@ -230,6 +251,34 @@ export function GateOrdersTable({ readOnly }: { readOnly?: boolean }) {
           </table>
         </div>
       )}
+
+      {closeModal ? (
+        <GateCloseDeliveryModal
+          orderId={closeModal.id}
+          poNumber={closeModal.po}
+          open
+          onClose={() => setCloseModal(null)}
+          onSuccess={(msg) => {
+            flashSuccess(closeModal.id, msg);
+            void load(filter);
+            router.refresh();
+          }}
+        />
+      ) : null}
+
+      {lateModal ? (
+        <GateLateReturnModal
+          orderId={lateModal.id}
+          poNumber={lateModal.po}
+          open
+          onClose={() => setLateModal(null)}
+          onSuccess={(msg) => {
+            flashSuccess(lateModal.id, msg);
+            void load(filter);
+            router.refresh();
+          }}
+        />
+      ) : null}
     </div>
   );
 }

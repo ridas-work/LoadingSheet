@@ -4,8 +4,12 @@ import mongoose from "mongoose";
 import { auth } from "@/lib/auth";
 import {
   assertOrdersAvailableForTrip,
+  assertOrdersMatchTripKind,
   clearDispatchTripIdOnOrders,
+  normalizeOrderChallans,
   parseOrderIds,
+  parseTripKind,
+  releaseBatchAssignmentsOnTripDiscard,
   syncTripDispatchToOrders,
   trimDispatchBody,
 } from "@/lib/dispatchTripSync";
@@ -47,6 +51,10 @@ export async function GET(_req: Request, ctx: RouteCtx) {
     productionIncharge: trip.productionIncharge ?? "",
     securityName: trip.securityName ?? "",
     driverSignature: trip.driverSignature ?? "",
+    orderChallans: (trip.orderChallans ?? []).map((row) => ({
+      orderId: row.orderId.toString(),
+      dcNo: row.dcNo ?? "",
+    })),
     orderIds: (trip.orderIds ?? []).map((oid) => oid.toString()),
     orders: orders.map((o) => ({
       id: o._id.toString(),
@@ -97,6 +105,11 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   if (conflict) {
     return NextResponse.json({ error: conflict }, { status: 400 });
   }
+  const tripKind = parseTripKind(trip.tripKind);
+  const kindMismatch = await assertOrdersMatchTripKind(nextOrderIds, tripKind);
+  if (kindMismatch) {
+    return NextResponse.json({ error: kindMismatch }, { status: 400 });
+  }
 
   const removed = prevOrderIds.filter((oid) => !nextOrderIds.includes(oid));
   if (removed.length > 0) {
@@ -106,9 +119,16 @@ export async function PATCH(req: Request, ctx: RouteCtx) {
   }
 
   const fields = trimDispatchBody({ ...trip.toObject(), ...body });
+  const orderChallans = normalizeOrderChallans(
+    body.orderChallans,
+    nextOrderIds,
+    trip.orderChallans ?? [],
+    fields.dcNo,
+  );
   trip.set({
     ...fields,
     orderIds: nextOrderIds,
+    orderChallans,
     dispatchedAt: trip.dispatchedAt ?? new Date(),
   });
   await trip.save();
@@ -154,6 +174,7 @@ export async function DELETE(_req: Request, ctx: RouteCtx) {
     );
   }
 
+  await releaseBatchAssignmentsOnTripDiscard(trip.orderIds ?? []);
   await clearDispatchTripIdOnOrders(trip.orderIds ?? []);
   await trip.deleteOne();
 

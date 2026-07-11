@@ -1,6 +1,7 @@
 import { connectToDatabase } from "@/lib/db";
 import {
-  resolveCustomBoxBatchProduct,
+  inferBatchKindForProduct,
+  resolveUnifiedBatchProduct,
   type NimraBatchKind,
 } from "@/lib/nimraBatchProductLists";
 import { ProductPacking } from "@/lib/models/ProductPacking";
@@ -104,12 +105,19 @@ export function parseBatchKind(v: unknown): NimraBatchKind {
 
 export async function resolveBatchProduct(
   productInput: string,
-  batchKind: NimraBatchKind,
+  batchKind?: NimraBatchKind,
 ): Promise<string | null> {
-  if (batchKind === "custom_box") {
-    return resolveCustomBoxBatchProduct(productInput);
-  }
-  return resolveBatchFamily(productInput);
+  return resolveUnifiedBatchProduct(productInput);
+}
+
+export async function resolveBatchProductWithKind(
+  productInput: string,
+  explicitKind?: NimraBatchKind,
+): Promise<{ product: string; batchKind: NimraBatchKind } | null> {
+  const product = await resolveUnifiedBatchProduct(productInput);
+  if (!product) return null;
+  const batchKind = explicitKind ?? (await inferBatchKindForProduct(product));
+  return { product, batchKind };
 }
 
 export async function resolveBatchFamily(productInput: string): Promise<string | null> {
@@ -134,18 +142,19 @@ export function parseQcBody(
 ) {
   const batchKind = options?.batchKind ?? "standard";
   const productFamily = options?.productFamily?.trim() ?? "";
-  const rhino = batchKind === "standard" && isRhinoBatchFamily(productFamily);
+  const isCustom = batchKind === "custom_box";
+  const needsHcl = !isCustom && isRhinoBatchFamily(productFamily);
 
   const fields = {
     ph: trimQcField(body.ph),
     solids: trimQcField(body.solids),
     appearance: trimQcField(body.appearance),
     provider: trimQcField(body.provider),
-    hcl: rhino ? trimQcField(body.hcl) : "",
-    viscosity: batchKind === "standard" ? trimQcField(body.viscosity) : "",
+    hcl: needsHcl ? trimQcField(body.hcl) : "",
+    viscosity: !isCustom ? trimQcField(body.viscosity) : "",
     quantity: trimQcField(body.quantity),
-    drum: batchKind === "custom_box" ? trimQcField(body.drum) : "",
-    customer: batchKind === "custom_box" ? trimQcField(body.customer) : "",
+    drum: isCustom ? trimQcField(body.drum) : "",
+    customer: trimQcField(body.customer),
   };
 
   if (!requireAll) return { ok: true as const, fields };
@@ -155,9 +164,7 @@ export function parseQcBody(
   if (!fields.solids) missing.push("solids");
   if (!fields.appearance) missing.push("appearance");
   if (!fields.provider) missing.push("provider");
-  if (batchKind === "custom_box") {
-    if (!fields.drum) missing.push("drum");
-  } else if (rhino && !fields.hcl) {
+  if (needsHcl && !fields.hcl) {
     missing.push("HCL");
   }
   if (!fields.quantity) missing.push("quantity");

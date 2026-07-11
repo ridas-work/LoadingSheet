@@ -1,12 +1,14 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import mongoose from "mongoose";
 
 import { LoadingSheetBatchEditor, type LoadingSheetLine } from "@/components/LoadingSheetBatchEditor";
+import { isCustomerNameBlocked } from "@/lib/customerAccountAccess";
 import { auth } from "@/lib/auth";
 import { accumulateBatchUsageFromSheetLines } from "@/lib/bundleCatalog";
 import { buildSheetLines, type OrderItemInput, type SheetLine } from "@/lib/buildSheetLines";
 import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
+import { formatDisplayDate } from "@/lib/dateOnly";
 import { Order } from "@/lib/models/Order";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
@@ -14,6 +16,7 @@ import { bottlesPerProductFromSheetLines } from "@/lib/bottlesFromSheetLines";
 import { isBatchAssignmentLocked, readyAllocationForOrder } from "@/lib/orderBatchStatus";
 import { getReadyStockMap, listBatchLots } from "@/lib/readyBottleLedger";
 import type { DeductionPacking, DeductionSheetLine } from "@/lib/packagingDeduction";
+import { canViewOrderAsPoCreator } from "@/lib/orderAccess";
 import { regularProductionBatchMongoFilter } from "@/lib/sampleProductionStock";
 import { roleFromSession, EMPTY_DISPATCH, type DispatchFields } from "@/lib/roles";
 
@@ -82,6 +85,7 @@ export default async function LoadingSheetPage(props: PageProps) {
 
   const session = await auth();
   const role = roleFromSession(session?.user as { role?: string });
+  const userId = (session?.user as { id?: string })?.id;
   const canEditDispatch = role === "dispatch_editor";
 
   await connectToDatabase();
@@ -95,6 +99,12 @@ export default async function LoadingSheetPage(props: PageProps) {
   ]);
 
   if (!order) notFound();
+
+  if (await isCustomerNameBlocked(order.customerName)) notFound();
+
+  if (role === "po_creator" && !canViewOrderAsPoCreator(role, userId, order)) {
+    redirect("/orders");
+  }
 
   const catalog = packingCatalogFromDocs(catalogDocs);
   const sheetLines = normalizeSheetLines(order as Parameters<typeof normalizeSheetLines>[0]);
@@ -143,7 +153,7 @@ export default async function LoadingSheetPage(props: PageProps) {
     sheetLines as DeductionSheetLine[],
     catalogDeduction,
   );
-  const created = order.createdAt ? new Date(order.createdAt).toISOString().slice(0, 10) : "";
+  const created = order.createdAt ? formatDisplayDate(order.createdAt) : "";
   const backHref = role === "batch_editor" ? "/production/batches" : "/orders";
 
   const rawDispatch = (order as { dispatch?: Partial<DispatchFields> }).dispatch;
@@ -172,25 +182,27 @@ export default async function LoadingSheetPage(props: PageProps) {
   );
 
   return (
-    <LoadingSheetBatchEditor
-      orderId={id}
-      poNumber={order.poNumber}
-      customerName={order.customerName}
-      createdDate={created}
-      sheetLines={sheetLines}
-      catalog={catalog}
-      productionBatches={productionBatches}
-      usedLitersElsewhere={usedLitersElsewhere}
-      initialDispatch={initialDispatch}
-      canEditDispatch={canEditDispatch}
-      initialDispatchEditMode={initialDispatchEditMode}
-      backHref={backHref}
-      dispatchTripId={dispatchTripId}
-      dispatchTripHref={dispatchTripHref}
-      batchesLocked={batchesLocked}
-      readyStockNeeds={readyStockNeeds}
-      weightsVerified={weightsVerified}
-      dispatchReadyForGate={dispatchReadyForGate}
-    />
+    <div className="space-y-4">
+      <LoadingSheetBatchEditor
+        orderId={id}
+        poNumber={order.poNumber}
+        customerName={order.customerName}
+        createdDate={created}
+        sheetLines={sheetLines}
+        catalog={catalog}
+        productionBatches={productionBatches}
+        usedLitersElsewhere={usedLitersElsewhere}
+        initialDispatch={initialDispatch}
+        canEditDispatch={canEditDispatch}
+        initialDispatchEditMode={initialDispatchEditMode}
+        backHref={backHref}
+        dispatchTripId={dispatchTripId}
+        dispatchTripHref={dispatchTripHref}
+        batchesLocked={batchesLocked}
+        readyStockNeeds={readyStockNeeds}
+        weightsVerified={weightsVerified}
+        dispatchReadyForGate={dispatchReadyForGate}
+      />
+    </div>
   );
 }

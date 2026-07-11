@@ -6,7 +6,8 @@ import { auth } from "@/lib/auth";
 import { connectToDatabase } from "@/lib/db";
 import { isBatchClosed } from "@/lib/productionBatchClose";
 import { ProductionBatch } from "@/lib/models/ProductionBatch";
-import { parseQcBody, parseProductionPurpose, resolveBatchFamily, trimQcField } from "@/lib/productionBatchApi";
+import { parseQcBody, parseProductionPurpose, resolveBatchProductWithKind, trimQcField } from "@/lib/productionBatchApi";
+import { inferBatchKindForProduct } from "@/lib/nimraBatchProductLists";
 import { renameProductionBatchNo, patchTouchesLockedFields } from "@/lib/renameProductionBatchNo";
 import {
   isProductionBatchLocked,
@@ -138,11 +139,39 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (!productInput) {
       return NextResponse.json({ error: "Product is required" }, { status: 400 });
     }
-    const batchFamily = await resolveBatchFamily(productInput);
-    if (!batchFamily) {
-      return NextResponse.json({ error: "Product must exist in catalog" }, { status: 400 });
+    const resolved = await resolveBatchProductWithKind(productInput);
+    if (!resolved) {
+      return NextResponse.json({ error: "Product must be in the batch product list" }, { status: 400 });
     }
-    batch.productName = batchFamily;
+    batch.productName = resolved.product;
+    batch.batchKind = resolved.batchKind;
+  }
+
+  const batchKind =
+    batch.productName?.trim()
+      ? await inferBatchKindForProduct(batch.productName)
+      : batch.batchKind === "custom_box"
+        ? "custom_box"
+        : "standard";
+
+  if (body.productName === undefined && batch.productName) {
+    batch.batchKind = batchKind;
+  }
+
+  const qc = parseQcBody(body, false, {
+    productFamily: batch.productName,
+    batchKind,
+  });
+  if (qc.ok) {
+    if (body.ph !== undefined) batch.ph = qc.fields.ph;
+    if (body.solids !== undefined) batch.solids = qc.fields.solids;
+    if (body.appearance !== undefined) batch.appearance = qc.fields.appearance;
+    if (body.provider !== undefined) batch.provider = qc.fields.provider;
+    if (body.hcl !== undefined) batch.hcl = qc.fields.hcl;
+    if (body.viscosity !== undefined) batch.viscosity = qc.fields.viscosity;
+    if (body.quantity !== undefined) batch.quantity = qc.fields.quantity;
+    if (body.drum !== undefined) batch.drum = qc.fields.drum;
+    if (body.customer !== undefined) batch.customer = qc.fields.customer;
   }
 
   if (body.totalLiters !== undefined) {
@@ -152,17 +181,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       return NextResponse.json({ error: "Total liters must be greater than 0" }, { status: 400 });
     }
     batch.totalLiters = totalLiters;
-  }
-
-  const qc = parseQcBody(body, false);
-  if (qc.ok) {
-    if (body.ph !== undefined) batch.ph = qc.fields.ph;
-    if (body.solids !== undefined) batch.solids = qc.fields.solids;
-    if (body.appearance !== undefined) batch.appearance = qc.fields.appearance;
-    if (body.provider !== undefined) batch.provider = qc.fields.provider;
-    if (body.hcl !== undefined) batch.hcl = qc.fields.hcl;
-    if (body.viscosity !== undefined) batch.viscosity = qc.fields.viscosity;
-    if (body.quantity !== undefined) batch.quantity = qc.fields.quantity;
   }
 
   if (body.preparedAt !== undefined && typeof body.preparedAt === "string" && body.preparedAt) {

@@ -230,3 +230,111 @@ export async function deductSampleProduction(input: {
 
   return { ok: true };
 }
+
+export type SampleBatchOption = {
+  batchNo: string;
+  productName: string;
+  remainingLiters: number;
+};
+
+/** Open sample production batches with remaining liters — for Rashid's sample batch dropdowns. */
+export async function sampleBatchAvailability(): Promise<SampleBatchOption[]> {
+  await connectToDatabase();
+  const batches = await ProductionBatch.find(sampleProductionBatchMongoFilter())
+    .sort({ preparedAt: 1, createdAt: 1 })
+    .lean();
+
+  const drawnMap = await drawnLitersByBatchId(batches.map((b) => b._id));
+
+  const options: SampleBatchOption[] = [];
+  for (const batch of batches) {
+    const remaining = await remainingSampleLitersForBatch(
+      { _id: batch._id, totalLiters: batch.totalLiters },
+      drawnMap,
+    );
+    if (remaining <= 0) continue;
+    options.push({
+      batchNo: batch.batchNo,
+      productName: batch.productName,
+      remainingLiters: remaining,
+    });
+  }
+  return options;
+}
+
+/** Undo sample pool deductions when a visit sample request is rejected. */
+export async function restoreSampleProductionForVisit(visitTicketId: string): Promise<void> {
+  if (!mongoose.Types.ObjectId.isValid(visitTicketId)) return;
+  await connectToDatabase();
+  await SampleProductionMovement.deleteMany({
+    visitTicketId: new mongoose.Types.ObjectId(visitTicketId),
+  });
+}
+
+export type SampleReturnLine = {
+  productName: string;
+  bottles: number;
+  /** Batch to credit back — defaults to the batch this visit originally drew from. */
+  batchNo?: string;
+};
+
+/**
+ * Credit returned sample bottles back into Esha's sample production pool.
+ * A negative `return` movement re-adds liters to the source batch (remaining goes up).
+ */
+export async function restoreSampleProductionForReturn(input: {
+  visitTicketId: string;
+  returns: SampleReturnLine[];
+  catalog: PackingCatalogRow[];
+  actor: DeductSampleActor;
+}): Promise<void> {
+  if (!mongoose.Types.ObjectId.isValid(input.visitTicketId)) return;
+  await connectToDatabase();
+
+  const visitOid = new mongoose.Types.ObjectId(input.visitTicketId);
+
+  for (const line of input.returns) {
+    const productName = line.productName.trim();
+    const bottles = typeof line.bottles === "number" ? Math.floor(line.bottles) : 0;
+    if (!productName || bottles <= 0) continue;
+
+    const lp = litersPerBottleForProduct(productName, input.catalog);
+    const liters = roundLiters(bottles * lp);
+    if (liters <= 0) continue;
+
+    let batchNo = line.batchNo?.trim() ?? "";
+    let productionBatchId: mongoose.Types.ObjectId | null = null;
+
+    if (batchNo) {
+      const batch = await ProductionBatch.findOne({ batchNo }).select({ _id: 1 }).lean();
+      productionBatchId = batch?._id ?? null;
+    }
+    // Fall back to the batch this visit drew this product from.
+    if (!productionBatchId) {
+      const movement = await SampleProductionMovement.findOne({
+        visitTicketId: visitOid,
+        productName,
+      })
+        .sort({ recordedAt: -1 })
+        .lean();
+      if (movement) {
+        productionBatchId = movement.productionBatchId as mongoose.Types.ObjectId;
+        batchNo = movement.batchNo;
+      }
+    }
+    if (!productionBatchId) continue;
+
+    await SampleProductionMovement.create({
+      visitTicketId: visitOid,
+      productionBatchId,
+      batchNo,
+      productName,
+      bottles: -bottles,
+      liters: -liters,
+      kind: "return",
+      recordedAt: new Date(),
+      recordedByName: input.actor.userName,
+      repUsername: input.actor.username?.trim().toLowerCase() ?? "",
+    });
+  }
+}

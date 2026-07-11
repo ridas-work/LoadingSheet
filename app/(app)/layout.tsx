@@ -44,8 +44,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const wideLayout =
     admin ||
     summaryViewer ||
+    role === "batch_editor" ||
     role === "dispatch_editor" ||
-    role === "packaging_editor" ||
     role === "chemicals_editor";
   const widthClass = mainWidthClass(wideLayout, role);
 
@@ -65,16 +65,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                   <AppNavLink href="/admin/approvals" label="Sample approvals" />
                   <AppNavLink href="/admin/delivery-summary" label="Delivered" />
                   <AppNavLink href="/admin/reports" label="Reports" />
+                  <AppNavLink href="/admin/print-log" label="Print log" />
                   <AppNavLink href="/admin/packaging-alerts" label="Packaging alerts" />
                   <AppNavLink href="/admin/chemical-requests" label="Chemical requests" />
-                  <AppNavLink href="/orders" label="Orders" />
+                  <AppNavLink href="/admin/orders" label="Orders" />
                   <AppNavLink href="/production/batches" label="Batches" />
-                  <AppNavLink href="/dispatch/trips" label="Trips" />
-                  <AppNavLink href="/dispatch/inventory" label="Packaging" />
                   <AppNavLink href="/dispatch/filling" label="Filling" />
                   <AppNavLink href="/dispatch/ready-stock" label="Ready stock" />
-                  <AppNavLink href="/chemicals/inventory" label="Chemicals" />
                   <AppNavLink href="/admin/field-visits" label="Field visits" />
+                  <AppNavLink href="/admin/market-visit-alerts" label="Market alerts" />
+                  <AppNavLink href="/accounts" label="Customer accounts" />
                   <AppNavLink href="/admin/rashid-daily-plan" label="Rashid plan" />
                   <AppNavLink href="https://fleet.waleedtech.com.pk/" label="Fleet" external />
                   <AppNavLink href="https://work.waleedtech.com.pk/" label="QC Logs" external />
@@ -86,34 +86,47 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 <>
                   <AppNavLink href="/admin" label="Summary" />
                   <AppNavLink href="/admin/delivery-summary" label="Delivered" />
+                  <AppNavLink href="/admin/reports" label="Reports" />
+                  <AppNavLink href="/admin/packaging-alerts" label="Packaging alerts" />
+                  <AppNavLink href="/admin/orders" label="Orders" />
+                  <AppNavLink href="/dispatch/ready-stock" label="Ready stock" />
+                  <AppNavLink href="https://fleet.waleedtech.com.pk/" label="Fleet" external />
                 </>
               ) : null}
-              {canViewOrdersList(role, username) && !admin ? (
+              {canViewOrdersList(role, username) && !admin && !summaryViewer ? (
                 <AppNavLink href="/orders" label="Orders" />
               ) : null}
               {role === "batch_editor" ? (
                 <>
                   <AppNavLink href="/production/batches" label="Batches" />
                   <AppNavLink href="/production/chemical-intake" label="Chemical intake" />
+                  <AppNavLink href="/dispatch/inventory" label="Packaging inventory" />
                 </>
               ) : null}
               {role === "dispatch_editor" && tripPlanner ? (
-                <AppNavLink href="/dispatch/trips" label="Dispatch trips" />
+                <>
+                  <AppNavLink href="/dispatch/trips" label="Dispatch trips" />
+                  <AppNavLink href="/dispatch/sample-trips" label="Sample trips" />
+                </>
               ) : null}
               {role === "dispatch_editor" && batchOperator ? (
                 <>
                   <AppNavLink href="/dispatch/trips" label="Trips & batches" />
+                  <AppNavLink href="/dispatch/sample-orders" label="Sample orders" />
                   <AppNavLink href="/dispatch/po-orders" label="Pending POs" />
                   <AppNavLink href="/dispatch/daily-plan" label="Daily plan" />
                   <AppNavLink href="/dispatch/filling" label="Daily filling" />
                   <AppNavLink href="/dispatch/ready-stock" label="Ready stock" />
                 </>
               ) : null}
-              {role === "packaging_editor" ? (
-                <AppNavLink href="/dispatch/inventory" label="Packaging inventory" />
-              ) : null}
               {role === "chemicals_editor" ? (
                 <AppNavLink href="/chemicals/inventory" label="Chemical materials" />
+              ) : null}
+              {role === "account_opener" ? (
+                <>
+                  <AppNavLink href="/accounts/open" label="Open account" />
+                  <AppNavLink href="/accounts" label="Accounts" />
+                </>
               ) : null}
               {role === "po_creator" ? <AppNavLink href="/new-order" label="New order" /> : null}
               {fieldVisits && !admin ? (

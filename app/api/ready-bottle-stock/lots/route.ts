@@ -3,9 +3,15 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { packingCatalogFromDocs } from "@/lib/catalogFromDb";
 import { connectToDatabase } from "@/lib/db";
-import { ProductionBatch } from "@/lib/models/ProductionBatch";
 import { ProductPacking } from "@/lib/models/ProductPacking";
 import { addBatchLot } from "@/lib/readyBottleLedger";
+import {
+  findProductionBatchForReadyLot,
+  loadReadyLotValidationContext,
+  nimraConsumptionMessage,
+  previousBottlesForReadyLot,
+  validateNimraLinkedReadyLotChange,
+} from "@/lib/readyStockBatchConsumption";
 import { canEditDispatch, roleFromSession } from "@/lib/roles";
 
 function normalizeKey(value: string): string {
@@ -36,17 +42,17 @@ export async function POST(req: Request) {
   }
 
   await connectToDatabase();
-  const [packing, nimraBatch] = await Promise.all([
-    ProductPacking.findOne({ code: productCode, active: true }).lean(),
-    ProductionBatch.findOne({ batchNo }).lean(),
-  ]);
+  const packing = await ProductPacking.findOne({ code: productCode, active: true }).lean();
   if (!packing) return NextResponse.json({ error: "Product not found in catalog." }, { status: 400 });
 
   const catalog = packingCatalogFromDocs([packing]);
   const productName = catalog[0]?.name ?? packing.name;
 
+  const { catalog: fullCatalog, usedMap, usageCatalog } = await loadReadyLotValidationContext();
+  const nimraBatch = await findProductionBatchForReadyLot(batchNo, productName, usageCatalog);
   const nimraLinked = Boolean(nimraBatch);
-  const batchProductName = nimraBatch?.productName?.trim() ?? "";
+  const canonicalBatchNo = nimraBatch?.batchNo ?? batchNo;
+  const batchProductName = nimraBatch?.productName ?? "";
 
   if (!note) {
     note = nimraLinked
@@ -66,8 +72,29 @@ export async function POST(req: Request) {
     }
   }
 
+  let previousBottles = 0;
+  if (nimraLinked && nimraBatch) {
+    previousBottles = await previousBottlesForReadyLot({
+      batchNo: canonicalBatchNo,
+      productCode,
+      bundleSetId,
+    });
+    const validationError = await validateNimraLinkedReadyLotChange({
+      nimraBatch,
+      productName,
+      previousBottles,
+      newBottles: bottles,
+      catalog: fullCatalog,
+      usedMap,
+      usageCatalog,
+    });
+    if (validationError) {
+      return NextResponse.json({ error: validationError }, { status: 400 });
+    }
+  }
+
   const err = await addBatchLot({
-    batchNo,
+    batchNo: canonicalBatchNo,
     productCode,
     productName,
     bottles,
@@ -80,11 +107,24 @@ export async function POST(req: Request) {
   });
   if (err) return NextResponse.json({ error: err }, { status: 400 });
 
+  const consumptionNote =
+    nimraLinked && nimraBatch
+      ? nimraConsumptionMessage({
+          nimraBatch,
+          productName,
+          previousBottles,
+          newBottles: bottles,
+          catalog: fullCatalog,
+        })
+      : null;
+
   return NextResponse.json({
     ok: true,
     nimraLinked,
     message: nimraLinked
-      ? `Ready stock saved and linked to QC batch ${batchNo}.`
-      : `Legacy ready stock saved for batch label "${batchNo}" (not in QC).`,
+      ? consumptionNote
+        ? `Ready stock saved and linked to QC batch ${canonicalBatchNo}. ${consumptionNote}`
+        : `Ready stock saved and linked to QC batch ${canonicalBatchNo}.`
+      : `Legacy ready stock saved for batch label "${canonicalBatchNo}" (not in QC).`,
   });
 }

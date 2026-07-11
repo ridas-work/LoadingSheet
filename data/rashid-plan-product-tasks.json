@@ -81,10 +81,10 @@
   },
   {
     "productCode": "power-wash",
-    "displayName": "Power Wash",
+    "displayName": "Power Wash 500ml",
     "tasks": [
       { "taskCode": "flip-tip", "label": "Flip tip", "packagingItemCode": "power-wash-flip-tip" },
-      { "taskCode": "bottle", "label": "Bottle", "packagingItemCode": "power-wash-bottles" },
+      { "taskCode": "bottle", "label": "500 ml bottle", "packagingItemCode": "power-wash-bottles" },
       { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "power-wash-stickers-front" },
       { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "power-wash-stickers-back" },
       { "taskCode": "ph-sticker", "label": "pH neutral sticker", "packagingItemCode": "ph-stickers-power-wash" },
@@ -96,7 +96,7 @@
   },
   {
     "productCode": "degrease-spray",
-    "displayName": "Degrease Spray",
+    "displayName": "Degrease Spray 750ml",
     "tasks": [
       { "taskCode": "spray", "label": "Spray pump", "packagingItemCode": "degreaser-pumps-750ml" },
       { "taskCode": "bottle", "label": "Degrease bottle", "packagingItemCode": "degreaser-bottles-750ml" },
@@ -156,12 +156,64 @@
       { "taskCode": "seal", "label": "Seal", "packagingItemCode": "wash-out-seal" },
       { "taskCode": "cap", "label": "Cap", "packagingItemCode": "wash-out-caps" },
       { "taskCode": "bottle", "label": "Washout bottle", "packagingItemCode": "wash-out-bottles" },
-      { "taskCode": "label-floral", "label": "Label floral", "packagingItemCode": "wash-out-label-floral" },
-      { "taskCode": "label-ocean", "label": "Label ocean", "packagingItemCode": "wash-out-label-ocean" },
-      { "taskCode": "label-lemon", "label": "Label lemon", "packagingItemCode": "wash-out-label-lemon" },
+      { "taskCode": "label-floral-front", "label": "Floral front label", "packagingItemCode": "wash-out-label-floral-front" },
+      { "taskCode": "label-floral-back", "label": "Floral back label", "packagingItemCode": "wash-out-label-floral-back" },
+      { "taskCode": "label-ocean-front", "label": "Ocean front label", "packagingItemCode": "wash-out-label-ocean-front" },
+      { "taskCode": "label-ocean-back", "label": "Ocean back label", "packagingItemCode": "wash-out-label-ocean-back" },
+      { "taskCode": "label-lemon-front", "label": "Lemon front label", "packagingItemCode": "wash-out-label-lemon-front" },
+      { "taskCode": "label-lemon-back", "label": "Lemon back label", "packagingItemCode": "wash-out-label-lemon-back" },
       { "taskCode": "box", "label": "Box", "packagingItemCode": "wash-out-boxes" },
-      { "taskCode": "partition-big", "label": "Large partition", "packagingItemCode": "wash-out-big-partition" },
-      { "taskCode": "partition-small", "label": "Small partition", "packagingItemCode": "wash-out-small-partition" },
+      { "taskCode": "partition-big", "label": "Large partition", "packagingItemCode": "wash-out-partition-big" },
+      { "taskCode": "filling", "label": "Filling bottles" }
+    ]
+  },
+  {
+    "productCode": "cpl-55ml",
+    "displayName": "Colgate Palmolive Lemon 55ml",
+    "tasks": [
+      { "taskCode": "cap", "label": "Cap", "packagingItemCode": "cpl-cpm-55ml-cap" },
+      { "taskCode": "bottle", "label": "55 ml bottle", "packagingItemCode": "cpl-cpm-55ml-bottle" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "cpl-55ml-label-front" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "cpl-55ml-label-back" },
+      { "taskCode": "small-box", "label": "Small box (×6 per carton)", "packagingItemCode": "cpl-cpm-55ml-small-box" },
+      { "taskCode": "big-box", "label": "Big box", "packagingItemCode": "cpl-cpm-55ml-big-box" },
+      { "taskCode": "filling", "label": "Filling bottles" }
+    ]
+  },
+  {
+    "productCode": "cpl-210ml",
+    "displayName": "Colgate Palmolive Lemon 210ml",
+    "tasks": [
+      { "taskCode": "pump", "label": "Pump", "packagingItemCode": "cpl-cpm-210ml-pump" },
+      { "taskCode": "bottle", "label": "210 ml bottle", "packagingItemCode": "cpl-cpm-210ml-bottle" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "cpl-210ml-label-front" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "cpl-210ml-label-back" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "cpl-cpm-210ml-box" },
+      { "taskCode": "filling", "label": "Filling bottles" }
+    ]
+  },
+  {
+    "productCode": "cpm-55ml",
+    "displayName": "Colgate Palmolive Mint 55ml",
+    "tasks": [
+      { "taskCode": "cap", "label": "Cap", "packagingItemCode": "cpl-cpm-55ml-cap" },
+      { "taskCode": "bottle", "label": "55 ml bottle", "packagingItemCode": "cpl-cpm-55ml-bottle" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "cpm-55ml-label-front" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "cpm-55ml-label-back" },
+      { "taskCode": "small-box", "label": "Small box (×6 per carton)", "packagingItemCode": "cpl-cpm-55ml-small-box" },
+      { "taskCode": "big-box", "label": "Big box", "packagingItemCode": "cpl-cpm-55ml-big-box" },
+      { "taskCode": "filling", "label": "Filling bottles" }
+    ]
+  },
+  {
+    "productCode": "cpm-210ml",
+    "displayName": "Colgate Palmolive Mint 210ml",
+    "tasks": [
+      { "taskCode": "pump", "label": "Pump", "packagingItemCode": "cpl-cpm-210ml-pump" },
+      { "taskCode": "bottle", "label": "210 ml bottle", "packagingItemCode": "cpl-cpm-210ml-bottle" },
+      { "taskCode": "label-front", "label": "Label front", "packagingItemCode": "cpm-210ml-label-front" },
+      { "taskCode": "label-back", "label": "Label back", "packagingItemCode": "cpm-210ml-label-back" },
+      { "taskCode": "box", "label": "Box", "packagingItemCode": "cpl-cpm-210ml-box" },
       { "taskCode": "filling", "label": "Filling bottles" }
     ]
   }
