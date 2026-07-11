@@ -1258,6 +1258,31 @@
     font-weight: 600;
   }
 
+  /* Admin summary (/admin): paginate the wide table across pages cleanly */
+  .admin-summary-print {
+    overflow: visible !important;
+  }
+
+  .admin-summary-print table {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .admin-summary-print thead {
+    display: table-header-group;
+  }
+
+  .admin-summary-print tbody tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .admin-summary-print th,
+  .admin-summary-print td {
+    padding: 2px 3px !important;
+    word-break: break-word;
+  }
+
   @page {
     size: landscape;
     margin: 10mm;

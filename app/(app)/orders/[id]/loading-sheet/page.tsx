@@ -22,7 +22,7 @@ import { roleFromSession, EMPTY_DISPATCH, type DispatchFields } from "@/lib/role
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ dispatch?: string }>;
+  searchParams: Promise<{ dispatch?: string; from?: string }>;
 };
 
 function normalizeSheetLines(order: {
@@ -79,7 +79,7 @@ function normalizeSheetLines(order: {
 
 export default async function LoadingSheetPage(props: PageProps) {
   const { id } = await props.params;
-  const { dispatch: dispatchParam } = await props.searchParams;
+  const { dispatch: dispatchParam, from: fromParam } = await props.searchParams;
 
   if (!mongoose.Types.ObjectId.isValid(id)) notFound();
 
@@ -154,7 +154,12 @@ export default async function LoadingSheetPage(props: PageProps) {
     catalogDeduction,
   );
   const created = order.createdAt ? formatDisplayDate(order.createdAt) : "";
-  const backHref = role === "batch_editor" ? "/production/batches" : "/orders";
+  const backHref =
+    fromParam === "admin"
+      ? "/admin"
+      : role === "batch_editor"
+        ? "/production/batches"
+        : "/orders";
 
   const rawDispatch = (order as { dispatch?: Partial<DispatchFields> }).dispatch;
   const initialDispatch: DispatchFields = {

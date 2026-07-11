@@ -129,7 +129,7 @@ export function AdminSummaryDashboard() {
       <div className={`${ui.pageHeader} print:hidden`}>
         <h1 className={ui.pageTitle}>Pending orders</h1>
         <p className={ui.pageDesc}>
-          Report date: {data.reportDate}
+          Report date: {data.reportDate} · Product columns show bottles
           {data.pendingApprovalCount > 0 ? (
             <>
               {" "}
@@ -209,7 +209,12 @@ export function AdminSummaryDashboard() {
         </TrackedPrintButton>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="hidden print:block">
+        <h1 className="text-base font-bold">Pending orders — {data.reportDate}</h1>
+        <p className="text-[10px] text-zinc-600">Product columns show bottles.</p>
+      </div>
+
+      <div className="admin-summary-print overflow-x-auto">
         <table className="w-full min-w-[960px] border-collapse border border-zinc-300 text-xs print:text-[10px]">
           <thead>
             <tr className="bg-zinc-100">
@@ -245,7 +250,7 @@ export function AdminSummaryDashboard() {
                     <td className="border border-zinc-300 px-2 py-1 font-medium">{row.deadlineDisplay || "—"}</td>
                     <td className="border border-zinc-300 px-2 py-1">{row.statusLabel}</td>
                     <td className="border border-zinc-300 px-2 py-1">
-                      <Link href={`/orders/${row.orderId}/loading-sheet`} className="underline">
+                      <Link href={`/orders/${row.orderId}/loading-sheet?from=admin`} className="underline">
                         {row.poNumber}
                       </Link>
                     </td>

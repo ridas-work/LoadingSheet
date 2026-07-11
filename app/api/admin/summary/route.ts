@@ -26,7 +26,7 @@ export async function GET(req: Request) {
 
   const [catalogDocs, orders] = await Promise.all([
     ProductPacking.find({ active: true })
-      .select({ code: 1, name: 1, summaryLabel: 1, aliases: 1 })
+      .select({ code: 1, name: 1, summaryLabel: 1, aliases: 1, bottlesPerCarton: 1 })
       .lean(),
     Order.find(notDiscardedOrdersMongoFilter())
       .sort({ createdAt: -1 })
@@ -54,6 +54,7 @@ export async function GET(req: Request) {
     name: p.name,
     summaryLabel: p.summaryLabel ?? "",
     aliases: p.aliases ?? [],
+    bottlesPerCarton: p.bottlesPerCarton ?? 1,
   }));
 
   const summary = buildAdminOrderSummary(

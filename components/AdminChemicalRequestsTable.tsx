@@ -7,6 +7,7 @@ import type {
   SerializedChemicalMaterial,
   SerializedChemicalRequest,
 } from "@/lib/chemicalMaterials";
+import { formatDisplayDate } from "@/lib/dateOnly";
 import { ui } from "@/lib/ui";
 
 function fmt(n: number) {
@@ -157,6 +158,7 @@ export function AdminChemicalRequestsTable() {
             <thead>
               <tr className="bg-zinc-50 text-left text-xs font-semibold uppercase text-zinc-600">
                 <th className="border-b px-3 py-2">Material</th>
+                <th className="border-b px-3 py-2">Date</th>
                 <th className="border-b px-3 py-2 text-right">Requested</th>
                 <th className="border-b px-3 py-2 text-right">Stock now</th>
                 <th className="border-b px-3 py-2 text-right">Stock at request</th>
@@ -205,6 +207,9 @@ export function AdminChemicalRequestsTable() {
                             .join("; ")}
                         </div>
                       ) : null}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap text-zinc-700">
+                      {r.createdAt ? formatDisplayDate(r.createdAt) : "—"}
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums">
                       {fmt(r.quantityRequested)} {r.unit}

@@ -113,7 +113,15 @@ function accumulateOrderCells(
     const boxes = Number(item.boxes) || 0;
     if (!name || boxes <= 0) continue;
     const code = resolveCatalogCode(name, catalog);
-    if (code) addCell(cells, code, boxes);
+    if (!code) continue;
+    const catalogBpc = catalog.find((p) => p.code === code)?.bottlesPerCarton;
+    const bottlesPerBox =
+      Number(item.bottlesPerBox) >= 1
+        ? Number(item.bottlesPerBox)
+        : catalogBpc && catalogBpc >= 1
+          ? catalogBpc
+          : 1;
+    addCell(cells, code, boxes * bottlesPerBox);
   }
 
   for (const carton of order.customCartons ?? []) {
