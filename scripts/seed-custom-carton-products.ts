@@ -24,6 +24,7 @@ async function main() {
     if (!("error" in result)) upserted += 1;
   }
   console.log(`Seeded ${upserted} custom-carton products.`);
+  process.exit(0);
 }
 
 main().catch((err) => {

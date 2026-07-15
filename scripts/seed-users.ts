@@ -87,6 +87,7 @@ async function main() {
 
   console.log(`Seeded ${users.length} users.`);
   await User.db.close();
+  process.exit(0);
 }
 
 main().catch((err) => {

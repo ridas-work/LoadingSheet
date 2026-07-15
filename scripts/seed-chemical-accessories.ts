@@ -48,6 +48,7 @@ async function main() {
   }
 
   await ChemicalRawMaterial.db.close();
+  process.exit(0);
 }
 
 main().catch((err) => {

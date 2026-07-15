@@ -91,6 +91,7 @@ async function main() {
 
   // eslint-disable-next-line no-console
   console.log(`Upserted ${n} product packing(s).`);
+  process.exit(0);
 }
 
 main().catch((err) => {
