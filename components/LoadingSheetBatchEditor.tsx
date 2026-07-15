@@ -10,7 +10,7 @@ import { PrintCartonLabelsButton } from "@/components/PrintCartonLabelsButton";
 import {
   augmentPoolWithReadyBatches,
   batchPickerOptionsForComponent,
-  buildSelectableBatchPickerOptions,
+  buildStaticBatchPickerOptions,
   type BatchPickerOption,
   type ReadyLotLike,
 } from "@/lib/readyBatchPool";
@@ -26,9 +26,7 @@ import {
 } from "@/lib/batchVolume";
 import {
   isBundleProduct,
-  lineLitersForProduct,
   resolveBundleParts,
-  usageLitersByBatchFromSheetLines,
   validateSheetBatchAllocations,
   componentBatchStateKey,
   type ComponentBatch,
@@ -47,7 +45,6 @@ import {
   formatKg,
   lookupStandardCartonWeight,
   validateAllSheetCartonWeights,
-  validateSheetLineCartonWeight,
 } from "@/lib/standardCartonWeight";
 
 export type LoadingSheetLine = {
@@ -337,17 +334,6 @@ export function LoadingSheetBatchEditor({
     [batches, catalog, componentBatches, sheetLines],
   );
 
-  const currentOrderUsedByBatch = useMemo(
-    () => usageLitersByBatchFromSheetLines(workingLines, catalog),
-    [catalog, workingLines],
-  );
-
-  const workingLinesByBox = useMemo(() => {
-    const map = new Map<number, (typeof workingLines)[number]>();
-    for (const line of workingLines) map.set(line.boxNo, line);
-    return map;
-  }, [workingLines]);
-
   const optionsByProduct = useMemo(() => {
     const map = new Map<string, BatchPickerOption[]>();
     for (const line of sheetLines) {
@@ -370,6 +356,14 @@ export function LoadingSheetBatchEditor({
     }
     return map;
   }, [augmentedProductionBatches, catalog, readyBatchLots, sheetLines]);
+
+  const staticOptionsByProduct = useMemo(() => {
+    const map = new Map<string, Array<{ batchNo: string; label: string }>>();
+    for (const [name, options] of optionsByProduct) {
+      map.set(name, buildStaticBatchPickerOptions(options));
+    }
+    return map;
+  }, [optionsByProduct]);
 
   const validation = useMemo(() => {
     const batchResult = validateSheetBatchAllocations(workingLines, effectiveBatchDefs, catalog);
@@ -734,21 +728,6 @@ export function LoadingSheetBatchEditor({
                   catalog,
                 );
                 const cartonWeightRaw = cartonWeights[row.boxNo] ?? "";
-                const cartonWeightTrimmed = cartonWeightRaw.trim();
-                const cartonWeightNum = cartonWeightTrimmed ? Number(cartonWeightTrimmed) : null;
-                let cartonWeightError: string | null = null;
-                if (showWeightInputs && cartonWeightTrimmed) {
-                  if (
-                    cartonWeightNum == null ||
-                    !Number.isFinite(cartonWeightNum) ||
-                    cartonWeightNum <= 0
-                  ) {
-                    cartonWeightError = "Enter a valid weight in kg.";
-                  } else {
-                    const check = validateSheetLineCartonWeight(row, catalog, cartonWeightNum);
-                    if (!check.ok) cartonWeightError = check.error;
-                  }
-                }
                 const displayCartonKg =
                   row.cartonWeightKg != null && !showWeightInputs
                     ? formatKg(row.cartonWeightKg)
@@ -777,9 +756,8 @@ export function LoadingSheetBatchEditor({
                             parts.map((part, index) => {
                               const stateKey = componentBatchStateKey(parts, index);
                               const compSplit = lineSplit?.components?.[index];
-                              const options = optionsByProduct.get(part.productName) ?? [];
+                              const options = staticOptionsByProduct.get(part.productName) ?? [];
                               const value = componentBatches[row.boxNo]?.[stateKey] ?? "";
-                              const workingLine = workingLinesByBox.get(row.boxNo);
                               return (
                                 <div key={stateKey} className="text-left">
                                   <div className="text-[10px] font-medium text-zinc-600 print:hidden">
@@ -807,17 +785,7 @@ export function LoadingSheetBatchEditor({
                                     className="w-full min-w-[5rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
                                   >
                                     <option value="">— assign batch</option>
-                                    {buildSelectableBatchPickerOptions({
-                                      productName: part.productName,
-                                      options,
-                                      catalog,
-                                      usedElsewhereMap,
-                                      usedOnSheetMap: currentOrderUsedByBatch,
-                                      litersNeeded: workingLine
-                                        ? lineLitersForProduct(workingLine, part.productName, catalog)
-                                        : 0,
-                                      selectedBatchNo: value,
-                                    }).map((option) => (
+                                    {options.map((option) => (
                                       <option key={option.batchNo} value={option.batchNo}>
                                         {option.label}
                                       </option>
@@ -844,20 +812,7 @@ export function LoadingSheetBatchEditor({
                                 className="w-full min-w-[5rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
                               >
                                 <option value="">— assign batch</option>
-                                {buildSelectableBatchPickerOptions({
-                                  productName: row.productName,
-                                  options: optionsByProduct.get(row.productName) ?? [],
-                                  catalog,
-                                  usedElsewhereMap,
-                                  usedOnSheetMap: currentOrderUsedByBatch,
-                                  litersNeeded: (() => {
-                                    const workingLine = workingLinesByBox.get(row.boxNo);
-                                    return workingLine
-                                      ? lineLitersForProduct(workingLine, row.productName, catalog)
-                                      : 0;
-                                  })(),
-                                  selectedBatchNo: batches[row.boxNo] ?? "",
-                                }).map((option) => (
+                                {(staticOptionsByProduct.get(row.productName) ?? []).map((option) => (
                                   <option key={option.batchNo} value={option.batchNo}>
                                     {option.label}
                                   </option>
@@ -877,7 +832,7 @@ export function LoadingSheetBatchEditor({
                           <CartonWeightInput
                             value={cartonWeightRaw}
                             placeholder={standardKg != null ? String(standardKg) : ""}
-                            error={cartonWeightError}
+                            standardKg={standardKg}
                             onValueChange={(next) => {
                               setSaved(false);
                               setError(null);
@@ -886,9 +841,8 @@ export function LoadingSheetBatchEditor({
                                 [row.boxNo]: next,
                               }));
                             }}
-                            className={`w-full min-w-[4rem] rounded border px-1 py-0.5 text-center text-sm ${
-                              cartonWeightError ? "border-red-400" : "border-zinc-300"
-                            }`}
+                            className="w-full min-w-[4rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm"
+                            errorClassName="w-full min-w-[4rem] rounded border border-red-400 px-1 py-0.5 text-center text-sm"
                           />
                         </div>
                       ) : (

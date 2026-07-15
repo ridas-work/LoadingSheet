@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { CartonWeightInput } from "@/components/CartonWeightInput";
@@ -10,20 +10,16 @@ import type { CombinedTripOrder } from "@/components/CombinedTripLoadingSheet";
 import {
   componentBatchStateKey,
   isBundleProduct,
-  lineLitersForProduct,
   resolveBundleParts,
   resolveComponentBatchAtIndex,
-  usageLitersByBatchFromSheetLines,
   type PackingCatalogRow,
-  type SheetLineLike,
 } from "@/lib/bundleCatalog";
 import { type ProductionBatchPoolItem } from "@/lib/batchVolume";
 import { isMixedSampleLine, resolveMixedSampleParts } from "@/lib/mixedSampleBox";
 import {
   augmentPoolWithReadyBatches,
   batchPickerOptionsForComponent,
-  buildSelectableBatchPickerOptions,
-  type BatchPickerOption,
+  buildStaticBatchPickerOptions,
   type ReadyLotLike,
 } from "@/lib/readyBatchPool";
 import {
@@ -54,6 +50,8 @@ type LineModel = {
   parts: Array<{ productName: string; bottlesPerUnit: number; litersPerBottle: number }>;
   standardKg: number | null;
 };
+
+type SelectOption = { batchNo: string; label: string };
 
 function lineHasComponentBatches(
   line: CombinedTripOrder["lines"][number],
@@ -134,69 +132,12 @@ function buildCartonWeightState(orders: CombinedTripOrder[]): Record<string, str
   return initial;
 }
 
-function buildTripWorkingLinesByKey(
-  orders: CombinedTripOrder[],
-  batches: Record<string, string>,
-  componentBatches: Record<string, Record<string, string>>,
-  catalog: PackingCatalogRow[],
-): Map<string, SheetLineLike> {
-  const byKey = new Map<string, SheetLineLike>();
-  for (const order of orders) {
-    for (const line of order.lines) {
-      const lineKey = orderLineStateKey(order.id, line.boxNo);
-      if (lineHasComponentBatches(line, catalog)) {
-        const parts = resolveLineParts(line, catalog);
-        byKey.set(lineKey, {
-          boxNo: line.boxNo,
-          productName: line.productName,
-          bottlesPerBox: line.bottlesPerBox,
-          lineKind: line.lineKind,
-          mixedContents: line.mixedContents,
-          batchNo: "",
-          componentBatches: parts.map((part, index) => ({
-            productName: part.productName,
-            batchNo: componentBatches[lineKey]?.[componentBatchStateKey(parts, index)] ?? "",
-          })),
-        });
-      } else {
-        byKey.set(lineKey, {
-          boxNo: line.boxNo,
-          productName: line.productName,
-          bottlesPerBox: line.bottlesPerBox,
-          lineKind: line.lineKind,
-          mixedContents: line.mixedContents,
-          batchNo: batches[lineKey] ?? "",
-          componentBatches: [],
-        });
-      }
-    }
-  }
-  return byKey;
-}
-
-function cartonWeightErrorFor(
-  line: CombinedTripOrder["lines"][number],
-  catalog: PackingCatalogRow[],
-  raw: string,
-): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const num = Number(trimmed);
-  if (!Number.isFinite(num) || num <= 0) return "Enter a valid weight in kg.";
-  const check = validateSheetLineCartonWeight(line, catalog, num);
-  return check.ok ? null : check.error;
-}
-
 type AssignmentRowProps = {
   model: LineModel;
-  catalog: PackingCatalogRow[];
   batchValue: string;
   componentBatchMap: Record<string, string> | undefined;
   cartonWeight: string;
-  workingLine: SheetLineLike | undefined;
-  optionsByProduct: Map<string, BatchPickerOption[]>;
-  usedElsewhereMap: Map<string, number>;
-  usedOnTripMap: Map<string, number>;
+  staticOptionsByProduct: Map<string, SelectOption[]>;
   onBatchChange: (lineKey: string, value: string) => void;
   onComponentBatchChange: (lineKey: string, stateKey: string, value: string) => void;
   onWeightChange: (lineKey: string, value: string) => void;
@@ -204,20 +145,15 @@ type AssignmentRowProps = {
 
 const TripBatchAssignmentRow = memo(function TripBatchAssignmentRow({
   model,
-  catalog,
   batchValue,
   componentBatchMap,
   cartonWeight,
-  workingLine,
-  optionsByProduct,
-  usedElsewhereMap,
-  usedOnTripMap,
+  staticOptionsByProduct,
   onBatchChange,
   onComponentBatchChange,
   onWeightChange,
 }: AssignmentRowProps) {
   const { line, lineKey, multiBatch, parts, standardKg, poNumber, challanNo } = model;
-  const cartonWeightError = cartonWeightErrorFor(line, catalog, cartonWeight);
 
   return (
     <tr>
@@ -240,8 +176,8 @@ const TripBatchAssignmentRow = memo(function TripBatchAssignmentRow({
           <div className="space-y-1">
             {parts.map((part, index) => {
               const stateKey = componentBatchStateKey(parts, index);
-              const options = optionsByProduct.get(part.productName) ?? [];
               const selectedBatchNo = componentBatchMap?.[stateKey] ?? "";
+              const options = staticOptionsByProduct.get(part.productName) ?? [];
               return (
                 <div key={stateKey} className="text-left">
                   <div className="text-[10px] font-medium text-zinc-600 print:hidden">
@@ -253,17 +189,7 @@ const TripBatchAssignmentRow = memo(function TripBatchAssignmentRow({
                     className="w-full min-w-[7rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
                   >
                     <option value="">— assign batch</option>
-                    {buildSelectableBatchPickerOptions({
-                      productName: part.productName,
-                      options,
-                      catalog,
-                      usedElsewhereMap,
-                      usedOnSheetMap: usedOnTripMap,
-                      litersNeeded: workingLine
-                        ? lineLitersForProduct(workingLine, part.productName, catalog)
-                        : 0,
-                      selectedBatchNo,
-                    }).map((option) => (
+                    {options.map((option) => (
                       <option key={option.batchNo} value={option.batchNo}>
                         {option.label}
                       </option>
@@ -284,17 +210,7 @@ const TripBatchAssignmentRow = memo(function TripBatchAssignmentRow({
               className="w-full min-w-[7rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
             >
               <option value="">— assign batch</option>
-              {buildSelectableBatchPickerOptions({
-                productName: line.productName,
-                options: optionsByProduct.get(line.productName) ?? [],
-                catalog,
-                usedElsewhereMap,
-                usedOnSheetMap: usedOnTripMap,
-                litersNeeded: workingLine
-                  ? lineLitersForProduct(workingLine, line.productName, catalog)
-                  : 0,
-                selectedBatchNo: batchValue,
-              }).map((option) => (
+              {(staticOptionsByProduct.get(line.productName) ?? []).map((option) => (
                 <option key={option.batchNo} value={option.batchNo}>
                   {option.label}
                 </option>
@@ -308,11 +224,10 @@ const TripBatchAssignmentRow = memo(function TripBatchAssignmentRow({
         <CartonWeightInput
           value={cartonWeight}
           placeholder={standardKg != null ? String(standardKg) : ""}
-          error={cartonWeightError}
+          standardKg={standardKg}
           onValueChange={(next) => onWeightChange(lineKey, next)}
-          className={`w-full min-w-[4rem] rounded border px-1 py-0.5 text-center text-sm print:hidden ${
-            cartonWeightError ? "border-red-500" : "border-zinc-300"
-          }`}
+          className="w-full min-w-[4rem] rounded border border-zinc-300 px-1 py-0.5 text-center text-sm print:hidden"
+          errorClassName="w-full min-w-[4rem] rounded border border-red-500 px-1 py-0.5 text-center text-sm print:hidden"
         />
         <span className="hidden print:inline">{cartonWeight}</span>
       </td>
@@ -331,9 +246,9 @@ export function TripBatchAssignmentSheet({
   catalog,
   productionBatches,
   readyBatchLots,
-  usedLitersElsewhere = {},
 }: Props) {
   const router = useRouter();
+  const [, startTransition] = useTransition();
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -344,6 +259,8 @@ export function TripBatchAssignmentSheet({
   const [cartonWeights, setCartonWeights] = useState<Record<string, string>>(() =>
     buildCartonWeightState(orders),
   );
+  const cartonWeightsRef = useRef(cartonWeights);
+  cartonWeightsRef.current = cartonWeights;
 
   const ordersSnapshot = useMemo(
     () =>
@@ -392,11 +309,6 @@ export function TripBatchAssignmentSheet({
     [tripId, vehicleNo, poList, tripDate],
   );
 
-  const usedElsewhereMap = useMemo(
-    () => new Map(Object.entries(usedLitersElsewhere)),
-    [usedLitersElsewhere],
-  );
-
   const augmentedProductionBatches = useMemo(
     () => augmentPoolWithReadyBatches(productionBatches, readyBatchLots, catalog),
     [catalog, productionBatches, readyBatchLots],
@@ -423,8 +335,8 @@ export function TripBatchAssignmentSheet({
     return models;
   }, [catalog, orders]);
 
-  const optionsByProduct = useMemo(() => {
-    const map = new Map<string, BatchPickerOption[]>();
+  const staticOptionsByProduct = useMemo(() => {
+    const map = new Map<string, SelectOption[]>();
     for (const model of lineModels) {
       const names = model.multiBatch
         ? model.parts.map((part) => part.productName)
@@ -433,7 +345,9 @@ export function TripBatchAssignmentSheet({
         if (!map.has(name)) {
           map.set(
             name,
-            batchPickerOptionsForComponent(name, augmentedProductionBatches, readyBatchLots, catalog),
+            buildStaticBatchPickerOptions(
+              batchPickerOptionsForComponent(name, augmentedProductionBatches, readyBatchLots, catalog),
+            ),
           );
         }
       }
@@ -441,32 +355,30 @@ export function TripBatchAssignmentSheet({
     return map;
   }, [augmentedProductionBatches, catalog, lineModels, readyBatchLots]);
 
-  const workingLinesByKey = useMemo(
-    () => buildTripWorkingLinesByKey(orders, batches, componentBatches, catalog),
-    [batches, catalog, componentBatches, orders],
-  );
-
-  const usedOnTripMap = useMemo(() => {
-    const lines = [...workingLinesByKey.values()];
-    return usageLitersByBatchFromSheetLines(lines, catalog);
-  }, [catalog, workingLinesByKey]);
-
   const onBatchChange = useCallback((lineKey: string, value: string) => {
-    setBatches((prev) => ({ ...prev, [lineKey]: value }));
+    startTransition(() => {
+      setBatches((prev) => ({ ...prev, [lineKey]: value }));
+    });
   }, []);
 
   const onComponentBatchChange = useCallback((lineKey: string, stateKey: string, value: string) => {
-    setComponentBatches((prev) => ({
-      ...prev,
-      [lineKey]: {
-        ...(prev[lineKey] ?? {}),
-        [stateKey]: value,
-      },
-    }));
+    startTransition(() => {
+      setComponentBatches((prev) => ({
+        ...prev,
+        [lineKey]: {
+          ...(prev[lineKey] ?? {}),
+          [stateKey]: value,
+        },
+      }));
+    });
   }, []);
 
   const onWeightChange = useCallback((lineKey: string, value: string) => {
-    setCartonWeights((prev) => ({ ...prev, [lineKey]: value }));
+    setCartonWeights((prev) => {
+      const next = { ...prev, [lineKey]: value };
+      cartonWeightsRef.current = next;
+      return next;
+    });
   }, []);
 
   const modelsByOrder = useMemo(() => {
@@ -481,6 +393,13 @@ export function TripBatchAssignmentSheet({
   }, [lineModels, orders]);
 
   const saveProgress = async () => {
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => resolve());
+    });
+
+    const latestWeights = cartonWeightsRef.current;
+
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -510,7 +429,7 @@ export function TripBatchAssignmentSheet({
     const weights = orders.flatMap((order) =>
       order.lines
         .map((line) => {
-          const raw = cartonWeights[orderLineStateKey(order.id, line.boxNo)]?.trim();
+          const raw = latestWeights[orderLineStateKey(order.id, line.boxNo)]?.trim();
           const kg = raw ? Number(raw) : null;
           return kg != null && Number.isFinite(kg) && kg > 0
             ? { orderId: order.id, boxNo: line.boxNo, cartonWeightKg: kg }
@@ -522,7 +441,7 @@ export function TripBatchAssignmentSheet({
     for (const order of orders) {
       const orderWeightByBox = new Map<number, number>();
       for (const line of order.lines) {
-        const raw = cartonWeights[orderLineStateKey(order.id, line.boxNo)]?.trim();
+        const raw = latestWeights[orderLineStateKey(order.id, line.boxNo)]?.trim();
         if (!raw) continue;
         const kg = Number(raw);
         if (Number.isFinite(kg) && kg > 0) orderWeightByBox.set(line.boxNo, kg);
@@ -636,14 +555,10 @@ export function TripBatchAssignmentSheet({
                       <TripBatchAssignmentRow
                         key={model.lineKey}
                         model={model}
-                        catalog={catalog}
                         batchValue={batches[model.lineKey] ?? ""}
                         componentBatchMap={componentBatches[model.lineKey]}
                         cartonWeight={cartonWeights[model.lineKey] ?? ""}
-                        workingLine={workingLinesByKey.get(model.lineKey)}
-                        optionsByProduct={optionsByProduct}
-                        usedElsewhereMap={usedElsewhereMap}
-                        usedOnTripMap={usedOnTripMap}
+                        staticOptionsByProduct={staticOptionsByProduct}
                         onBatchChange={onBatchChange}
                         onComponentBatchChange={onComponentBatchChange}
                         onWeightChange={onWeightChange}

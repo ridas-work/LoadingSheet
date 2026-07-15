@@ -1,30 +1,34 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { validateCartonWeight } from "@/lib/standardCartonWeight";
 
 type Props = {
   value: string;
   placeholder?: string;
-  error?: string | null;
+  /** When set, validate draft locally without involving the parent sheet. */
+  standardKg?: number | null;
   className?: string;
+  errorClassName?: string;
   onValueChange: (value: string) => void;
 };
 
 /**
- * Keeps keystrokes local so parent sheet re-renders (and batch dropdown rebuilds)
- * only flush after blur or a short debounce — avoids freezing large Rashid sheets.
+ * Weight typing stays fully local. Parent (and the large batch table) only updates on blur,
+ * so backspace/typing never freezes Rashid's multi-PO trip sheet.
  */
 export function CartonWeightInput({
   value,
   placeholder,
-  error,
+  standardKg = null,
   className,
+  errorClassName,
   onValueChange,
 }: Props) {
   const [draft, setDraft] = useState(value);
   const draftRef = useRef(draft);
   const valueRef = useRef(value);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (value !== valueRef.current) {
@@ -34,21 +38,15 @@ export function CartonWeightInput({
     }
   }, [value]);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
-
-  const flush = (next: string) => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    if (next === valueRef.current) return;
-    valueRef.current = next;
-    onValueChange(next);
-  };
+  const error = useMemo(() => {
+    const trimmed = draft.trim();
+    if (!trimmed) return null;
+    const num = Number(trimmed);
+    if (!Number.isFinite(num) || num <= 0) return "Enter a valid weight in kg.";
+    if (standardKg == null) return null;
+    const check = validateCartonWeight(num, standardKg);
+    return check.ok ? null : check.error;
+  }, [draft, standardKg]);
 
   return (
     <div className="space-y-0.5">
@@ -61,11 +59,14 @@ export function CartonWeightInput({
           const next = e.target.value;
           draftRef.current = next;
           setDraft(next);
-          if (timerRef.current) clearTimeout(timerRef.current);
-          timerRef.current = setTimeout(() => flush(next), 200);
         }}
-        onBlur={() => flush(draftRef.current)}
-        className={className}
+        onBlur={() => {
+          const next = draftRef.current;
+          if (next === valueRef.current) return;
+          valueRef.current = next;
+          onValueChange(next);
+        }}
+        className={error && errorClassName ? errorClassName : className}
       />
       {error ? <p className="text-[10px] text-red-700 print:hidden">{error}</p> : null}
     </div>

@@ -174,6 +174,24 @@ export function formatBatchPickerOptionLabel(
   return `${option.batchNo} (${formatLiters(remainingLiters)} L left)`;
 }
 
+/** Stable labels for large trip sheets — avoids rebuilding remaining-L on every keystroke. */
+export function formatStaticBatchPickerOptionLabel(option: BatchPickerOption): string {
+  if (option.readyBottles > 0) {
+    const tail = option.fromReadyOnly ? "" : `, ${formatLiters(option.totalLiters)} L lot`;
+    return `${option.batchNo} (${option.readyBottles} ready${tail})`;
+  }
+  return `${option.batchNo} (${formatLiters(option.totalLiters)} L lot)`;
+}
+
+export function buildStaticBatchPickerOptions(
+  options: BatchPickerOption[],
+): Array<{ batchNo: string; label: string }> {
+  return options.map((option) => ({
+    batchNo: option.batchNo,
+    label: formatStaticBatchPickerOptionLabel(option),
+  }));
+}
+
 export function isBatchPickerOptionSelectable(
   remainingLiters: number,
   litersNeeded: number,
