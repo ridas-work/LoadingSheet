@@ -1,5 +1,6 @@
 import {
   batchUsageKey,
+  catalogProductKey,
   formatLiters,
   inferLitersPerBottleFromName,
   normalizeBatchNo,
@@ -16,6 +17,71 @@ export type ReadyLotLike = {
   bottles: number;
   batchProductName?: string;
 };
+
+function normName(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function productIndexKeys(name: string, catalog: PackingCatalogRow[]): string[] {
+  const keys = new Set<string>();
+  const trimmed = name.trim();
+  if (!trimmed) return [];
+  const catalogKey = catalogProductKey(trimmed, catalog);
+  if (catalogKey) keys.add(catalogKey);
+  keys.add(normName(trimmed));
+  return [...keys];
+}
+
+function pushIndexed<T>(map: Map<string, T[]>, keys: string[], value: T) {
+  for (const key of keys) {
+    const list = map.get(key);
+    if (list) list.push(value);
+    else map.set(key, [value]);
+  }
+}
+
+function collectIndexed<T>(map: Map<string, T[]>, keys: string[]): T[] {
+  if (keys.length === 0) return [];
+  const seen = new Set<T>();
+  const out: T[] = [];
+  for (const key of keys) {
+    for (const item of map.get(key) ?? []) {
+      if (seen.has(item)) continue;
+      seen.add(item);
+      out.push(item);
+    }
+  }
+  return out;
+}
+
+export type BatchPickerLookupIndex = {
+  poolByProductKey: Map<string, ProductionBatchPoolItem[]>;
+  lotsByProductKey: Map<string, ReadyLotLike[]>;
+};
+
+/** Build once per page load — O(pool + lots), then each product lookup is O(matches). */
+export function buildBatchPickerLookupIndex(
+  productionPool: ProductionBatchPoolItem[],
+  lots: ReadyLotLike[],
+  catalog: PackingCatalogRow[],
+): BatchPickerLookupIndex {
+  const poolByProductKey = new Map<string, ProductionBatchPoolItem[]>();
+  for (const batch of productionPool) {
+    pushIndexed(poolByProductKey, productIndexKeys(batch.productName, catalog), batch);
+  }
+
+  const lotsByProductKey = new Map<string, ReadyLotLike[]>();
+  for (const lot of lots) {
+    const keys = new Set<string>(productIndexKeys(lot.productName, catalog));
+    const packing = findPackingByName(lot.productName, catalog);
+    const lotFamily =
+      packing?.batchFamily?.trim() || lot.batchProductName?.trim() || "";
+    for (const key of productIndexKeys(lotFamily, catalog)) keys.add(key);
+    pushIndexed(lotsByProductKey, [...keys], lot);
+  }
+
+  return { poolByProductKey, lotsByProductKey };
+}
 
 export function batchFamilyForLineName(name: string, catalog: PackingCatalogRow[]): string | null {
   const trimmed = name.trim();
@@ -105,17 +171,30 @@ export type BatchPickerOption = {
   fromReadyOnly: boolean;
 };
 
-export function batchPickerOptionsForComponent(
+function lookupKeysForComponent(
   componentName: string,
-  productionPool: ProductionBatchPoolItem[],
-  lots: ReadyLotLike[],
   catalog: PackingCatalogRow[],
-): BatchPickerOption[] {
+): { family: string; keys: string[] } {
   const family = batchFamilyForLineName(componentName, catalog) || componentName.trim();
-  const fromProduction = productionPool.filter((pb) => productsMatch(pb.productName, family, catalog));
+  const keys = new Set<string>([
+    ...productIndexKeys(componentName, catalog),
+    ...productIndexKeys(family, catalog),
+  ]);
+  return { family, keys: [...keys] };
+}
+
+function batchPickerOptionsFromIndex(
+  componentName: string,
+  catalog: PackingCatalogRow[],
+  index: BatchPickerLookupIndex,
+): BatchPickerOption[] {
+  const { family, keys } = lookupKeysForComponent(componentName, catalog);
+  const fromProduction = collectIndexed(index.poolByProductKey, keys).filter((pb) =>
+    productsMatch(pb.productName, family, catalog),
+  );
 
   const readyByBatch = new Map<string, number>();
-  for (const lot of lots) {
+  for (const lot of collectIndexed(index.lotsByProductKey, keys)) {
     if (!lotMatchesComponent(lot, componentName, catalog)) continue;
     const bn = normalizeBatchNo(lot.batchNo);
     if (!bn) continue;
@@ -136,21 +215,50 @@ export function batchPickerOptionsForComponent(
     readyByBatch.delete(bn);
   }
 
-  for (const [batchNo, readyBottles] of readyByBatch) {
+  if (readyByBatch.size > 0) {
     const packing = findPackingByName(componentName, catalog);
     const lp = packing
       ? inferLitersPerBottleFromName(packing.name, packing.litersPerBottle)
       : inferLitersPerBottleFromName(componentName);
-    byBatch.set(batchNo, {
-      batchNo,
-      productName: family,
-      totalLiters: roundLiters(readyBottles * lp),
-      readyBottles,
-      fromReadyOnly: true,
-    });
+    for (const [batchNo, readyBottles] of readyByBatch) {
+      byBatch.set(batchNo, {
+        batchNo,
+        productName: family,
+        totalLiters: roundLiters(readyBottles * lp),
+        readyBottles,
+        fromReadyOnly: true,
+      });
+    }
   }
 
   return [...byBatch.values()].sort((a, b) => b.batchNo.localeCompare(a.batchNo));
+}
+
+export function batchPickerOptionsForComponent(
+  componentName: string,
+  productionPool: ProductionBatchPoolItem[],
+  lots: ReadyLotLike[],
+  catalog: PackingCatalogRow[],
+  index?: BatchPickerLookupIndex,
+): BatchPickerOption[] {
+  const lookup = index ?? buildBatchPickerLookupIndex(productionPool, lots, catalog);
+  return batchPickerOptionsFromIndex(componentName, catalog, lookup);
+}
+
+/** Build picker options for many products with a single index pass. */
+export function buildBatchPickerOptionsByProduct(
+  productNames: Iterable<string>,
+  productionPool: ProductionBatchPoolItem[],
+  lots: ReadyLotLike[],
+  catalog: PackingCatalogRow[],
+): Map<string, BatchPickerOption[]> {
+  const index = buildBatchPickerLookupIndex(productionPool, lots, catalog);
+  const map = new Map<string, BatchPickerOption[]>();
+  for (const name of productNames) {
+    if (!name || map.has(name)) continue;
+    map.set(name, batchPickerOptionsFromIndex(name, catalog, index));
+  }
+  return map;
 }
 
 export function remainingLitersForPickerOption(args: {

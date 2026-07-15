@@ -105,7 +105,7 @@ export function familyKeyForLineName(name: string, catalog: PackingMatchRow[]): 
     return "rhino";
   }
 
-  const byFamily = catalog.find((p) => key(p.batchFamily) === key(trimmed));
+  const byFamily = packingByExactKey(catalog).get(key(trimmed));
   if (byFamily?.batchFamily?.trim()) {
     return byFamily.batchFamily.trim().toLowerCase();
   }
@@ -113,7 +113,29 @@ export function familyKeyForLineName(name: string, catalog: PackingMatchRow[]): 
   return null;
 }
 
-export function findPackingForLineName(
+const packingByExactKeyCache = new WeakMap<object, Map<string, PackingMatchRow>>();
+const packingByNameResultCache = new WeakMap<object, Map<string, PackingMatchRow | null>>();
+
+function packingByExactKey(catalog: PackingMatchRow[]): Map<string, PackingMatchRow> {
+  let map = packingByExactKeyCache.get(catalog);
+  if (map) return map;
+
+  map = new Map();
+  for (const packing of catalog) {
+    const nameKey = key(packing.name);
+    if (nameKey && !map.has(nameKey)) map.set(nameKey, packing);
+    for (const alias of packing.aliases ?? []) {
+      const aliasKey = key(alias);
+      if (aliasKey && !map.has(aliasKey)) map.set(aliasKey, packing);
+    }
+    const familyKey = key(packing.batchFamily);
+    if (familyKey && !map.has(familyKey)) map.set(familyKey, packing);
+  }
+  packingByExactKeyCache.set(catalog, map);
+  return map;
+}
+
+function resolvePackingForLineName(
   name: string,
   catalog: PackingMatchRow[],
   context?: PackingMatchContext,
@@ -121,11 +143,7 @@ export function findPackingForLineName(
   const k = key(name);
   if (!k) return null;
 
-  let hit =
-    catalog.find((p) => key(p.name) === k) ??
-    catalog.find((p) => (p.aliases ?? []).some((alias) => key(alias) === k)) ??
-    catalog.find((p) => key(p.batchFamily) === k) ??
-    null;
+  let hit = packingByExactKey(catalog).get(k) ?? null;
   if (hit) return hit;
 
   const lineKey = matchKeyForName(name);
@@ -146,4 +164,29 @@ export function findPackingForLineName(
   }
 
   return null;
+}
+
+export function findPackingForLineName(
+  name: string,
+  catalog: PackingMatchRow[],
+  context?: PackingMatchContext,
+): PackingMatchRow | null {
+  // Context-sensitive Rhino sizing cannot share the plain-name cache.
+  if (context?.parentLineName) {
+    return resolvePackingForLineName(name, catalog, context);
+  }
+
+  const cacheKey = key(name);
+  if (!cacheKey) return null;
+
+  let byName = packingByNameResultCache.get(catalog);
+  if (!byName) {
+    byName = new Map();
+    packingByNameResultCache.set(catalog, byName);
+  }
+  if (byName.has(cacheKey)) return byName.get(cacheKey) ?? null;
+
+  const hit = resolvePackingForLineName(name, catalog, context);
+  byName.set(cacheKey, hit);
+  return hit;
 }

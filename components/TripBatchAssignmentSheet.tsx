@@ -18,7 +18,7 @@ import { type ProductionBatchPoolItem } from "@/lib/batchVolume";
 import { isMixedSampleLine, resolveMixedSampleParts } from "@/lib/mixedSampleBox";
 import {
   augmentPoolWithReadyBatches,
-  batchPickerOptionsForComponent,
+  buildBatchPickerOptionsByProduct,
   buildStaticBatchPickerOptions,
   type ReadyLotLike,
 } from "@/lib/readyBatchPool";
@@ -336,21 +336,23 @@ export function TripBatchAssignmentSheet({
   }, [catalog, orders]);
 
   const staticOptionsByProduct = useMemo(() => {
-    const map = new Map<string, SelectOption[]>();
+    const names: string[] = [];
     for (const model of lineModels) {
-      const names = model.multiBatch
-        ? model.parts.map((part) => part.productName)
-        : [model.line.productName];
-      for (const name of names) {
-        if (!map.has(name)) {
-          map.set(
-            name,
-            buildStaticBatchPickerOptions(
-              batchPickerOptionsForComponent(name, augmentedProductionBatches, readyBatchLots, catalog),
-            ),
-          );
-        }
+      if (model.multiBatch) {
+        for (const part of model.parts) names.push(part.productName);
+      } else {
+        names.push(model.line.productName);
       }
+    }
+    const optionsByProduct = buildBatchPickerOptionsByProduct(
+      names,
+      augmentedProductionBatches,
+      readyBatchLots,
+      catalog,
+    );
+    const map = new Map<string, SelectOption[]>();
+    for (const [name, options] of optionsByProduct) {
+      map.set(name, buildStaticBatchPickerOptions(options));
     }
     return map;
   }, [augmentedProductionBatches, catalog, lineModels, readyBatchLots]);

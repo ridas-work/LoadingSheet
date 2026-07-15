@@ -349,52 +349,40 @@ function packingMatchRowsForCatalog(catalog: CatalogProduct[]) {
   return mapped;
 }
 
+/** Prefill known catalog names/aliases/families so later lookups are O(1). */
+function catalogProductKeyIndex(catalog: CatalogProduct[]): Map<string, string | null> {
+  let byName = catalogProductKeyCache.get(catalog);
+  if (byName) return byName;
+
+  byName = new Map();
+  for (const p of catalog) {
+    const family = (p.batchFamily?.trim() || p.name.trim()).toLowerCase();
+    if (!family) continue;
+    const nameKey = p.name.trim().toLowerCase();
+    if (nameKey) byName.set(nameKey, family);
+    for (const alias of p.aliases ?? []) {
+      const aliasKey = alias.trim().toLowerCase();
+      if (aliasKey) byName.set(aliasKey, family);
+    }
+    const familyKey = p.batchFamily?.trim().toLowerCase();
+    if (familyKey) byName.set(familyKey, family);
+  }
+  catalogProductKeyCache.set(catalog, byName);
+  return byName;
+}
+
 export function catalogProductKey(productName: string, catalog: CatalogProduct[]): string | null {
   const key = productName.trim().toLowerCase();
   if (!key) return null;
 
-  let byName = catalogProductKeyCache.get(catalog);
-  if (!byName) {
-    byName = new Map();
-    catalogProductKeyCache.set(catalog, byName);
-  }
+  const byName = catalogProductKeyIndex(catalog);
   if (byName.has(key)) return byName.get(key) ?? null;
 
-  let result: string | null = null;
-
-  for (const p of catalog) {
-    const family = (p.batchFamily?.trim() || p.name.trim()).toLowerCase();
-    if (p.name.trim().toLowerCase() === key) {
-      result = family;
-      break;
-    }
-    for (const alias of p.aliases ?? []) {
-      if (alias.trim().toLowerCase() === key) {
-        result = family;
-        break;
-      }
-    }
-    if (result !== null) break;
-  }
-
-  if (result === null) {
-    for (const p of catalog) {
-      const family = (p.batchFamily?.trim() || p.name.trim()).toLowerCase();
-      if (family === key) {
-        result = family;
-        break;
-      }
-    }
-  }
-
-  if (result === null) {
-    const packing = findPackingForLineName(productName, packingMatchRowsForCatalog(catalog));
-    if (packing) {
-      result = (packing.batchFamily?.trim() || packing.name.trim()).toLowerCase();
-    } else {
-      result = batchProductMatchKey(productName) || key;
-    }
-  }
+  // Unknown free-text (custom PO line) — resolve once via packing match, then cache.
+  const packing = findPackingForLineName(productName, packingMatchRowsForCatalog(catalog));
+  const result = packing
+    ? (packing.batchFamily?.trim() || packing.name.trim()).toLowerCase()
+    : batchProductMatchKey(productName) || key;
 
   byName.set(key, result);
   return result;

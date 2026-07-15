@@ -9,9 +9,8 @@ import { CartonWeightInput } from "@/components/CartonWeightInput";
 import { PrintCartonLabelsButton } from "@/components/PrintCartonLabelsButton";
 import {
   augmentPoolWithReadyBatches,
-  batchPickerOptionsForComponent,
+  buildBatchPickerOptionsByProduct,
   buildStaticBatchPickerOptions,
-  type BatchPickerOption,
   type ReadyLotLike,
 } from "@/lib/readyBatchPool";
 import { PrintSheetButton } from "@/components/PrintSheetButton";
@@ -335,26 +334,20 @@ export function LoadingSheetBatchEditor({
   );
 
   const optionsByProduct = useMemo(() => {
-    const map = new Map<string, BatchPickerOption[]>();
+    const names: string[] = [];
     for (const line of sheetLines) {
-      const names = lineHasComponentBatches(line, catalog)
-        ? resolveLineParts(line, catalog).map((part) => part.productName)
-        : [line.productName];
-      for (const name of names) {
-        if (!map.has(name)) {
-          map.set(
-            name,
-            batchPickerOptionsForComponent(
-              name,
-              augmentedProductionBatches,
-              readyBatchLots as ReadyLotLike[],
-              catalog,
-            ),
-          );
-        }
+      if (lineHasComponentBatches(line, catalog)) {
+        for (const part of resolveLineParts(line, catalog)) names.push(part.productName);
+      } else {
+        names.push(line.productName);
       }
     }
-    return map;
+    return buildBatchPickerOptionsByProduct(
+      names,
+      augmentedProductionBatches,
+      readyBatchLots as ReadyLotLike[],
+      catalog,
+    );
   }, [augmentedProductionBatches, catalog, readyBatchLots, sheetLines]);
 
   const staticOptionsByProduct = useMemo(() => {
