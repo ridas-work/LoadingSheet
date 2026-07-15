@@ -314,37 +314,90 @@ export type OrderSheetLineInput = {
   bottlesPerBox?: number;
 };
 
+/** Per-catalog memo of productName → batch family key (avoids O(catalog) scans on every picker rebuild). */
+const catalogProductKeyCache = new WeakMap<object, Map<string, string | null>>();
+const packingMatchRowsCache = new WeakMap<object, Array<{
+  code: string;
+  name: string;
+  aliases?: string[];
+  batchFamily?: string;
+}>>();
+
+function packingMatchRowsForCatalog(catalog: CatalogProduct[]) {
+  const existing = packingMatchRowsCache.get(catalog);
+  if (existing) return existing;
+
+  const first = catalog[0] as { code?: string } | undefined;
+  if (first && typeof first.code === "string") {
+    const rows = catalog as unknown as Array<{
+      code: string;
+      name: string;
+      aliases?: string[];
+      batchFamily?: string;
+    }>;
+    packingMatchRowsCache.set(catalog, rows);
+    return rows;
+  }
+
+  const mapped = catalog.map((p) => ({
+    code: p.name,
+    name: p.name,
+    aliases: p.aliases,
+    batchFamily: p.batchFamily,
+  }));
+  packingMatchRowsCache.set(catalog, mapped);
+  return mapped;
+}
+
 export function catalogProductKey(productName: string, catalog: CatalogProduct[]): string | null {
   const key = productName.trim().toLowerCase();
   if (!key) return null;
 
+  let byName = catalogProductKeyCache.get(catalog);
+  if (!byName) {
+    byName = new Map();
+    catalogProductKeyCache.set(catalog, byName);
+  }
+  if (byName.has(key)) return byName.get(key) ?? null;
+
+  let result: string | null = null;
+
   for (const p of catalog) {
     const family = (p.batchFamily?.trim() || p.name.trim()).toLowerCase();
-    if (p.name.trim().toLowerCase() === key) return family;
+    if (p.name.trim().toLowerCase() === key) {
+      result = family;
+      break;
+    }
     for (const alias of p.aliases ?? []) {
-      if (alias.trim().toLowerCase() === key) return family;
+      if (alias.trim().toLowerCase() === key) {
+        result = family;
+        break;
+      }
+    }
+    if (result !== null) break;
+  }
+
+  if (result === null) {
+    for (const p of catalog) {
+      const family = (p.batchFamily?.trim() || p.name.trim()).toLowerCase();
+      if (family === key) {
+        result = family;
+        break;
+      }
     }
   }
 
-  for (const p of catalog) {
-    const family = (p.batchFamily?.trim() || p.name.trim()).toLowerCase();
-    if (family === key) return family;
+  if (result === null) {
+    const packing = findPackingForLineName(productName, packingMatchRowsForCatalog(catalog));
+    if (packing) {
+      result = (packing.batchFamily?.trim() || packing.name.trim()).toLowerCase();
+    } else {
+      result = batchProductMatchKey(productName) || key;
+    }
   }
 
-  const packing = findPackingForLineName(
-    productName,
-    catalog.map((p) => ({
-      code: p.name,
-      name: p.name,
-      aliases: p.aliases,
-      batchFamily: p.batchFamily,
-    })),
-  );
-  if (packing) {
-    return (packing.batchFamily?.trim() || packing.name.trim()).toLowerCase();
-  }
-
-  return batchProductMatchKey(productName) || key;
+  byName.set(key, result);
+  return result;
 }
 
 /** Unique key for batch usage when the same batch no is used for different products. */

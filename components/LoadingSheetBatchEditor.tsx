@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 
+import { CartonWeightInput } from "@/components/CartonWeightInput";
 import { PrintCartonLabelsButton } from "@/components/PrintCartonLabelsButton";
 import {
   augmentPoolWithReadyBatches,
   batchPickerOptionsForComponent,
   buildSelectableBatchPickerOptions,
+  type BatchPickerOption,
   type ReadyLotLike,
 } from "@/lib/readyBatchPool";
 import { PrintSheetButton } from "@/components/PrintSheetButton";
@@ -340,6 +342,35 @@ export function LoadingSheetBatchEditor({
     [catalog, workingLines],
   );
 
+  const workingLinesByBox = useMemo(() => {
+    const map = new Map<number, (typeof workingLines)[number]>();
+    for (const line of workingLines) map.set(line.boxNo, line);
+    return map;
+  }, [workingLines]);
+
+  const optionsByProduct = useMemo(() => {
+    const map = new Map<string, BatchPickerOption[]>();
+    for (const line of sheetLines) {
+      const names = lineHasComponentBatches(line, catalog)
+        ? resolveLineParts(line, catalog).map((part) => part.productName)
+        : [line.productName];
+      for (const name of names) {
+        if (!map.has(name)) {
+          map.set(
+            name,
+            batchPickerOptionsForComponent(
+              name,
+              augmentedProductionBatches,
+              readyBatchLots as ReadyLotLike[],
+              catalog,
+            ),
+          );
+        }
+      }
+    }
+    return map;
+  }, [augmentedProductionBatches, catalog, readyBatchLots, sheetLines]);
+
   const validation = useMemo(() => {
     const batchResult = validateSheetBatchAllocations(workingLines, effectiveBatchDefs, catalog);
     if (!batchResult.ok) return batchResult;
@@ -347,17 +378,6 @@ export function LoadingSheetBatchEditor({
     if (!readyResult.ok) return readyResult;
     return batchResult;
   }, [catalog, effectiveBatchDefs, readyByBox, workingLines]);
-
-  const batchesForRow = useCallback(
-    (productName: string) =>
-      batchPickerOptionsForComponent(
-        productName,
-        augmentedProductionBatches,
-        readyBatchLots as ReadyLotLike[],
-        catalog,
-      ),
-    [augmentedProductionBatches, catalog, readyBatchLots],
-  );
 
   const canSaveDispatch = validation.ok && !saving;
 
@@ -757,8 +777,9 @@ export function LoadingSheetBatchEditor({
                             parts.map((part, index) => {
                               const stateKey = componentBatchStateKey(parts, index);
                               const compSplit = lineSplit?.components?.[index];
-                              const options = batchesForRow(part.productName);
+                              const options = optionsByProduct.get(part.productName) ?? [];
                               const value = componentBatches[row.boxNo]?.[stateKey] ?? "";
+                              const workingLine = workingLinesByBox.get(row.boxNo);
                               return (
                                 <div key={stateKey} className="text-left">
                                   <div className="text-[10px] font-medium text-zinc-600 print:hidden">
@@ -788,23 +809,13 @@ export function LoadingSheetBatchEditor({
                                     <option value="">— assign batch</option>
                                     {buildSelectableBatchPickerOptions({
                                       productName: part.productName,
-                                      options: options,
+                                      options,
                                       catalog,
                                       usedElsewhereMap,
                                       usedOnSheetMap: currentOrderUsedByBatch,
-                                      litersNeeded: lineLitersForProduct(
-                                        workingLines.find((line) => line.boxNo === row.boxNo) ?? {
-                                          boxNo: row.boxNo,
-                                          productName: row.productName,
-                                          bottlesPerBox: row.bottlesPerBox,
-                                          lineKind: row.lineKind,
-                                          mixedContents: row.mixedContents,
-                                          batchNo: "",
-                                          componentBatches: [],
-                                        },
-                                        part.productName,
-                                        catalog,
-                                      ),
+                                      litersNeeded: workingLine
+                                        ? lineLitersForProduct(workingLine, part.productName, catalog)
+                                        : 0,
                                       selectedBatchNo: value,
                                     }).map((option) => (
                                       <option key={option.batchNo} value={option.batchNo}>
@@ -835,23 +846,16 @@ export function LoadingSheetBatchEditor({
                                 <option value="">— assign batch</option>
                                 {buildSelectableBatchPickerOptions({
                                   productName: row.productName,
-                                  options: batchesForRow(row.productName),
+                                  options: optionsByProduct.get(row.productName) ?? [],
                                   catalog,
                                   usedElsewhereMap,
                                   usedOnSheetMap: currentOrderUsedByBatch,
-                                  litersNeeded: lineLitersForProduct(
-                                    workingLines.find((line) => line.boxNo === row.boxNo) ?? {
-                                      boxNo: row.boxNo,
-                                      productName: row.productName,
-                                      bottlesPerBox: row.bottlesPerBox,
-                                      lineKind: row.lineKind,
-                                      mixedContents: row.mixedContents,
-                                      batchNo: batches[row.boxNo] ?? "",
-                                      componentBatches: [],
-                                    },
-                                    row.productName,
-                                    catalog,
-                                  ),
+                                  litersNeeded: (() => {
+                                    const workingLine = workingLinesByBox.get(row.boxNo);
+                                    return workingLine
+                                      ? lineLitersForProduct(workingLine, row.productName, catalog)
+                                      : 0;
+                                  })(),
                                   selectedBatchNo: batches[row.boxNo] ?? "",
                                 }).map((option) => (
                                   <option key={option.batchNo} value={option.batchNo}>
@@ -869,27 +873,23 @@ export function LoadingSheetBatchEditor({
                     </td>
                     <td className="border border-black px-1 py-1 text-center">
                       {showWeightInputs ? (
-                        <div className="space-y-0.5 print:hidden">
-                          <input
-                            type="text"
-                            inputMode="decimal"
+                        <div className="print:hidden">
+                          <CartonWeightInput
                             value={cartonWeightRaw}
                             placeholder={standardKg != null ? String(standardKg) : ""}
-                            onChange={(e) => {
+                            error={cartonWeightError}
+                            onValueChange={(next) => {
                               setSaved(false);
                               setError(null);
                               setCartonWeights((prev) => ({
                                 ...prev,
-                                [row.boxNo]: e.target.value,
+                                [row.boxNo]: next,
                               }));
                             }}
                             className={`w-full min-w-[4rem] rounded border px-1 py-0.5 text-center text-sm ${
                               cartonWeightError ? "border-red-400" : "border-zinc-300"
                             }`}
                           />
-                          {cartonWeightError ? (
-                            <p className="text-[9px] text-red-700">{cartonWeightError}</p>
-                          ) : null}
                         </div>
                       ) : (
                         displayCartonKg
